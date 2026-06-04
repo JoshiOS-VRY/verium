@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Vericonomy Wallet (Alpha)",
+  "productName": "Vericonomy Wallet Alpha",
   "version": "1.0.0-alpha.1",
   "identifier": "com.vericonomy.wallet.desktop",
   "build": {
