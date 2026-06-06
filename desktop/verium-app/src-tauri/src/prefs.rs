@@ -70,6 +70,15 @@ pub struct UserPreferences {
     /// Optional VRM/USD price assumption for solo revenue estimates.
     #[serde(default)]
     pub mining_vrm_price_usd: Option<f64>,
+    /// VRM address for official pool payouts (Stratum username prefix).
+    #[serde(default)]
+    pub pool_payout_address: Option<String>,
+    /// Worker suffix for official pool mining (`ADDRESS.worker`).
+    #[serde(default)]
+    pub pool_worker_name: Option<String>,
+    /// Last selected mining tab: `solo` or `pool`.
+    #[serde(default)]
+    pub mining_mode: Option<String>,
     /// "system" (follow OS), "light", or "dark". Defaults to "system".
     #[serde(default = "default_theme_mode")]
     pub theme_mode: String,
@@ -134,7 +143,7 @@ fn default_notify_on_vrc_received() -> bool {
 }
 
 fn default_tx_template() -> String {
-    "https://staging-explorer.vericonomy.com/vrm/tx/%s".to_string()
+    "https://explorer.vericonomy.com/vrm/tx/%s".to_string()
 }
 
 impl Default for UserPreferences {
@@ -164,6 +173,9 @@ impl Default for UserPreferences {
             mining_power_watts: None,
             mining_cost_per_kwh: None,
             mining_vrm_price_usd: None,
+            pool_payout_address: None,
+            pool_worker_name: None,
+            mining_mode: None,
             theme_mode: default_theme_mode(),
             wallet_unlock_duration_seconds: default_wallet_unlock_duration(),
             wallet_unlock_duration_by_coin: None,
@@ -200,6 +212,9 @@ pub struct PartialUserPreferences {
     pub mining_power_watts: Option<f64>,
     pub mining_cost_per_kwh: Option<f64>,
     pub mining_vrm_price_usd: Option<f64>,
+    pub pool_payout_address: Option<String>,
+    pub pool_worker_name: Option<String>,
+    pub mining_mode: Option<String>,
     pub theme_mode: Option<String>,
     pub wallet_unlock_duration_seconds: Option<u32>,
     pub wallet_unlock_duration_by_coin: Option<HashMap<String, u32>>,
@@ -371,6 +386,11 @@ pub fn merge(current: UserPreferences, partial: PartialUserPreferences) -> UserP
         mining_vrm_price_usd: partial
             .mining_vrm_price_usd
             .or(current.mining_vrm_price_usd),
+        pool_payout_address: partial
+            .pool_payout_address
+            .or(current.pool_payout_address),
+        pool_worker_name: partial.pool_worker_name.or(current.pool_worker_name),
+        mining_mode: partial.mining_mode.or(current.mining_mode),
         theme_mode: partial.theme_mode.unwrap_or(current.theme_mode),
         wallet_unlock_duration_seconds: partial
             .wallet_unlock_duration_seconds

@@ -4,6 +4,7 @@ import { useChainSynced } from "@/hooks/useChainSynced";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { subscribeChainTip } from "@/lib/chain-tip-store";
+import { addSeenTxid } from "@/lib/seen-txid-set";
 import { walletTransactionsQueryKey } from "@/lib/wallet-transactions-query";
 import { type TransactionItem } from "@/lib/rpc/client";
 
@@ -65,13 +66,19 @@ export function useBlockMinedWatcher(): void {
   // chime fires on the same instant the block appears.
   useEffect(() => {
     const queryKey = walletTransactionsQueryKey(VERIUM);
+    let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
     const recheck = () => {
       void queryClient.invalidateQueries({ queryKey });
     };
-    return subscribeChainTip(VERIUM, () => {
+    const unsub = subscribeChainTip(VERIUM, () => {
       recheck();
-      window.setTimeout(recheck, TIP_RECHECK_MS);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(recheck, TIP_RECHECK_MS);
     });
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      unsub();
+    };
   }, [queryClient]);
 
   useEffect(() => {
@@ -84,7 +91,7 @@ export function useBlockMinedWatcher(): void {
       for (const tx of mined) {
         const t = tx.blocktime ?? tx.time ?? 0;
         if (t > 0 && nowSec - t > FRESH_MINED_SEED_GRACE_SEC) {
-          seenTxids.current.add(tx.txid);
+          addSeenTxid(seenTxids.current, tx.txid);
         }
       }
       initialized.current = true;
@@ -95,7 +102,7 @@ export function useBlockMinedWatcher(): void {
     for (const tx of sorted) {
       if (seenTxids.current.has(tx.txid)) continue;
 
-      seenTxids.current.add(tx.txid);
+      addSeenTxid(seenTxids.current, tx.txid);
       if (!syncedRef.current) continue;
 
       emitBlockMined({

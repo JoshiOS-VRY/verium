@@ -49,6 +49,7 @@ export function MinerHashrateDisplay({
       unitClassName={unitClassName}
       spinnerClassName={spinnerClassName}
       fallback={fallback ?? "—"}
+      immediate={!booting && value != null}
     />
   );
 }

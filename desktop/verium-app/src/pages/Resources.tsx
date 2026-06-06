@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Cpu,
   Download,
   Globe,
   HardDriveDownload,
@@ -26,6 +27,7 @@ import {
   DOCS_HOME,
   EXPLORER_HOME,
 } from "@/lib/verium-links";
+import { POOL_WEB_URL } from "@/lib/verium-pool";
 import releases from "@/lib/releases-manifest.json";
 
 interface ResourceCardProps {
@@ -84,6 +86,13 @@ export function Resources() {
           description="Browse blocks, transactions, peers, and the rich list on the official Verium explorer."
           href={EXPLORER_HOME}
           cta="Open explorer"
+        />
+        <ResourceCard
+          icon={Cpu}
+          title="Official Verium pool"
+          description="PPLNS CPU mining pool with per-address dashboards, worker stats, and automatic payouts."
+          href={POOL_WEB_URL}
+          cta="Open pool"
         />
         <ResourceCard
           icon={HardDriveDownload}

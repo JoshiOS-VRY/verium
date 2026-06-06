@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { CoinId } from "@/lib/coin/profile";
+import { migrateExplorerPrefs } from "@/lib/explorer-links";
 import { DEFAULT_TX_EXPLORER_TEMPLATE } from "@/lib/verium-links";
 import type { ThemeMode } from "@/lib/theme";
 import { DEFAULT_WALLET_UNLOCK_SECONDS } from "@/lib/wallet-unlock";
@@ -34,6 +35,12 @@ export interface UserPreferences {
   mining_cost_per_kwh?: number;
   /** Optional VRM/USD price for solo revenue estimates; blank uses live explorer price. */
   mining_vrm_price_usd?: number;
+  /** VRM address for official pool payouts (Stratum username prefix). */
+  pool_payout_address?: string;
+  /** Worker suffix for official pool mining (ADDRESS.worker). */
+  pool_worker_name?: string;
+  /** Last selected mining tab on the Mining page. */
+  mining_mode?: "solo" | "pool";
   theme_mode?: ThemeMode;
   /** @deprecated use wallet_unlock_duration_by_coin */
   wallet_unlock_duration_seconds?: number;
@@ -65,6 +72,9 @@ const DEFAULT_PREFS: UserPreferences = {
   mining_reward_address_mode: "dynamic",
   mining_reward_address: "",
   auto_mine_threads: 2,
+  pool_payout_address: "",
+  pool_worker_name: "wallet",
+  mining_mode: "pool",
   theme_mode: "system",
   wallet_unlock_duration_seconds: DEFAULT_WALLET_UNLOCK_SECONDS,
   wallet_unlock_duration_by_coin: {
@@ -89,6 +99,13 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
           ...merged.setup_completed_by_coin,
           verium: true,
         };
+      }
+      const explorerMigration = migrateExplorerPrefs(merged);
+      if (explorerMigration) {
+        Object.assign(merged, explorerMigration);
+        await invoke<UserPreferences>("set_user_preferences", {
+          partial: explorerMigration,
+        });
       }
       set({
         prefs: merged,

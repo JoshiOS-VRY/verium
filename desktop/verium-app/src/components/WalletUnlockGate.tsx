@@ -30,7 +30,7 @@ export function WalletUnlockGate({
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: 5_000,
+    refetchInterval: false,
   });
 
   if (wallet.isLoading) {

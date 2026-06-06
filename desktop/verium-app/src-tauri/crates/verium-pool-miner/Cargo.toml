@@ -1,0 +1,21 @@
+[package]
+name = "verium-pool-miner"
+version = "0.1.0"
+edition = "2021"
+description = "Native Stratum pool miner for the Vericonomy wallet (scrypt² + share reconstruction)."
+
+[dependencies]
+hex = "0.4"
+libc = "0.2"
+num-bigint = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+tracing = "0.1"
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+serde_json = "1"

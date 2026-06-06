@@ -131,21 +131,19 @@ impl CoinId {
         }
     }
 
-    /// Base for wallet compatibility API on the staging explorer-v2. The legacy
-    /// per-coin hosts (`explorer-vrm`/`explorer-vrc`) are retired; the wallet
-    /// reads legacy-shaped JSON from the `/v1/:chain/wallet/*` compat routes.
+    /// Base for wallet compatibility API on the production explorer-v2.
     pub fn explorer_api_base(self) -> &'static str {
         match self {
-            CoinId::Verium => "https://staging-explorer.vericonomy.com/v1/vrm/wallet",
-            CoinId::Vericoin => "https://staging-explorer.vericonomy.com/v1/vrc/wallet",
+            CoinId::Verium => "https://explorer.vericonomy.com/v1/vrm/wallet",
+            CoinId::Vericoin => "https://explorer.vericonomy.com/v1/vrc/wallet",
         }
     }
 
     pub fn explorer_logo_url(self) -> &'static str {
         match self {
-            CoinId::Verium => "https://staging-explorer.vericonomy.com/img/vericonomy/verium-logo.svg",
+            CoinId::Verium => "https://explorer.vericonomy.com/img/vericonomy/verium-logo.svg",
             CoinId::Vericoin => {
-                "https://staging-explorer.vericonomy.com/img/vericonomy/vericoin-logo.svg"
+                "https://explorer.vericonomy.com/img/vericonomy/vericoin-logo.svg"
             }
         }
     }

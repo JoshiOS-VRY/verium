@@ -1,0 +1,13 @@
+Verium Miner — first run
+========================
+
+1. Open PowerShell or cmd in this folder.
+2. Run the setup wizard (creates your wallet/pool config):
+
+   cpuminer.exe --setup
+
+3. Start mining:
+
+   cpuminer.exe
+
+Optional: copy cpuminer-conf.example.json and edit by hand instead of --setup.

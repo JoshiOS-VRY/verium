@@ -10,7 +10,9 @@ import { useWebAudioGestureUnlock } from "@/lib/web-audio";
 import { PasskeyGate } from "@/components/PasskeyGate";
 import { useAutoLock } from "@/hooks/useAutoLock";
 import { useScheduledBackup } from "@/hooks/useScheduledBackup";
+import { useMiningPollCoordinator } from "@/hooks/useMiningPollCoordinator";
 import { useAdaptiveMiningThreads } from "@/hooks/useAdaptiveMiningThreads";
+import { useWalletInfoPollCoordinator } from "@/hooks/useWalletInfoPollCoordinator";
 import { useAutoMine } from "@/hooks/useAutoMine";
 import { useAutoStake } from "@/hooks/useAutoStake";
 import { useBlockMinedSound } from "@/hooks/useBlockMinedSound";
@@ -29,6 +31,7 @@ import { isCoinSetupComplete } from "@/lib/setup";
 import { useTheme } from "@/hooks/useTheme";
 import { useDeepLinkHandler } from "@/hooks/useDeepLinkHandler";
 import { ToastHost } from "@/components/ToastHost";
+import { MemoryDiagnosticsPanel } from "@/components/MemoryDiagnosticsPanel";
 
 const Setup = lazy(() =>
   import("@/pages/Setup").then((m) => ({ default: m.Setup })),
@@ -102,6 +105,8 @@ function SetupRedirect() {
 function AppHooks() {
   const prefs = useUserPreferences((s) => s.prefs);
   useAutoMine();
+  useMiningPollCoordinator();
+  useWalletInfoPollCoordinator();
   useAdaptiveMiningThreads();
   useAutoStake();
   useAutoLock();
@@ -140,6 +145,7 @@ function AppRoutes() {
       <AppHooks />
       <SetupRedirect />
       <ToastHost />
+      <MemoryDiagnosticsPanel />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/setup" element={<Setup />} />

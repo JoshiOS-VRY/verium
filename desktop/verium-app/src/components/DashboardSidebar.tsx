@@ -11,7 +11,6 @@ import {
 import { ExplorerLink } from "@/components/ExplorerLink";
 import { YourMiningPanel } from "@/components/YourMiningPanel";
 import { fetchExplorerStats, isExplorerApiEnabled } from "@/lib/explorer-api";
-import { miningInfoRefetchMs } from "@/lib/mining-boot";
 import { networkHashToKhm } from "@/lib/mining-revenue";
 import { rpcGetMiningInfo, rpcGetWalletInfo } from "@/lib/rpc/client";
 import { formatCoinAmount } from "@/lib/units";
@@ -38,12 +37,6 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: visible ? 10_000 : false,
   });
-  const mining = useQuery({
-    queryKey: coinQueryKey(coin, "getmininginfo"),
-    queryFn: () => rpcGetMiningInfo(coin),
-    refetchInterval: () =>
-      visible && coin === "verium" ? miningInfoRefetchMs() : false,
-  });
   const explorerEnabled = useQuery({
     queryKey: ["explorer-api-enabled"],
     queryFn: isExplorerApiEnabled,
@@ -55,6 +48,17 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
     enabled: explorerEnabled.data === true,
     refetchInterval: visible ? 60_000 : false,
     retry: 0,
+  });
+  const mining = useQuery({
+    queryKey: coinQueryKey(coin, "getmininginfo"),
+    queryFn: () => rpcGetMiningInfo(coin),
+    enabled:
+      visible &&
+      coin === "verium" &&
+      explorerEnabled.data === true &&
+      stats.data?.network_hash == null,
+    staleTime: 60_000,
+    refetchInterval: false,
   });
 
   const explorerHeight = stats.data?.height;

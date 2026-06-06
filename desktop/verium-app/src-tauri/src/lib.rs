@@ -1,3 +1,4 @@
+mod block_height_cache;
 mod node;
 mod addressbook;
 mod audit_log;
@@ -12,8 +13,13 @@ mod dace_commands;
 mod daemon;
 mod error;
 mod explorer_api;
+mod pool_api;
+mod pool_miner;
+mod pool_miner_sidecar;
 mod features;
 mod gpu_miner;
+mod http_shared;
+mod memory_telemetry;
 mod hardware_wallet;
 mod installer_verify;
 mod logs;
@@ -70,6 +76,7 @@ pub fn run() {
             });
             app.manage(state);
             app.manage(gpu_miner::GpuMinerHandle::new());
+            app.manage(pool_miner::PoolMinerHandle::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -144,6 +151,18 @@ pub fn run() {
             commands::fetch_explorer_peers_cmd,
             commands::get_explorer_logo_url,
             commands::is_explorer_api_enabled,
+            commands::is_pool_api_enabled_cmd,
+            commands::fetch_pool_stats_cmd,
+            commands::fetch_miner_overview_cmd,
+            commands::fetch_miner_hashrate_history_cmd,
+            commands::fetch_pool_payout_summary_cmd,
+            commands::fetch_miner_payouts_cmd,
+            pool_miner::pool_miner_detect,
+            pool_miner::pool_miner_memory_limits,
+            pool_miner::pool_miner_status,
+            pool_miner::pool_miner_log_lines,
+            pool_miner::pool_miner_start,
+            pool_miner::pool_miner_stop,
             commands::ensure_daemon_connected,
             commands::repair_chain,
             commands::node_retry,
@@ -228,6 +247,8 @@ pub fn run() {
             security_commands::verify_installation,
             security_commands::parse_payment_uri,
             security_commands::build_payment_uri,
+            memory_telemetry::get_memory_diagnostics,
+            memory_telemetry::set_node_state_listener_count,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

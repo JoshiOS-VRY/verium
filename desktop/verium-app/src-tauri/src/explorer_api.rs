@@ -7,11 +7,15 @@ use tokio::sync::Mutex;
 
 use crate::coin_profile::CoinId;
 use crate::error::{AppError, AppResult};
+use crate::http_shared::shared_http_client;
 
 pub const EXPLORER_API_ENABLED: bool = true;
 
 const CACHE_TTL: Duration = Duration::from_secs(30);
 const PEERS_CACHE_TTL: Duration = Duration::from_secs(300);
+const MAX_EXTRACTION_CACHE_KEYS: usize = 32;
+const HTTP_TIMEOUT: Duration = Duration::from_secs(12);
+const HTTP_USER_AGENT: &str = "vericonomy-desktop-app/0.1";
 
 fn explorer_api_url(coin: CoinId, path: &str) -> String {
     let base = coin.explorer_api_base();
@@ -132,10 +136,22 @@ static CACHE: once_cell::sync::Lazy<Mutex<HashMap<CoinId, CoinCache>>> =
     once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
 fn http_client() -> AppResult<reqwest::Client> {
-    Ok(reqwest::Client::builder()
-        .timeout(Duration::from_secs(12))
-        .user_agent("vericonomy-desktop-app/0.1")
-        .build()?)
+    shared_http_client(HTTP_TIMEOUT, HTTP_USER_AGENT)
+}
+
+fn evict_stale_extractions(map: &mut HashMap<String, TimedEntry<Vec<ExplorerExtractionEntry>>>) {
+    map.retain(|_, entry| entry.at.elapsed() < CACHE_TTL);
+    while map.len() > MAX_EXTRACTION_CACHE_KEYS {
+        if let Some(oldest_key) = map
+            .iter()
+            .min_by_key(|(_, entry)| entry.at)
+            .map(|(k, _)| k.clone())
+        {
+            map.remove(&oldest_key);
+        } else {
+            break;
+        }
+    }
 }
 
 async fn get_json(client: &reqwest::Client, url: &str) -> AppResult<Value> {
@@ -473,6 +489,7 @@ async fn write_extraction_cache(
                 value: entries,
             },
         );
+        evict_stale_extractions(&mut c.extractions);
     })
     .await;
 }

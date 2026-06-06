@@ -43,7 +43,7 @@ export function useAdaptiveMiningThreads() {
   const minerState = useQuery({
     queryKey: coinQueryKey(VERIUM, "get_miner_state"),
     queryFn: () => rpcGetMinerState(VERIUM),
-    refetchInterval: 5_000,
+    refetchInterval: false,
     enabled,
   });
 

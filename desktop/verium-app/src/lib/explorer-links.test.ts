@@ -6,8 +6,8 @@ import {
   explorerTemplateTargetsOtherChain,
 } from "@/lib/explorer-links";
 
-const VRM_TX = "https://staging-explorer.vericonomy.com/vrm/tx/%s";
-const VRC_TX = "https://staging-explorer.vericonomy.com/vrc/tx/%s";
+const VRM_TX = "https://explorer.vericonomy.com/vrm/tx/%s";
+const VRC_TX = "https://explorer.vericonomy.com/vrc/tx/%s";
 
 describe("explorerTemplateTargetsOtherChain", () => {
   it("detects vrm template when active coin is vericoin", () => {
@@ -31,6 +31,11 @@ describe("effectiveTxExplorerTemplate", () => {
 
   it("keeps stored vrm template for verium", () => {
     expect(effectiveTxExplorerTemplate("verium", VRM_TX)).toBe(VRM_TX);
+  });
+
+  it("migrates legacy staging host to production default", () => {
+    const staging = "https://staging-explorer.vericonomy.com/vrm/tx/%s";
+    expect(effectiveTxExplorerTemplate("verium", staging)).toBe(VRM_TX);
   });
 });
 

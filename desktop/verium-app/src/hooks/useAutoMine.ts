@@ -66,14 +66,14 @@ export function useAutoMine() {
   const wallet = useQuery({
     queryKey: coinQueryKey(VERIUM, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(VERIUM),
-    refetchInterval: 5_000,
+    refetchInterval: false,
     enabled: loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
   });
 
   const minerState = useQuery({
     queryKey: coinQueryKey(VERIUM, "get_miner_state"),
     queryFn: () => rpcGetMinerState(VERIUM),
-    refetchInterval: 5_000,
+    refetchInterval: false,
     enabled: loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
   });
 

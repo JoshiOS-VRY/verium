@@ -2,14 +2,17 @@
 
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 use crate::error::{AppError, AppResult};
+use crate::memory_telemetry::{track_background_task_end, track_background_task_start};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +33,8 @@ pub struct GpuMinerStatus {
 pub struct GpuMinerHandle {
     child: Mutex<Option<Child>>,
     status: Mutex<GpuMinerStatus>,
+    cancel: Arc<AtomicBool>,
+    tasks: Mutex<Vec<JoinHandle<()>>>,
 }
 
 impl GpuMinerHandle {
@@ -37,6 +42,8 @@ impl GpuMinerHandle {
         Self {
             child: Mutex::new(None),
             status: Mutex::new(GpuMinerStatus::default()),
+            cancel: Arc::new(AtomicBool::new(true)),
+            tasks: Mutex::new(Vec::new()),
         }
     }
 
@@ -44,17 +51,33 @@ impl GpuMinerHandle {
         self.status.lock().await.clone()
     }
 
+    async fn abort_tasks(&self) {
+        self.cancel.store(true, Ordering::Release);
+        let mut tasks = self.tasks.lock().await;
+        for handle in tasks.drain(..) {
+            handle.abort();
+        }
+    }
+
     pub async fn stop(&self) -> AppResult<()> {
+        self.abort_tasks().await;
         let mut guard = self.child.lock().await;
         if let Some(mut child) = guard.take() {
             let _ = child.kill().await;
+            let _ = child.wait().await;
         }
         let mut st = self.status.lock().await;
         st.running = false;
         Ok(())
     }
 
-    pub async fn start(&self, cfg: &GpuMinerConfig, rpc_url: &str, rpc_user: &str, rpc_pass: &str) -> AppResult<()> {
+    pub async fn start(
+        &self,
+        cfg: &GpuMinerConfig,
+        rpc_url: &str,
+        rpc_user: &str,
+        rpc_pass: &str,
+    ) -> AppResult<()> {
         if !cfg.enabled {
             return Err(AppError::other("GPU miner is disabled (experimental opt-in)"));
         }
@@ -76,40 +99,81 @@ impl GpuMinerHandle {
         }
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        let mut child = cmd.spawn().map_err(|e| AppError::other(format!("GPU miner spawn failed: {e}")))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| AppError::other(format!("GPU miner spawn failed: {e}")))?;
         let stdout = child.stdout.take();
-        let status = Arc::new(Mutex::new(GpuMinerStatus {
-            running: true,
-            ..GpuMinerStatus::default()
-        }));
-        *self.status.lock().await = status.lock().await.clone();
+        let stderr = child.stderr.take();
+
+        {
+            let mut st = self.status.lock().await;
+            st.running = true;
+            st.last_log_line.clear();
+            st.hashrate = 0.0;
+        }
         *self.child.lock().await = Some(child);
 
+        self.cancel.store(false, Ordering::Release);
+        let status = Arc::new(Mutex::new(self.status.lock().await.clone()));
+        let cancel = Arc::clone(&self.cancel);
+
+        let mut tasks = self.tasks.lock().await;
         if let Some(out) = stdout {
-            let status_clone = Arc::clone(&status);
-            tokio::spawn(async move {
-                let reader = BufReader::new(out);
-                let mut lines = reader.lines();
-                while let Ok(Some(line)) = lines.next_line().await {
-                    let mut st = status_clone.lock().await;
-                    st.last_log_line = line.clone();
-                    if let Some(hr) = parse_hashrate(&line) {
-                        st.hashrate = hr;
-                    }
-                }
-                let mut st = status_clone.lock().await;
-                st.running = false;
-            });
+            tasks.push(spawn_log_reader(
+                Arc::clone(&status),
+                Arc::clone(&cancel),
+                out,
+            ));
+        }
+        if let Some(err) = stderr {
+            tasks.push(spawn_log_reader(
+                Arc::clone(&status),
+                Arc::clone(&cancel),
+                err,
+            ));
         }
 
         Ok(())
     }
 }
 
+fn spawn_log_reader(
+    status: Arc<Mutex<GpuMinerStatus>>,
+    cancel: Arc<AtomicBool>,
+    stream: impl tokio::io::AsyncRead + Unpin + Send + 'static,
+) -> JoinHandle<()> {
+    track_background_task_start();
+    tokio::spawn(async move {
+        let _guard = TaskGuard;
+        let reader = BufReader::new(stream);
+        let mut lines = reader.lines();
+        while !cancel.load(Ordering::Acquire) {
+            let next = lines.next_line().await;
+            let Ok(Some(line)) = next else { break };
+            let mut st = status.lock().await;
+            st.last_log_line = line.clone();
+            if let Some(hr) = parse_hashrate(&line) {
+                st.hashrate = hr;
+            }
+        }
+        let mut st = status.lock().await;
+        st.running = false;
+    })
+}
+
+struct TaskGuard;
+
+impl Drop for TaskGuard {
+    fn drop(&mut self) {
+        track_background_task_end();
+    }
+}
+
 fn parse_hashrate(line: &str) -> Option<f64> {
     for token in line.split_whitespace() {
         if let Ok(v) = token.parse::<f64>() {
-            if line.to_lowercase().contains("hash") || line.contains("H/s") || line.contains("H/m") {
+            if line.to_lowercase().contains("hash") || line.contains("H/s") || line.contains("H/m")
+            {
                 return Some(v);
             }
         }
@@ -135,5 +199,7 @@ pub async fn gpu_miner_start(
     rpc_user: String,
     rpc_pass: String,
 ) -> AppResult<()> {
-    handle.start(&config, &rpc_url, &rpc_user, &rpc_pass).await
+    handle
+        .start(&config, &rpc_url, &rpc_user, &rpc_pass)
+        .await
 }

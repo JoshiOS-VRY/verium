@@ -401,7 +401,7 @@ function VeriumSummaryCard() {
   const data = useDashboardData(coin);
   const statusRow = buildHeroStatusRow(data, explorerEnabled);
 
-  const localHashrate = data.mining.data?.hashrate ?? 0;
+  const localHashrate = data.localHashrate;
   const networkHashKhm =
     data.explorer.data?.network_hash != null
       ? networkHashToKhm(data.explorer.data.network_hash)
@@ -443,13 +443,14 @@ function VeriumSummaryCard() {
                 value={localHashrate > 0 ? localHashrate : undefined}
                 fractionDigits={0}
                 className="font-semibold text-fg"
+                immediate={data.miningActive}
               />
             }
-            sub={data.minerActive ? "On" : "Off"}
+            sub={data.miningActive ? "On" : "Off"}
             subClassName={
-              data.minerActive ? "font-semibold text-success" : undefined
+              data.miningActive ? "font-semibold text-success" : undefined
             }
-            active={data.minerActive}
+            active={data.miningActive}
           />
           <StatBox
             icon={<Wallet />}

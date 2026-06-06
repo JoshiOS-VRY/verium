@@ -12,6 +12,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+dotenvy = "0.15"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -50,6 +51,7 @@ totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
 urlencoding = "2"
 zeroize = { version = "1", features = ["derive"] }
 sysinfo = "0.33"
+verium-pool-miner = { path = "crates/verium-pool-miner" }
 
 [features]
 default = ["custom-protocol"]

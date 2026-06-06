@@ -563,6 +563,24 @@ export function Settings() {
                   placeholder={defaultAddressExplorerTemplate(activeCoin)}
                   mono
                 />
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() =>
+                      void updatePrefs({
+                        explorer_tx_url_template:
+                          defaultTxExplorerTemplate(activeCoin),
+                        explorer_block_url_template:
+                          defaultBlockExplorerTemplate(activeCoin),
+                        explorer_address_url_template:
+                          defaultAddressExplorerTemplate(activeCoin),
+                      })
+                    }
+                  >
+                    Reset to production defaults
+                  </Button>
+                </div>
               </section>
             </CardContent>
           )}

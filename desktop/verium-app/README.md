@@ -95,7 +95,8 @@ Global hooks mount once in `App.tsx`: theme, auto-mine, block-mined watcher/soun
 | `addressbook.rs` | `addressbook.json` CRUD |
 | `bootstrap.rs` | Chain snapshot download from CDN |
 | `logs.rs` | Tail `debug.log`, corruption/sync-stall detection |
-| `explorer_api.rs` | Proxy to public explorer REST API |
+| `explorer_api.rs` | Proxy to production explorer `/v1/:chain/wallet/*` compat API |
+| `pool_api.rs` | Pool stats (`pool.vericonomy.com/api/stats`) and Supabase read RPCs for miner dashboard |
 | `updates.rs` | Version check (CDN + bundled manifest) |
 | `wsl.rs` | Windows WSL dev: start/stop/rebuild `veriumd` in Linux |
 
@@ -212,6 +213,8 @@ VERIUMD_LOCAL=/path/to/veriumd npm run fetch:veriumd
 
 # Offline placeholder (cargo check / manifest validation only — node won't run)
 npm run fetch:veriumd:stub
+
+**Pool miner dashboard (optional):** Copy `.env.example` to `src-tauri/.env` or `src-tauri/../.env` and set `POOL_SUPABASE_ANON_KEY` (public anon key from the verium-pool project). Global pool stats on the dashboard work without it via `https://pool.vericonomy.com/api/stats`.
 
 # Skip re-download if sidecar already present (used in CI build)
 npm run fetch:veriumd:if-missing

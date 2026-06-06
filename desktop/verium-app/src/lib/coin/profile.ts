@@ -12,7 +12,7 @@ export interface CoinProfile {
   defaultP2pPort: number;
   earnMode: "mining" | "staking";
   confirmationsMatured: number;
-  /** Staging explorer-v2 host (see Rust `explorer_api_base` for the `/v1/:chain/wallet` API path). */
+  /** Production explorer host (see Rust `explorer_api_base` for `/v1/:chain/wallet`). */
   explorerApiBase: string;
   bootstrapCdn: string;
   accentClass: string;
@@ -30,7 +30,7 @@ export const COIN_PROFILES: Record<CoinId, CoinProfile> = {
     defaultP2pPort: 36988,
     earnMode: "mining",
     confirmationsMatured: 100,
-    explorerApiBase: "https://staging-explorer.vericonomy.com",
+    explorerApiBase: "https://explorer.vericonomy.com",
     bootstrapCdn: "https://files.vericonomy.com/vrm/bootstrap",
     accentClass: "bg-accent/15 text-accent border-accent/30",
   },
@@ -46,7 +46,7 @@ export const COIN_PROFILES: Record<CoinId, CoinProfile> = {
     defaultP2pPort: 58684,
     earnMode: "staking",
     confirmationsMatured: 500,
-    explorerApiBase: "https://staging-explorer.vericonomy.com",
+    explorerApiBase: "https://explorer.vericonomy.com",
     bootstrapCdn: "https://files.vericonomy.com/vrc/bootstrap",
     accentClass: "bg-bg-panel text-fg-muted border-border-strong",
   },

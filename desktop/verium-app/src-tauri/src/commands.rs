@@ -45,6 +45,11 @@ use crate::explorer_api::{
     fetch_transactions, ExplorerBlock, ExplorerChainTip, ExplorerExtractionEntry, ExplorerPeerEntry,
     ExplorerStats, ExplorerTransaction, EXPLORER_API_ENABLED, explorer_logo_url,
 };
+use crate::pool_api::{
+    fetch_miner_hashrate_history, fetch_miner_overview, fetch_miner_payouts, fetch_pool_payout_summary,
+    fetch_pool_stats, is_pool_api_enabled, HashratePoint, MinerOverview, MinerPayoutsResult,
+    PoolPayoutSummary, PoolStats,
+};
 use crate::logs::{
     current_log_session, detect_chain_corruption_session,
     detect_datadir_lock_conflict, detect_node_starting, detect_reindex_active_session,
@@ -192,6 +197,7 @@ pub async fn shutdown_all_vericonomy_processes(
     app: Option<&AppHandle>,
     state: &AppState,
     gpu: Option<&crate::gpu_miner::GpuMinerHandle>,
+    pool_miner: Option<&crate::pool_miner::PoolMinerHandle>,
     stop_all_coins: bool,
 ) {
     if SHUTDOWN_ONCE.swap(true, Ordering::SeqCst) {
@@ -209,6 +215,13 @@ pub async fn shutdown_all_vericonomy_processes(
         emit_shutdown_progress(app, "gpu", "Stopping GPU miner…", 12.0);
         if let Err(e) = gpu.stop().await {
             tracing::warn!("shutdown: GPU miner stop failed: {e}");
+        }
+    }
+
+    if let Some(pool) = pool_miner {
+        emit_shutdown_progress(app, "pool-miner", "Stopping pool miner…", 15.0);
+        if let Err(e) = pool.stop().await {
+            tracing::warn!("shutdown: pool miner stop failed: {e}");
         }
     }
 
@@ -262,7 +275,7 @@ pub async fn shutdown_all_vericonomy_processes(
 
 /// Stop earn mode and daemons when the wallet UI closes.
 pub async fn shutdown_daemon_on_app_exit(state: &AppState) {
-    shutdown_all_vericonomy_processes(None, state, None, true).await;
+    shutdown_all_vericonomy_processes(None, state, None, None, true).await;
 }
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(20);
@@ -272,12 +285,14 @@ pub async fn graceful_shutdown_and_exit(app: AppHandle) {
     tracing::info!("graceful_shutdown: starting");
     if let Some(state) = app.try_state::<AppState>() {
         let gpu = app.try_state::<crate::gpu_miner::GpuMinerHandle>();
+        let pool = app.try_state::<crate::pool_miner::PoolMinerHandle>();
         match tokio::time::timeout(
             SHUTDOWN_TIMEOUT,
             shutdown_all_vericonomy_processes(
                 Some(&app),
                 state.inner(),
                 gpu.as_ref().map(|s| s.inner()),
+                pool.as_ref().map(|s| s.inner()),
                 true,
             ),
         )
@@ -305,6 +320,7 @@ pub fn run_shutdown_on_exit(app: &AppHandle) {
         .spawn(move || {
             if let Some(state) = app.try_state::<AppState>() {
                 let gpu = app.try_state::<crate::gpu_miner::GpuMinerHandle>();
+                let pool = app.try_state::<crate::pool_miner::PoolMinerHandle>();
                 let _ = tauri::async_runtime::block_on(async {
                     tokio::time::timeout(
                         Duration::from_secs(15),
@@ -312,6 +328,7 @@ pub fn run_shutdown_on_exit(app: &AppHandle) {
                             Some(&app),
                             state.inner(),
                             gpu.as_ref().map(|s| s.inner()),
+                            pool.as_ref().map(|s| s.inner()),
                             true,
                         ),
                     )
@@ -1573,30 +1590,21 @@ async fn enrich_transaction_block_heights(
         return Ok(());
     };
 
-    let mut hashes = HashSet::new();
+    let mut needed = HashSet::new();
     for tx in rows.iter() {
         if tx.get("blockheight").is_some() {
             continue;
         }
         if let Some(hash) = tx.get("blockhash").and_then(Value::as_str) {
-            hashes.insert(hash.to_string());
+            needed.insert(hash.to_string());
         }
     }
 
-    let mut height_by_hash: HashMap<String, u64> = HashMap::new();
-    for hash in hashes {
-        match client
-            .call::<Value>("getblock", json!([hash, 1]))
-            .await
-        {
-            Ok(block) => {
-                if let Some(height) = block.get("height").and_then(Value::as_u64) {
-                    height_by_hash.insert(hash, height);
-                }
-            }
-            Err(e) => tracing::debug!("list_transactions: getblock {hash}: {e}"),
-        }
+    if needed.is_empty() {
+        return Ok(());
     }
+
+    let height_by_hash = crate::block_height_cache::resolve_block_heights(client, needed).await;
 
     for tx in rows.iter_mut() {
         if tx.get("blockheight").is_some() {
@@ -3107,6 +3115,45 @@ pub async fn fetch_explorer_peers_cmd(coin: String) -> AppResult<Vec<ExplorerPee
 pub fn get_explorer_logo_url(coin: String) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
     Ok(explorer_logo_url(coin))
+}
+
+#[tauri::command]
+pub fn is_pool_api_enabled_cmd() -> bool {
+    is_pool_api_enabled()
+}
+
+#[tauri::command]
+pub async fn fetch_pool_stats_cmd() -> AppResult<PoolStats> {
+    fetch_pool_stats().await
+}
+
+#[tauri::command]
+pub async fn fetch_miner_overview_cmd(address: String) -> AppResult<Option<MinerOverview>> {
+    fetch_miner_overview(address).await
+}
+
+#[tauri::command]
+pub async fn fetch_miner_hashrate_history_cmd(
+    address: String,
+    hours: Option<u32>,
+    bucket_seconds: Option<u32>,
+    smooth_seconds: Option<u32>,
+) -> AppResult<Vec<HashratePoint>> {
+    fetch_miner_hashrate_history(address, hours, bucket_seconds, smooth_seconds).await
+}
+
+#[tauri::command]
+pub async fn fetch_pool_payout_summary_cmd() -> AppResult<PoolPayoutSummary> {
+    fetch_pool_payout_summary().await
+}
+
+#[tauri::command]
+pub async fn fetch_miner_payouts_cmd(
+    address: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> AppResult<MinerPayoutsResult> {
+    fetch_miner_payouts(address, limit.unwrap_or(20), offset.unwrap_or(0)).await
 }
 
 /// Start the managed daemon when RPC is down.

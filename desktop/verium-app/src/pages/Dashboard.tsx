@@ -3,6 +3,7 @@ import { BackupHealthCard } from "@/components/BackupHealthCard";
 import { DashboardHero } from "@/components/DashboardHero";
 import { DashboardMiddleRow } from "@/components/DashboardMiddleRow";
 import { ExplorerRecentBlocks } from "@/components/ExplorerRecentBlocks";
+import { PoolStatsStrip } from "@/components/pool/PoolStatsStrip";
 import { useActiveCoin } from "@/lib/coin/context";
 import { useIsTestNetwork } from "@/lib/network-mode";
 
@@ -15,6 +16,7 @@ export function Dashboard() {
       <BootstrapBanner />
       <DashboardHero coin={coin} />
       <DashboardMiddleRow coin={coin} />
+      {coin === "verium" && !isTestNetwork && <PoolStatsStrip />}
       {!isTestNetwork && (
         <ExplorerRecentBlocks coin={coin} variant="dashboard" />
       )}

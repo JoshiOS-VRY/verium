@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 
 import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import type { ExplorerBlock } from "@/lib/explorer-api";
 import { pushChainTip } from "@/lib/chain-tip-store";
 import { walletTransactionsQueryKey } from "@/lib/wallet-transactions-query";
 
@@ -12,11 +11,12 @@ interface ChainTipPayload {
   height: number;
   hash: string;
   time: number;
-  block: ExplorerBlock | null;
 }
 
 /** Delay before refreshing the explorer feed so it can index the new block. */
 const ENRICH_DELAY_MS = 4_000;
+/** Coalesce burst tip events during sync (avoids invalidation storms). */
+const INVALIDATE_DEBOUNCE_MS = 3_000;
 
 /**
  * Listens for `chain-tip-changed` events from the node watcher, pushes them
@@ -29,6 +29,24 @@ export function useChainTipWatcher(): void {
   useEffect(() => {
     let cancelled = false;
     let enrichTimer: number | undefined;
+    let invalidateTimer: number | undefined;
+
+    const scheduleInvalidations = (coin: CoinId) => {
+      if (invalidateTimer != null) window.clearTimeout(invalidateTimer);
+      invalidateTimer = window.setTimeout(() => {
+        void queryClient.invalidateQueries({
+          queryKey: coinQueryKey(coin, "getblockchaininfo"),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: coinQueryKey(coin, "getwalletinfo"),
+        });
+        // Wallet txs are heavy (listtransactions + header lookups) — refresh
+        // on a slower cadence; block-found watchers also use chain-tip events.
+        void queryClient.invalidateQueries({
+          queryKey: walletTransactionsQueryKey(coin),
+        });
+      }, INVALIDATE_DEBOUNCE_MS);
+    };
 
     const unlistenPromise = listen<ChainTipPayload>("chain-tip-changed", (event) => {
       if (cancelled) return;
@@ -39,18 +57,9 @@ export function useChainTipWatcher(): void {
         height: payload.height,
         hash: payload.hash,
         time: payload.time,
-        block: payload.block ?? undefined,
       });
 
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(payload.coin, "getblockchaininfo"),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(payload.coin, "getwalletinfo"),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: walletTransactionsQueryKey(payload.coin),
-      });
+      scheduleInvalidations(payload.coin);
 
       if (enrichTimer != null) window.clearTimeout(enrichTimer);
       enrichTimer = window.setTimeout(() => {
@@ -61,6 +70,7 @@ export function useChainTipWatcher(): void {
     return () => {
       cancelled = true;
       if (enrichTimer != null) window.clearTimeout(enrichTimer);
+      if (invalidateTimer != null) window.clearTimeout(invalidateTimer);
       void unlistenPromise.then((unlisten) => unlisten());
     };
   }, [queryClient]);

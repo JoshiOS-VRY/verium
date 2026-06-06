@@ -1,11 +1,12 @@
 import type { CoinId } from "@/lib/coin/profile";
 
-/** V2 explorer web UI (external links only — API fetches stay on production explorers). */
-export const EXPLORER_LINK_BASE = "https://staging-explorer.vericonomy.com";
+/** V2 explorer web UI (external links only — API fetches use `/v1/:chain/wallet`). */
+export const EXPLORER_LINK_BASE = "https://explorer.vericonomy.com";
 
 const LEGACY_EXPLORER_HOSTS = [
   "https://explorer-vrm.vericonomy.com",
   "https://explorer-vrc.vericonomy.com",
+  "https://staging-explorer.vericonomy.com",
 ];
 
 export function explorerChainPath(coin: CoinId): "vrm" | "vrc" {
@@ -20,7 +21,7 @@ export function explorerHome(coin: CoinId): string {
   return `${chainBase(coin)}/`;
 }
 
-/** Logo asset URL — served from the staging explorer-v2 web app. */
+/** Logo asset URL — served from the production explorer web app. */
 export function explorerLogoUrl(coin: CoinId): string {
   const slug = coin === "verium" ? "verium" : "vericoin";
   return `${EXPLORER_LINK_BASE}/img/vericonomy/${slug}-logo.svg`;
@@ -62,6 +63,51 @@ export function explorerProfitabilityHash(_coin: CoinId): string {
 
 function isLegacyExplorerUrl(url: string): boolean {
   return LEGACY_EXPLORER_HOSTS.some((host) => url.startsWith(host));
+}
+
+/** Rewrite alpha staging explorer URLs to production (one-time prefs migration). */
+export function migrateStagingExplorerTemplate(template: string): string {
+  if (!template.includes("staging-explorer.vericonomy.com")) return template;
+  return template.replaceAll(
+    "staging-explorer.vericonomy.com",
+    "explorer.vericonomy.com",
+  );
+}
+
+/** Apply staging → production migration to all explorer URL prefs. */
+export function migrateExplorerPrefs(
+  prefs: Partial<{
+    explorer_tx_url_template?: string;
+    explorer_block_url_template?: string;
+    explorer_address_url_template?: string;
+  }>,
+): Partial<{
+  explorer_tx_url_template: string;
+  explorer_block_url_template?: string;
+  explorer_address_url_template?: string;
+}> | null {
+  const tx = prefs.explorer_tx_url_template;
+  const block = prefs.explorer_block_url_template;
+  const addr = prefs.explorer_address_url_template;
+  const nextTx = tx ? migrateStagingExplorerTemplate(tx) : undefined;
+  const nextBlock = block ? migrateStagingExplorerTemplate(block) : undefined;
+  const nextAddr = addr ? migrateStagingExplorerTemplate(addr) : undefined;
+  if (
+    nextTx === tx &&
+    nextBlock === block &&
+    nextAddr === addr
+  ) {
+    return null;
+  }
+  return {
+    ...(nextTx && nextTx !== tx ? { explorer_tx_url_template: nextTx } : {}),
+    ...(nextBlock && nextBlock !== block
+      ? { explorer_block_url_template: nextBlock }
+      : {}),
+    ...(nextAddr && nextAddr !== addr
+      ? { explorer_address_url_template: nextAddr }
+      : {}),
+  };
 }
 
 function otherCoin(coin: CoinId): CoinId {

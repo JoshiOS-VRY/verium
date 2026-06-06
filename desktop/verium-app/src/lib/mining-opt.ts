@@ -71,8 +71,6 @@ export async function isOnAcPower(): Promise<boolean> {
 }
 
 export const MINING_THREADS_MIN = 1;
-/** Fallback when CPU topology is not available yet. */
-export const MINING_THREADS_FALLBACK_MAX = 64;
 
 /** Logical CPUs reported by the OS / topology probe (for display). */
 export function detectedLogicalCpus(topology: CpuTopology | undefined): number {
@@ -82,7 +80,7 @@ export function detectedLogicalCpus(topology: CpuTopology | undefined): number {
   if (typeof navigator !== "undefined" && navigator.hardwareConcurrency) {
     return Math.max(MINING_THREADS_MIN, navigator.hardwareConcurrency);
   }
-  return MINING_THREADS_FALLBACK_MAX;
+  return 2;
 }
 
 /**
@@ -104,10 +102,7 @@ export function triedToMineOnAllLogicalCpus(
   return detected > 1 && threads >= detected;
 }
 
-export function clampMiningThreads(
-  n: number,
-  max = MINING_THREADS_FALLBACK_MAX,
-): number {
+export function clampMiningThreads(n: number, max: number): number {
   return Math.max(
     MINING_THREADS_MIN,
     Math.min(max, n || MINING_THREADS_MIN),
@@ -125,9 +120,9 @@ export function optimizedMiningThreads(topology: CpuTopology | undefined): numbe
   return clampMiningThreads(n, max);
 }
 
-/** Max threads for auto-adjust (device-tuned ceiling from topology). */
+/** Max threads for auto-adjust — logical CPUs − 1. */
 export function adaptiveMiningCeiling(topology: CpuTopology | undefined): number {
-  return optimizedMiningThreads(topology);
+  return maxMiningThreads(topology);
 }
 
 export type AdaptiveLoadSignal = "high" | "low" | "neutral";

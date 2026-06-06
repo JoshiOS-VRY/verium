@@ -20,11 +20,16 @@ export function isMinerBooting(
 
 /** React Query refetch interval for local mining hashrate (`getmininginfo`). */
 export function miningInfoRefetchMs(
-  _active?: boolean,
-  _hashrate?: number,
-  _startedAt?: number,
-  _legacyIdleMs?: number,
-  _legacyActiveMs?: number,
-): number {
-  return MINING_HASHRATE_POLL_MS;
+  active?: boolean,
+  hashrate?: number,
+  startedAt?: number,
+): number | false {
+  if (!active) return false;
+  if (hashrate !== undefined && hashrate > 0) return MINING_HASHRATE_POLL_MS;
+  if (!startedAt) return MINING_HASHRATE_POLL_MS;
+  if (Date.now() / 1000 - startedAt < MINER_BOOT_GRACE_SECONDS) {
+    return MINING_HASHRATE_POLL_MS;
+  }
+  // Active but zero hashrate past boot grace — slow poll only.
+  return MINING_HASHRATE_POLL_MS * 3;
 }

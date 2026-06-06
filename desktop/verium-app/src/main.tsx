@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,22 +8,20 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
       retry: 1,
-      staleTime: 2_000,
-      // Bound retained response payloads: drop inactive (unmounted) query data
-      // after 5 minutes so a long-running session does not accumulate cached
-      // responses for views the user has navigated away from.
-      gcTime: 5 * 60_000,
+      staleTime: 10_000,
+      // Aggressive cache eviction to keep WebView2 memory bounded.
+      gcTime: 30_000,
     },
   },
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>,
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </QueryClientProvider>,
 );

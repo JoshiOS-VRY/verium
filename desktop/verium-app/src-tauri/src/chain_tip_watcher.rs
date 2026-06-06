@@ -11,7 +11,8 @@ use tokio::time::sleep;
 
 use crate::coin_profile::CoinId;
 use crate::commands::rpc_reachable;
-use crate::explorer_api::{invalidate_blocks_cache, ExplorerBlock};
+use crate::explorer_api::invalidate_blocks_cache;
+use crate::memory_telemetry::{track_background_task_end, track_background_task_start};
 use crate::rpc::RpcClient;
 use crate::state::AppState;
 
@@ -37,7 +38,9 @@ pub fn spawn_chain_tip_watchers(app: AppHandle, state: AppState) {
         let state = state.clone();
         let coin = *coin;
         tauri::async_runtime::spawn(async move {
+            track_background_task_start();
             watch_loop(app, state, coin).await;
+            track_background_task_end();
         });
     }
 }
@@ -121,11 +124,10 @@ async fn emit_tip(
     height: u64,
     hash: &str,
 ) {
-    let block = fetch_block_detail(client, height, hash).await;
-    let time = block.as_ref().map(|b| b.time).unwrap_or(0);
+    // Lightweight header lookup only — avoid getblock verbosity 2 (full block + txs)
+    // which allocates megabytes per tip and crosses IPC to the WebView.
+    let time = block_header_time(client, hash).await.unwrap_or(0);
 
-    // Let the next explorer fetch bypass the 30s cache so enrichment
-    // (miner address, reward) lands quickly behind the instant node row.
     invalidate_blocks_cache(coin).await;
 
     let payload = json!({
@@ -133,105 +135,11 @@ async fn emit_tip(
         "height": height,
         "hash": hash,
         "time": time,
-        "block": block,
     });
     let _ = app.emit("chain-tip-changed", payload);
 }
 
-/// Build an `ExplorerBlock`-shaped row entirely from the node. Verbosity 2
-/// returns full transactions, so we derive the "Out" (total output value) and
-/// "Extracted by" (coinbase/coinstake address) columns locally — no waiting on
-/// the explorer to index the block. Explorer enrichment still runs behind this
-/// to confirm/backfill, but the row is complete the moment the block arrives.
-async fn fetch_block_detail(
-    client: &RpcClient,
-    height: u64,
-    hash: &str,
-) -> Option<ExplorerBlock> {
-    let block: Value = client.call("getblock", json!([hash, 2])).await.ok()?;
-    let time = block.get("time").and_then(Value::as_u64).unwrap_or(0);
-    let txs = block.get("tx").and_then(Value::as_array);
-    let n_tx = block
-        .get("nTx")
-        .and_then(Value::as_u64)
-        .or_else(|| txs.map(|a| a.len() as u64));
-    let difficulty = block
-        .get("difficulty")
-        .and_then(Value::as_f64)
-        .map(|d| d.to_string());
-    let size = block
-        .get("strippedsize")
-        .and_then(Value::as_u64)
-        .or_else(|| block.get("size").and_then(Value::as_u64));
-    let mint = block
-        .get("mint")
-        .and_then(Value::as_f64)
-        .filter(|m| *m > 0.0)
-        .map(|m| format!("{m:.8}"));
-
-    let (output_total, output_count, miner_address) = txs
-        .map(|t| extract_block_outputs(t))
-        .unwrap_or((None, None, None));
-
-    Some(ExplorerBlock {
-        id: height,
-        hash: hash.to_string(),
-        height,
-        time,
-        mint,
-        difficulty,
-        n_tx,
-        miner_address,
-        size,
-        output_total,
-        output_count,
-    })
-}
-
-/// Sum every output value in the block (matches the explorer's total-output
-/// column) and pick the extraction address: the largest-value output of the
-/// first transaction that pays out (coinbase for PoW, coinstake for PoS).
-fn extract_block_outputs(txs: &[Value]) -> (Option<String>, Option<u64>, Option<String>) {
-    let mut total: f64 = 0.0;
-    let mut output_count: u64 = 0;
-    let mut miner: Option<String> = None;
-
-    for tx in txs {
-        let Some(vout) = tx.get("vout").and_then(Value::as_array) else {
-            continue;
-        };
-
-        let mut best_value = -1.0_f64;
-        let mut best_addr: Option<String> = None;
-        for out in vout {
-            let value = out.get("value").and_then(Value::as_f64).unwrap_or(0.0);
-            total += value;
-            output_count += 1;
-            if miner.is_none() && value > best_value {
-                if let Some(addr) = out
-                    .get("scriptPubKey")
-                    .and_then(|s| s.get("addresses"))
-                    .and_then(Value::as_array)
-                    .and_then(|a| a.first())
-                    .and_then(Value::as_str)
-                    .or_else(|| {
-                        out.get("scriptPubKey")
-                            .and_then(|s| s.get("address"))
-                            .and_then(Value::as_str)
-                    })
-                {
-                    best_value = value;
-                    best_addr = Some(addr.to_string());
-                }
-            }
-        }
-
-        if miner.is_none() {
-            miner = best_addr;
-        }
-    }
-
-    let output_total = (total > 0.0).then(|| format!("{total:.8}"));
-    let output_count = (output_count > 0).then_some(output_count);
-    (output_total, output_count, miner)
+async fn block_header_time(client: &RpcClient, hash: &str) -> Option<u64> {
+    let header: Value = client.call("getblockheader", json!([hash])).await.ok()?;
+    header.get("time").and_then(Value::as_u64)
 }

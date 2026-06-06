@@ -11,9 +11,9 @@ import {
 } from "@/lib/bootstrap-policy";
 import { useChainTip } from "@/lib/chain-tip-store";
 import { fetchExplorerStats } from "@/lib/explorer-api";
-import { miningInfoRefetchMs } from "@/lib/mining-boot";
 import { deriveDashboardActivity } from "@/lib/node/dashboard-activity";
 import { useExplorerQueriesEnabled } from "@/lib/network-mode";
+import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
 import {
   rpcGetBlockchainInfo,
   rpcGetMinerState,
@@ -37,13 +37,22 @@ export function useDashboardData(coin: CoinId) {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: visible ? 5_000 : false,
+    refetchInterval: (query) => {
+      if (!visible) return false;
+      const data = query.state.data;
+      const syncing =
+        data != null &&
+        data.headers != null &&
+        data.blocks != null &&
+        data.headers > data.blocks + 1;
+      return syncing ? 5_000 : 30_000;
+    },
   });
 
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
 
   const explorer = useQuery({
@@ -59,23 +68,34 @@ export function useDashboardData(coin: CoinId) {
   const minerState = useQuery({
     queryKey: coinQueryKey(coin, "get_miner_state"),
     queryFn: () => rpcGetMinerState(coin),
-    refetchInterval: visible ? 5_000 : false,
+    refetchInterval: false,
     enabled: coin === "verium",
   });
 
   const minerActive = minerState.data?.active ?? false;
   const minerStartedAt = minerState.data?.started_at;
 
+  const poolMiner = useQuery({
+    queryKey: ["pool-miner", "status"],
+    queryFn: fetchPoolMinerStatus,
+    refetchInterval: false,
+    gcTime: 30_000,
+    enabled: coin === "verium",
+  });
+
+  const poolMinerRunning = poolMiner.data?.running ?? false;
+  const poolHashrate = poolMiner.data?.hashrateHm ?? 0;
+  const miningActive = minerActive || poolMinerRunning;
+
   const mining = useQuery({
     queryKey: coinQueryKey(coin, "getmininginfo"),
     queryFn: () => rpcGetMiningInfo(coin),
-    refetchInterval: (query) => {
-      if (!visible || coin !== "verium") return false;
-      const hashrate = query.state.data?.hashrate ?? 0;
-      return miningInfoRefetchMs(minerActive, hashrate, minerStartedAt);
-    },
-    enabled: coin === "verium",
+    refetchInterval: false,
+    enabled: coin === "verium" && miningActive,
   });
+
+  const soloHashrate = mining.data?.hashrate ?? 0;
+  const localHashrate = poolMinerRunning ? poolHashrate : soloHashrate;
 
   const stakingState = useQuery({
     queryKey: coinQueryKey(coin, "get_staking_state"),
@@ -149,5 +169,9 @@ export function useDashboardData(coin: CoinId) {
     networkTip,
     minerActive,
     minerStartedAt,
+    poolMiner,
+    poolMinerRunning,
+    miningActive,
+    localHashrate,
   };
 }

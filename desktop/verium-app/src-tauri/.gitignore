@@ -3,4 +3,5 @@ gen/schemas
 Cargo.lock
 binaries/veriumd-*
 binaries/vericoind-*
+binaries/cpuminer-*
 !binaries/.gitkeep

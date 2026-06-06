@@ -34,21 +34,25 @@ export function YourMiningPanel() {
     transactions,
     explorer: explorerStats,
     minerActive,
+    poolMinerRunning,
+    miningActive,
+    localHashrate,
   } = useDashboardData(coin);
 
-  const localHashrate = mining.data?.hashrate ?? 0;
   const networkStats = buildNetworkStats(explorerStats.data, mining.data);
   const blocksFound =
     transactions.data?.filter(
       (t) => t.category === "generate" || t.category === "immature",
     ).length ?? 0;
   const immature = wallet.data?.immature_balance ?? 0;
-  const active = minerActive;
-  const minerBooting = isMinerBooting(
-    active,
-    localHashrate,
-    minerState.data?.started_at,
-  );
+  const active = miningActive;
+  const minerBooting = poolMinerRunning
+    ? localHashrate <= 0
+    : isMinerBooting(
+        minerActive,
+        localHashrate,
+        minerState.data?.started_at,
+      );
   const share = networkSharePercent(localHashrate, networkStats?.networkHash);
   const estBlockH = estimateHoursPerBlock(localHashrate, networkStats);
   const daily =

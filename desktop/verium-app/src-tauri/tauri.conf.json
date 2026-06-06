@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: asset: http://ipc.localhost https://staging-explorer.vericonomy.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' blob:"
+      "csp": "default-src 'self'; img-src 'self' data: blob: asset: http://ipc.localhost https://explorer.vericonomy.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' blob:"
     }
   },
   "plugins": {
@@ -47,7 +47,7 @@
     "shortDescription": "Vericonomy Wallet (Alpha)",
     "longDescription": "Modern desktop wallet for Verium (VRM) and Vericoin (VRC) with bundled veriumd and vericoind nodes, CPU mining, PoST staking, send/receive, transaction history, and chain bootstrap.",
     "publisher": "Vericonomy",
-    "externalBin": ["binaries/veriumd", "binaries/vericoind"],
+    "externalBin": ["binaries/veriumd", "binaries/vericoind", "binaries/cpuminer"],
     "resources": [],
     "copyright": "Copyright (c) Vericonomy",
     "linux": {

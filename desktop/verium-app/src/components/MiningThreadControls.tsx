@@ -21,8 +21,12 @@ interface MiningThreadControlsProps {
   /** Active miner thread count (when mining with auto-adjust). */
   activeThreads?: number;
   isMining?: boolean;
+  /** When false, hide the live CPU-load adjust hint (e.g. pool miner). */
+  liveAdaptive?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  /** Extra hint shown under manual thread input (e.g. pool RAM limits). */
+  memoryNote?: string;
   onAutoAdjustChange: (autoAdjust: boolean) => void;
   onManualThreadsChange: (threads: number) => void;
 }
@@ -36,8 +40,10 @@ export function MiningThreadControls({
   logicalCpus,
   activeThreads,
   isMining = false,
+  liveAdaptive = true,
   disabled = false,
   compact = false,
+  memoryNote,
   onAutoAdjustChange,
   onManualThreadsChange,
 }: MiningThreadControlsProps) {
@@ -114,11 +120,13 @@ export function MiningThreadControls({
             {suggestedThreads == null ? (
               " (detecting…)"
             ) : null}
-            {isMining ? (
+            {isMining && liveAdaptive ? (
               <>
                 {" "}
                 · adjusts every {ADAPTIVE_MINING_POLL_MS / 1000}s from CPU load
               </>
+            ) : isMining ? (
+              <> · restart mining to apply thread changes</>
             ) : null}
           </p>
         ) : (
@@ -144,6 +152,7 @@ export function MiningThreadControls({
               {cpuHint ? ` (${cpuHint})` : ""}. The UI shows up to {detected}{" "}
               CPUs, but mining is capped at {allowedMax} so one core stays free.
               Stop the miner before changing threads.
+              {memoryNote ? ` ${memoryNote}` : ""}
             </p>
           </div>
         )}

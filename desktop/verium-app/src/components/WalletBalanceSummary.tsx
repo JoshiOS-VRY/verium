@@ -2,27 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useActiveCoin } from "@/lib/coin/context";
 import { coinQueryKey } from "@/lib/coin/profile";
-import { rpcGetWalletInfo, type WalletInfo } from "@/lib/rpc/client";
+import { rpcGetWalletInfo } from "@/lib/rpc/client";
 import { formatCoinAmount } from "@/lib/units";
 import { coinMaturityConfirmations } from "@/lib/units";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-
-function walletScanProgress(
-  scanning: WalletInfo["scanning"],
-): { duration: number; progress: number } | null {
-  return typeof scanning === "object" ? scanning : null;
-}
 
 export function WalletBalanceSummary() {
   const coin = useActiveCoin();
-  const visible = useWindowVisible();
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: (query) => {
-      if (!visible) return false;
-      return walletScanProgress(query.state.data?.scanning) ? 3_000 : 10_000;
-    },
+    refetchInterval: false,
   });
 
   if (wallet.isLoading || !wallet.data) return null;
@@ -31,7 +20,8 @@ export function WalletBalanceSummary() {
   const unconfirmed = wallet.data.unconfirmed_balance;
   const immature = wallet.data.immature_balance;
   const total = spendable + unconfirmed + immature;
-  const scanning = walletScanProgress(wallet.data.scanning);
+  const scanning =
+    typeof wallet.data.scanning === "object" ? wallet.data.scanning : null;
   const mature = coinMaturityConfirmations(coin);
 
   return (

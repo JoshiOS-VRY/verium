@@ -1,6 +1,10 @@
 import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { useState, useEffect, useMemo } from "react";
+import { useMinerPayoutsQuery } from "@/hooks/usePoolQueries";
+import { resolvePoolDashboardAddress } from "@/lib/pool-dashboard-address";
+import { useUserPreferences } from "@/lib/user-preferences";
+import { rpcListAddressGroupings } from "@/lib/rpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { ChevronLeft, ChevronRight, ArrowDownLeft, ArrowUpRight } from "lucide-react";
@@ -98,6 +102,7 @@ function TransferModeToggle({
 export function Transactions() {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
+  const prefs = useUserPreferences((s) => s.prefs);
   const [mode, setMode] = useState<TransferMode>("send");
   const [prefill, setPrefill] = useState<{
     address?: string;
@@ -130,6 +135,31 @@ export function Transactions() {
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: visible ? 10_000 : false,
   });
+
+  const addressGroupings = useQuery({
+    queryKey: coinQueryKey(coin, "listaddressgroupings"),
+    queryFn: () => rpcListAddressGroupings(coin),
+    enabled: coin === "verium",
+    staleTime: 30_000,
+  });
+
+  const poolDashboardAddress = useMemo(
+    () =>
+      coin === "verium"
+        ? resolvePoolDashboardAddress(prefs, addressGroupings.data)
+        : undefined,
+    [coin, prefs, addressGroupings.data],
+  );
+
+  const poolPayouts = useMinerPayoutsQuery(
+    poolDashboardAddress,
+    coin === "verium",
+  );
+
+  const poolPayoutTxids = useMemo(() => {
+    const rows = poolPayouts.data?.rows ?? [];
+    return new Set(rows.map((p) => p.txid).filter((id): id is string => Boolean(id)));
+  }, [poolPayouts.data]);
 
   const walletTxCount = wallet.data?.txcount ?? 0;
   const historyCapped = walletTxCount > TRANSACTIONS_LIST_CAP;
@@ -437,11 +467,16 @@ export function Transactions() {
                           {new Date(tx.time * 1000).toLocaleString()}
                         </td>
                         <td className="px-4 py-2">
-                          <Badge
-                            className={transactionCategoryBadgeClass(tx.category)}
-                          >
-                            {transactionCategoryLabel(tx.category)}
-                          </Badge>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge
+                              className={transactionCategoryBadgeClass(tx.category)}
+                            >
+                              {transactionCategoryLabel(tx.category)}
+                            </Badge>
+                            {coin === "verium" && poolPayoutTxids.has(tx.txid) ? (
+                              <Badge tone="neutral">Pool payout</Badge>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="truncate px-4 py-2 text-xs">
                           {tx.address ?? "—"}

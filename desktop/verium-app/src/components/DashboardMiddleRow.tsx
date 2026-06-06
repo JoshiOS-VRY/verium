@@ -104,21 +104,29 @@ export function DashboardMiddleRow({ coin }: { coin: CoinId }) {
 
     minerActive,
 
+    poolMinerRunning,
+
+    miningActive,
+
+    localHashrate,
+
   } = useDashboardData(coin);
 
 
 
-  const localHashrate = mining.data?.hashrate ?? 0;
+  const minerBooting = poolMinerRunning
 
-  const minerBooting = isMinerBooting(
+    ? localHashrate <= 0
 
-    minerActive,
+    : isMinerBooting(
 
-    localHashrate,
+        minerActive,
 
-    minerState.data?.started_at,
+        localHashrate,
 
-  );
+        minerState.data?.started_at,
+
+      );
 
   const networkStats = buildNetworkStats(stats.data, mining.data);
 
@@ -412,7 +420,7 @@ export function DashboardMiddleRow({ coin }: { coin: CoinId }) {
 
                 <MiningPickaxeAnimation
 
-                  active={minerActive && !minerBooting}
+                  active={miningActive && !minerBooting}
 
                   booting={minerBooting}
 
@@ -422,7 +430,7 @@ export function DashboardMiddleRow({ coin }: { coin: CoinId }) {
 
               </CardTitle>
 
-              <MinerBootBadge booting={minerBooting} active={minerActive} />
+              <MinerBootBadge booting={minerBooting} active={miningActive} />
 
             </CardHeader>
 
@@ -451,6 +459,8 @@ export function DashboardMiddleRow({ coin }: { coin: CoinId }) {
                     fractionDigits={0}
 
                     className="font-semibold text-fg"
+
+                    immediate={miningActive}
 
                   />
 

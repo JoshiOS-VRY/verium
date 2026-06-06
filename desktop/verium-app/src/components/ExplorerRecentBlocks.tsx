@@ -1,4 +1,5 @@
 import { Blocks, Loader2, Pickaxe, Trophy } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -59,6 +60,10 @@ import {
 } from "@/lib/local-recent-block";
 
 import { explorerBlocksHash } from "@/lib/explorer-links";
+import {
+  isVeriumPoolMinerAddress,
+  VERIUM_POOL_DISPLAY_NAME,
+} from "@/lib/verium-pool-labels";
 
 import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
 import { formatCoinAmount } from "@/lib/units";
@@ -549,14 +554,22 @@ export function ExplorerRecentBlocks({
                               </span>
                             )
                           ) : block.miner_address ? (
-                            <ExplorerLink
-                              coin={coin}
-                              target={{
-                                kind: "address",
-                                address: block.miner_address,
-                              }}
-                              label={block.miner_address}
-                            />
+                            <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
+                              {isVerium &&
+                              isVeriumPoolMinerAddress(block.miner_address) ? (
+                                <Badge tone="neutral" className="shrink-0">
+                                  {VERIUM_POOL_DISPLAY_NAME}
+                                </Badge>
+                              ) : null}
+                              <ExplorerLink
+                                coin={coin}
+                                target={{
+                                  kind: "address",
+                                  address: block.miner_address,
+                                }}
+                                label={block.miner_address}
+                              />
+                            </span>
                           ) : (
                             "—"
                           )}

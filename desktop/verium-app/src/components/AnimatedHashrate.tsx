@@ -13,6 +13,8 @@ export interface AnimatedHashrateProps {
   fallback?: ReactNode;
   showTrendColor?: boolean;
   spinnerClassName?: string;
+  /** Skip spring animation — use while mining to reduce WebView churn. */
+  immediate?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export function AnimatedHashrate({
   fallback = "—",
   showTrendColor = true,
   spinnerClassName,
+  immediate = false,
 }: AnimatedHashrateProps) {
   if (booting) {
     return (
@@ -57,6 +60,7 @@ export function AnimatedHashrate({
         fallback={fallback}
         showTrendColor={showTrendColor}
         className={className}
+        immediate={immediate}
       />
       {unit && value != null && Number.isFinite(value) ? (
         <span
