@@ -392,6 +392,22 @@ jobs:
       - name: Backend unit tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
 
+      # create-dmg + TAURI_BUNDLER_DMG_IGNORE_CI=false: Tauri's bundle_dmg.sh uses
+      # create-dmg/Finder AppleScript for DMG layout; GitHub-hosted macOS runners
+      # often fail without the brew tool and with the default CI skip path (see
+      # tauri-apps/tauri-action#1003, #1091).
+      - name: macOS DMG bundler prerequisites
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          brew install create-dmg
+          echo "TAURI_BUNDLER_DMG_IGNORE_CI=false" >> "$GITHUB_ENV"
+          for vol in "/Volumes/Vericonomy Wallet Alpha" "/Volumes/Vericonomy Wallet (Alpha)"; do
+            if [ -d "$vol" ]; then
+              hdiutil detach "$vol" -force || true
+            fi
+          done
+
       - name: Tauri bundle
         run: npx tauri build --target ${{ matrix.target }}
         env:
