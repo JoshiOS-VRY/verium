@@ -1,6 +1,4 @@
 import { Blocks, Loader2, Pickaxe, Trophy } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
@@ -62,6 +60,7 @@ import {
 import { explorerBlocksHash } from "@/lib/explorer-links";
 import {
   isVeriumPoolMinerAddress,
+  resolveVeriumMinerExplorerAddress,
   VERIUM_POOL_DISPLAY_NAME,
 } from "@/lib/verium-pool-labels";
 
@@ -430,6 +429,15 @@ export function ExplorerRecentBlocks({
                       ? youMinedRowClassName({ isYours, isFresh, isTip })
                       : youStakedRowClassName({ isYours, isFresh, isTip });
 
+                    const poolMiner =
+                      isVerium &&
+                      Boolean(block.miner_address) &&
+                      isVeriumPoolMinerAddress(block.miner_address);
+                    const minerLinkAddress = block.miner_address
+                      ? (resolveVeriumMinerExplorerAddress(block.miner_address) ??
+                        block.miner_address)
+                      : null;
+
                     return (
                       <tr
                         key={block.hash}
@@ -553,23 +561,29 @@ export function ExplorerRecentBlocks({
                                 You
                               </span>
                             )
-                          ) : block.miner_address ? (
-                            <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
-                              {isVerium &&
-                              isVeriumPoolMinerAddress(block.miner_address) ? (
-                                <Badge tone="neutral" className="shrink-0">
-                                  {VERIUM_POOL_DISPLAY_NAME}
-                                </Badge>
-                              ) : null}
+                          ) : minerLinkAddress ? (
+                            poolMiner ? (
                               <ExplorerLink
                                 coin={coin}
                                 target={{
                                   kind: "address",
-                                  address: block.miner_address,
+                                  address: minerLinkAddress,
+                                }}
+                                label={VERIUM_POOL_DISPLAY_NAME}
+                                showIcon={false}
+                                title={minerLinkAddress}
+                                className="inline-flex max-w-full shrink-0 items-center rounded-full border border-border bg-bg-subtle px-2 py-0.5 text-xs font-medium text-fg-muted no-underline hover:border-border hover:bg-bg-subtle hover:text-fg"
+                              />
+                            ) : (
+                              <ExplorerLink
+                                coin={coin}
+                                target={{
+                                  kind: "address",
+                                  address: minerLinkAddress,
                                 }}
                                 label={block.miner_address}
                               />
-                            </span>
+                            )
                           ) : (
                             "—"
                           )}

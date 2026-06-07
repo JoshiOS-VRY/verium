@@ -30,6 +30,7 @@ import { coinQueryKey, COIN_PROFILES, type CoinId } from "@/lib/coin/profile";
 import {
   anyEnabledCoinSetupIncomplete,
   coinSetupCompletePatch,
+  fullNodeWalletExists,
   isCoinSetupComplete,
   isCoinWalletReady,
 } from "@/lib/setup";
@@ -149,14 +150,14 @@ export function Setup() {
   }, [resetCoinOnboarding]);
 
   const openReadyCoinDashboard = useCallback(
-    async (targetCoin: CoinId, hasLightWallet: boolean) => {
+    async (targetCoin: CoinId) => {
       await updatePrefs({
         ...coinSetupCompletePatch(targetCoin, prefs),
         active_coin: targetCoin,
       });
-      if (hasLightWallet && LIGHT_WALLET_ENABLED) {
+      if (LIGHT_WALLET_ENABLED) {
         try {
-          await walletModeSet("light");
+          await walletModeSet(setupWalletMode);
           invalidateWalletMode();
         } catch {
           /* prefs may reconcile on next load */
@@ -164,7 +165,7 @@ export function Setup() {
       }
       navigate("/dashboard", { replace: true });
     },
-    [prefs, updatePrefs, invalidateWalletMode, navigate],
+    [prefs, updatePrefs, invalidateWalletMode, navigate, setupWalletMode],
   );
 
   const startCoinSetup = useCallback(
@@ -172,8 +173,19 @@ export function Setup() {
       const hasLightWallet = await lightWalletExists(targetCoin).catch(
         () => false,
       );
-      if (isCoinWalletReady(targetCoin, prefs, hasLightWallet)) {
-        await openReadyCoinDashboard(targetCoin, hasLightWallet);
+      let hasFullNodeWallet = false;
+      if (setupWalletMode === "full_node") {
+        const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
+        hasFullNodeWallet = fullNodeWalletExists(status);
+      }
+      if (
+        isCoinWalletReady(targetCoin, prefs, {
+          walletMode: setupWalletMode,
+          hasLightWallet,
+          hasFullNodeWallet,
+        })
+      ) {
+        await openReadyCoinDashboard(targetCoin);
         return;
       }
       setActiveCoin(targetCoin);
@@ -418,7 +430,18 @@ export function Setup() {
       const hasLightWallet = await lightWalletExists(targetCoin).catch(
         () => false,
       );
-      if (isCoinWalletReady(targetCoin, patch, hasLightWallet)) {
+      let hasFullNodeWallet = false;
+      if (setupWalletMode === "full_node") {
+        const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
+        hasFullNodeWallet = fullNodeWalletExists(status);
+      }
+      if (
+        isCoinWalletReady(targetCoin, patch, {
+          walletMode: setupWalletMode,
+          hasLightWallet,
+          hasFullNodeWallet,
+        })
+      ) {
         patch = { ...patch, ...coinSetupCompletePatch(targetCoin, patch) };
       }
     }
@@ -429,7 +452,7 @@ export function Setup() {
     });
     if (LIGHT_WALLET_ENABLED) {
       try {
-        await walletModeSet("light");
+        await walletModeSet(setupWalletMode);
         invalidateWalletMode();
       } catch {
         /* continue */

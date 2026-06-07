@@ -1,3 +1,4 @@
+import { PoolStatsStrip } from "@/components/pool/PoolStatsStrip";
 import { PoolMiningPanel } from "@/components/pool/PoolMiningPanel";
 import { usePoolMinerRunning } from "@/components/pool/PoolMiningControls";
 import { fetchPoolMinerMemoryLimits, stopPoolMiner } from "@/lib/pool-miner-api";
@@ -363,6 +364,8 @@ export function Mining() {
         )}
 
         {miningMode === "pool" || isLight ? (
+          <>
+          <PoolStatsStrip enabled={explorerEnabled} />
           <PoolMiningPanel
             prefs={prefs}
             enabled={explorerEnabled}
@@ -400,6 +403,7 @@ export function Mining() {
               if (active) void stop.mutate();
             }}
           />
+          </>
         ) : null}
 
         {!isLight && miningMode === "solo" ? (

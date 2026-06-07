@@ -13,7 +13,7 @@ import {
   syncTargetHeight,
 } from "@/lib/bootstrap-policy";
 import { useChainTip } from "@/lib/chain-tip-store";
-import { fetchExplorerStats } from "@/lib/explorer-api";
+import { fetchExplorerBlocks, fetchExplorerStats } from "@/lib/explorer-api";
 import {
   deriveDashboardActivity,
   type DashboardActivity,
@@ -27,7 +27,9 @@ import {
   rpcGetStakingState,
   rpcGetVericoinMiningInfo,
   rpcGetWalletInfo,
+  rpcRaw,
 } from "@/lib/rpc/client";
+import { resolveTipBlockTime } from "@/lib/tip-block-time";
 import { formatBlockAge } from "@/lib/utils";
 
 /** Shared RPC polling for dashboard hero, middle row, and activity banners. */
@@ -86,6 +88,15 @@ export function useDashboardData(coin: CoinId) {
     retry: 0,
   });
 
+  const explorerBlocks = useQuery({
+    queryKey: coinQueryKey(coin, "explorer-blocks", 10),
+    queryFn: () => fetchExplorerBlocks(coin, 10),
+    enabled: explorerEnabled && connected && visible,
+    staleTime: 60_000,
+    refetchInterval: visible ? 60_000 : false,
+    retry: 2,
+  });
+
   const transactions = useWalletTransactions(coin, {
     enabled: connected && (!isLight || lightExistsForCoin.data !== false),
   });
@@ -136,6 +147,22 @@ export function useDashboardData(coin: CoinId) {
     enabled: coin === "vericoin" && !isLight,
   });
 
+  const tipHashForHeader =
+    chainTip.tip?.hash ?? blockchain.data?.bestblockhash ?? "";
+
+  const tipHeaderTime = useQuery({
+    queryKey: coinQueryKey(coin, "blockheader-time", tipHashForHeader),
+    queryFn: async () => {
+      const header = (await rpcRaw(coin, "getblockheader", [
+        tipHashForHeader,
+      ])) as { time?: number };
+      return header.time != null && header.time > 0 ? header.time : null;
+    },
+    enabled: !isLight && Boolean(tipHashForHeader),
+    staleTime: 15_000,
+    refetchInterval: visible && !isLight ? 30_000 : false,
+  });
+
   const networkTip = explorer.data?.height ?? lightServer.tipHeight ?? undefined;
   const syncCtx = {
     connected,
@@ -155,10 +182,12 @@ export function useDashboardData(coin: CoinId) {
   const tipHash = chainTip.tip?.hash ?? blockHash;
   const syncTarget = syncTargetHeight(blockchain.data, networkTip);
   const behind = blocksBehindNetwork(localBlocks, syncTarget);
-  const tipTime =
-    chainTip.tip?.time != null && chainTip.tip.time > 0
-      ? chainTip.tip.time
-      : blockchain.data?.mediantime;
+
+  const tipTime = resolveTipBlockTime(tipHeight, {
+    chainTip: chainTip.tip,
+    explorerBlocks: explorerBlocks.data,
+    headerTime: tipHeaderTime.data,
+  });
   const blockAge = tipTime != null ? formatBlockAge(tipTime, ageTick) : "—";
   const connections = isLight ? 0 : (node.data?.connections ?? 0);
 

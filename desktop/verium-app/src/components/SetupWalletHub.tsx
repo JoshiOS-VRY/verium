@@ -11,15 +11,22 @@ import { useEnabledCoins } from "@/lib/coin/context";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { lightWalletExists } from "@/lib/light-wallet/client";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { isCoinWalletReady } from "@/lib/setup";
+import { tauriWalletFileStatus } from "@/lib/rpc/client";
+import {
+  fullNodeWalletExists,
+  isCoinWalletReady,
+  type WalletModeChoice,
+} from "@/lib/setup";
 import { LIGHT_WALLET_ENABLED } from "@/lib/features";
+import { ThemeSegmented } from "@/components/ThemeSegmented";
 import { Button } from "@/components/ui/Button";
+import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import type { UserPreferences } from "@/lib/user-preferences";
 
 interface SetupWalletHubProps {
-  walletMode: "light" | "full_node";
-  onWalletModeChange: (mode: "light" | "full_node") => void;
+  walletMode: WalletModeChoice;
+  onWalletModeChange: (mode: WalletModeChoice) => void;
   showAdvancedLightMode: boolean;
   onShowAdvancedLightMode: () => void;
   onSelectCoin: (coin: CoinId) => void | Promise<void>;
@@ -30,11 +37,13 @@ interface SetupWalletHubProps {
 function CoinHubCard({
   coin,
   prefs,
+  walletMode,
   onSelect,
   opening,
 }: {
   coin: CoinId;
   prefs: UserPreferences;
+  walletMode: WalletModeChoice;
   onSelect: (coin: CoinId) => void | Promise<void>;
   opening: boolean;
 }) {
@@ -43,7 +52,16 @@ function CoinHubCard({
     queryKey: coinQueryKey(coin, "light-wallet-exists"),
     queryFn: () => lightWalletExists(coin),
   });
-  const ready = isCoinWalletReady(coin, prefs, light.data);
+  const walletFile = useQuery({
+    queryKey: coinQueryKey(coin, "wallet-file-status"),
+    queryFn: () => tauriWalletFileStatus(coin),
+    enabled: walletMode === "full_node",
+  });
+  const ready = isCoinWalletReady(coin, prefs, {
+    walletMode,
+    hasLightWallet: light.data,
+    hasFullNodeWallet: fullNodeWalletExists(walletFile.data),
+  });
 
   return (
     <button
@@ -116,6 +134,7 @@ export function SetupWalletHub({
 }: SetupWalletHubProps) {
   const enabledCoins = useEnabledCoins();
   const prefs = useUserPreferences((s) => s.prefs);
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const options = ALL_COINS.filter((coin) => enabledCoins.includes(coin));
 
   const veriumLight = useQuery({
@@ -129,16 +148,30 @@ export function SetupWalletHub({
     enabled: options.includes("vericoin"),
   });
 
-  const lightByCoin: Partial<Record<CoinId, boolean | undefined>> = {
-    verium: veriumLight.data,
-    vericoin: vericoinLight.data,
-  };
+  const veriumWalletFile = useQuery({
+    queryKey: coinQueryKey("verium", "wallet-file-status"),
+    queryFn: () => tauriWalletFileStatus("verium"),
+    enabled: options.includes("verium") && walletMode === "full_node",
+  });
+  const vericoinWalletFile = useQuery({
+    queryKey: coinQueryKey("vericoin", "wallet-file-status"),
+    queryFn: () => tauriWalletFileStatus("vericoin"),
+    enabled: options.includes("vericoin") && walletMode === "full_node",
+  });
+
+  const readyOptions = (coin: CoinId) => ({
+    walletMode,
+    hasLightWallet: coin === "verium" ? veriumLight.data : vericoinLight.data,
+    hasFullNodeWallet: fullNodeWalletExists(
+      coin === "verium" ? veriumWalletFile.data : vericoinWalletFile.data,
+    ),
+  });
 
   const anyComplete = options.some((coin) =>
-    isCoinWalletReady(coin, prefs, lightByCoin[coin]),
+    isCoinWalletReady(coin, prefs, readyOptions(coin)),
   );
   const allComplete = options.every((coin) =>
-    isCoinWalletReady(coin, prefs, lightByCoin[coin]),
+    isCoinWalletReady(coin, prefs, readyOptions(coin)),
   );
 
   return (
@@ -147,6 +180,14 @@ export function SetupWalletHub({
         Choose Verium or Vericoin to set up or continue onboarding. You can
         return here anytime from setup to switch chains or open the dashboard.
       </p>
+
+      <div className="flex flex-col gap-2 rounded-md border border-border bg-bg-subtle p-3">
+        <p className="text-xs font-medium text-fg">Appearance</p>
+        <ThemeSegmented value={themeMode} onChange={setThemeMode} />
+        <p className="text-[11px] text-fg-subtle">
+          Auto follows your system light or dark setting.
+        </p>
+      </div>
 
       {LIGHT_WALLET_ENABLED && (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-bg-subtle p-3">
@@ -204,6 +245,7 @@ export function SetupWalletHub({
             key={coin}
             coin={coin}
             prefs={prefs}
+            walletMode={walletMode}
             onSelect={onSelectCoin}
             opening={openingCoin === coin}
           />

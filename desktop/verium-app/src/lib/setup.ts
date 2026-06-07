@@ -1,5 +1,21 @@
 import type { CoinId } from "@/lib/coin/profile";
+import type { WalletFileStatus } from "@/lib/rpc/client";
 import type { UserPreferences } from "@/lib/user-preferences";
+
+export type WalletModeChoice = "light" | "full_node";
+
+export interface CoinWalletReadyOptions {
+  walletMode?: WalletModeChoice;
+  hasLightWallet?: boolean;
+  hasFullNodeWallet?: boolean;
+}
+
+/** True if wallet.dat (or a legacy Qt wallet) exists for this chain. */
+export function fullNodeWalletExists(
+  status?: Pick<WalletFileStatus, "exists" | "legacy_wallet_detected"> | null,
+): boolean {
+  return status?.exists === true || status?.legacy_wallet_detected === true;
+}
 
 /** True if any enabled chain still needs first-run setup. */
 export function anyEnabledCoinSetupIncomplete(
@@ -9,13 +25,25 @@ export function anyEnabledCoinSetupIncomplete(
   return enabledCoins.some((coin) => !isCoinSetupComplete(coin, prefs));
 }
 
-/** Wizard done or a persisted light wallet exists for this chain. */
+/**
+ * Chain is ready to open from the hub: wizard marked complete, or the selected
+ * wallet mode already has persisted keys (light keystore vs local wallet.dat).
+ */
 export function isCoinWalletReady(
   coin: CoinId,
   prefs: Pick<UserPreferences, "setup_completed" | "setup_completed_by_coin">,
-  hasLightWallet?: boolean,
+  options?: CoinWalletReadyOptions | boolean,
 ): boolean {
-  return isCoinSetupComplete(coin, prefs) || hasLightWallet === true;
+  if (isCoinSetupComplete(coin, prefs)) return true;
+
+  const opts: CoinWalletReadyOptions =
+    typeof options === "boolean" ? { hasLightWallet: options } : (options ?? {});
+
+  const mode = opts.walletMode ?? "full_node";
+  if (mode === "light") {
+    return opts.hasLightWallet === true;
+  }
+  return opts.hasFullNodeWallet === true;
 }
 
 /** True when the user finished (or migrated) first-run setup for this chain. */

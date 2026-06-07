@@ -32,7 +32,8 @@ import { useDaemonStatus } from "@/hooks/useDaemonStatus";
 import { useWalletMode } from "@/hooks/useWalletMode";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { lightWalletExists } from "@/lib/light-wallet/client";
-import { isCoinWalletReady } from "@/lib/setup";
+import { tauriWalletFileStatus } from "@/lib/rpc/client";
+import { fullNodeWalletExists, isCoinWalletReady } from "@/lib/setup";
 import { useTheme } from "@/hooks/useTheme";
 import { useDeepLinkHandler } from "@/hooks/useDeepLinkHandler";
 import { ToastHost } from "@/components/ToastHost";
@@ -103,10 +104,22 @@ function SetupRedirect() {
     enabled: loaded,
     staleTime: 10_000,
   });
+  const walletFile = useQuery({
+    queryKey: coinQueryKey(coin, "wallet-file-status"),
+    queryFn: () => tauriWalletFileStatus(coin),
+    enabled: loaded && !isLight,
+    staleTime: 10_000,
+  });
 
   useEffect(() => {
     if (!loaded || storedLightWallet.isLoading) return;
-    if (isCoinWalletReady(coin, prefs, storedLightWallet.data)) return;
+    if (!isLight && walletFile.isLoading) return;
+    const ready = isCoinWalletReady(coin, prefs, {
+      walletMode: isLight ? "light" : "full_node",
+      hasLightWallet: storedLightWallet.data,
+      hasFullNodeWallet: fullNodeWalletExists(walletFile.data),
+    });
+    if (ready) return;
     if (location.pathname === "/setup") return;
     if (!isLight && daemonLoading) return;
     navigate("/setup", { replace: true, state: { setupHub: true } });
@@ -118,6 +131,8 @@ function SetupRedirect() {
     prefs,
     storedLightWallet.isLoading,
     storedLightWallet.data,
+    walletFile.isLoading,
+    walletFile.data,
     location.pathname,
     navigate,
   ]);

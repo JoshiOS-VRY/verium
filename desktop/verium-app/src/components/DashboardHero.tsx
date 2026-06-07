@@ -1,7 +1,17 @@
 import { type ReactNode } from "react";
-import { Clock3, Coins, Cpu, Loader2, Users, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Clock3,
+  Coins,
+  Loader2,
+  TrendingUp,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { ExplorerLink } from "@/components/ExplorerLink";
 import { AnimatedBlockNumber } from "@/components/AnimatedBlockNumber";
+import { MiningPickaxeAnimation } from "@/components/MiningPickaxeAnimation";
+import { MinerBootBadge } from "@/components/MinerBootIndicator";
 import {
   getCoinProfile,
   type CoinId,
@@ -13,18 +23,32 @@ import {
   heroStatusPillShowsPulse,
 } from "@/lib/node/dashboard-activity";
 import {
+  buildNetworkStats,
+  estimateDailyMining,
   networkHashToKhm,
+  networkSharePercent,
   resolveBlockTimeMinutes,
 } from "@/lib/mining-revenue";
+import { isMinerBooting } from "@/lib/mining-boot";
 import {
-  networkCoinsStakingPercent,
   mergeStakingNetworkKpis,
+  networkCoinsStakingPercent,
+  walletStakeSharePercent,
 } from "@/lib/staking-stats";
 import { useExplorerQueriesEnabled } from "@/lib/network-mode";
 import { AnimatedHashrate } from "@/components/AnimatedHashrate";
 import { cn, formatNumber } from "@/lib/utils";
 import { formatCoinAmount } from "@/lib/units";
-import { isWalletLocked, lockedWalletBalanceClass } from "@/lib/wallet-unlock";
+import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
+
+type DashboardData = ReturnType<typeof useDashboardData>;
+
+function formatUsd(value?: number | null): string {
+  if (value === undefined || value === null) return "—";
+  if (value >= 1_000_000) return `$${formatNumber(value / 1_000_000, 2)}M`;
+  if (value >= 1_000) return `$${formatNumber(value / 1_000, 2)}K`;
+  return `$${formatNumber(value, 4)}`;
+}
 
 function StatusPill({
   children,
@@ -54,6 +78,72 @@ function StatusPill({
   );
 }
 
+function MiniStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle sm:text-[10px]">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-base font-semibold tabular-nums text-fg sm:mt-0.5 sm:text-sm">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function HeroSection({
+  title,
+  icon,
+  action,
+  href,
+  children,
+  className,
+}: {
+  title: string;
+  icon: ReactNode;
+  action?: ReactNode;
+  href?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const body = (
+    <div
+      className={cn(
+        "flex h-full min-w-0 flex-col rounded-xl bg-bg-subtle/30 p-4 ring-1 ring-inset ring-border/45 sm:p-4 md:p-3.5 xl:p-4",
+        href &&
+          "transition-colors hover:bg-bg-subtle/50 hover:ring-border/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+      )}
+    >
+      <div className="mb-3 flex min-w-0 items-center justify-between gap-2 md:mb-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-fg">
+          <span className="shrink-0 text-accent [&>svg]:h-4 [&>svg]:w-4">
+            {icon}
+          </span>
+          <span className="truncate">{title}</span>
+        </div>
+        {action}
+      </div>
+      <div className="grid flex-1 grid-cols-2 gap-x-4 gap-y-3 sm:gap-x-5 md:gap-x-3 md:gap-y-2.5 xl:gap-x-4 xl:gap-y-3">
+        {children}
+      </div>
+    </div>
+  );
+
+  if (href) {
+    return (
+      <Link
+        to={href}
+        aria-label={`Open ${title.toLowerCase()}`}
+        className={cn("block h-full min-w-0", className)}
+      >
+        {body}
+      </Link>
+    );
+  }
+
+  return <div className={cn("h-full min-w-0", className)}>{body}</div>;
+}
+
 function HeroBlockHeight({
   coin,
   localBlocks,
@@ -73,17 +163,15 @@ function HeroBlockHeight({
   return (
     <div
       className={cn(
-        "text-[clamp(1.875rem,2.5vw+1rem,3rem)] font-bold tabular-nums tracking-tight",
+        "text-[clamp(2rem,3.5vw+0.75rem,3rem)] font-bold tabular-nums leading-none tracking-tight",
         showPlaceholder ? "text-fg-muted" : "text-fg",
       )}
     >
       {showPlaceholder ? (
-        <span className="inline-flex items-center gap-2">
-          <Loader2
-            className="h-9 w-9 animate-spin text-accent/80 md:h-10 md:w-10"
-            aria-hidden
-          />
-        </span>
+        <Loader2
+          className="h-9 w-9 animate-spin text-accent/80"
+          aria-hidden
+        />
       ) : canLink ? (
         <ExplorerLink
           coin={coin}
@@ -91,17 +179,17 @@ function HeroBlockHeight({
           label={
             <AnimatedBlockNumber
               value={localBlocks}
-              className="text-[clamp(1.875rem,2.5vw+1rem,3rem)] font-bold tracking-tight"
+              className="text-[clamp(2rem,3.5vw+0.75rem,3rem)] font-bold leading-none tracking-tight"
             />
           }
           showIcon={false}
           title="View block on explorer"
-          className="rounded-sm text-[clamp(1.875rem,2.5vw+1rem,3rem)] font-bold tabular-nums tracking-tight text-fg no-underline transition-colors hover:text-accent hover:underline"
+          className="rounded-sm font-bold tabular-nums leading-none tracking-tight text-fg no-underline transition-colors hover:text-accent hover:underline"
         />
       ) : connected && localBlocks != null ? (
         <AnimatedBlockNumber
           value={localBlocks}
-          className="text-[clamp(1.875rem,2.5vw+1rem,3rem)] font-bold tracking-tight"
+          className="text-[clamp(2rem,3.5vw+0.75rem,3rem)] font-bold leading-none tracking-tight"
         />
       ) : (
         "—"
@@ -125,7 +213,7 @@ function SyncProgressBar({
       : 0;
 
   return (
-    <div className="mt-3 w-full max-w-sm min-w-0 space-y-2">
+    <div className="mt-3 w-full min-w-0 space-y-2">
       <div className="flex items-center justify-between gap-3 text-[11px] text-fg-muted">
         <span>
           of ~{formatNumber(syncTarget)} network tip
@@ -133,9 +221,7 @@ function SyncProgressBar({
             <> · ~{formatNumber(behind, 0)} blocks behind</>
           )}
         </span>
-        <span className="shrink-0 font-semibold tabular-nums text-fg-muted">
-          {progress}%
-        </span>
+        <span className="shrink-0 font-semibold tabular-nums">{progress}%</span>
       </div>
       <div
         className="h-1.5 overflow-hidden rounded-full bg-border/80"
@@ -154,96 +240,20 @@ function SyncProgressBar({
   );
 }
 
-function StatBox({
-  icon,
-  label,
-  compactLabel,
-  value,
-  valueClassName,
-  sub,
-  subClassName,
-  active = false,
-}: {
-  icon: ReactNode;
-  label: string;
-  compactLabel?: string;
-  value: ReactNode;
-  valueClassName?: string;
-  sub?: string;
-  subClassName?: string;
-  active?: boolean;
-}) {
-  const narrowLabel = compactLabel ?? label;
-
-  return (
-    <div
-      className={cn(
-        "@container/stat group flex min-w-0 items-stretch gap-2 overflow-hidden rounded-xl border p-2 transition-all duration-200 @[11rem]/stat:gap-2.5 @[11rem]/stat:p-2.5 sm:p-3",
-        active
-          ? "border-success/30 bg-gradient-to-br from-success/[0.08] to-bg-subtle/40 shadow-sm shadow-success/5"
-          : "border-border/70 bg-gradient-to-br from-bg-subtle/50 to-bg-subtle/20 hover:border-border-strong hover:from-bg-subtle/70",
-      )}
-    >
-      <div
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-lg transition-colors [&>svg]:h-3.5 [&>svg]:w-3.5 @[11rem]/stat:h-9 @[11rem]/stat:w-9 @[11rem]/stat:[&>svg]:h-4 @[11rem]/stat:[&>svg]:w-4",
-          active
-            ? "bg-success/15 text-success ring-1 ring-inset ring-success/25"
-            : "bg-bg-panel/80 text-fg-muted ring-1 ring-inset ring-border/60 group-hover:ring-border-strong",
-        )}
-      >
-        {icon}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 py-0.5">
-        <div
-          className="truncate text-[9px] font-semibold uppercase leading-none tracking-wide text-fg-subtle @[11rem]/stat:text-[10px] @[14rem]/stat:text-[11px]"
-          title={label}
-        >
-          <span className="@[11rem]/stat:hidden">{narrowLabel}</span>
-          <span className="hidden @[11rem]/stat:inline">{label}</span>
-        </div>
-
-        <div
-          className={cn(
-            "truncate font-semibold tabular-nums leading-tight tracking-tight text-[clamp(0.6875rem,5.5cqi,1.0625rem)] text-fg",
-            valueClassName,
-          )}
-          title={typeof value === "string" ? value : undefined}
-        >
-          {value}
-        </div>
-
-        {sub ? (
-          <div
-            className={cn(
-              "truncate text-[9px] leading-tight text-fg-subtle @[11rem]/stat:text-[10px]",
-              subClassName,
-            )}
-            title={sub}
-          >
-            {sub}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function NetworkMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 px-1 py-0.5 sm:px-2 lg:border-l lg:border-border/50 lg:first:border-l-0">
-      <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-fg-subtle">
+    <div className="min-w-0 py-1.5 xl:border-l xl:border-border/40 xl:py-1 xl:pl-4 xl:first:border-l-0 xl:first:pl-0">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-fg-subtle sm:text-[10px]">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold tabular-nums text-fg">
+      <div className="mt-1 truncate text-base font-semibold tabular-nums text-fg sm:mt-0.5 sm:text-sm">
         {value}
       </div>
     </div>
   );
 }
 
-function HeroSummaryLayout({
+function HeroPanel({
   coin,
   profile,
   statusRow,
@@ -256,7 +266,7 @@ function HeroSummaryLayout({
   synced,
   syncTarget,
   behind,
-  statBoxes,
+  detailColumns,
   networkMetrics,
 }: {
   coin: CoinId;
@@ -266,12 +276,12 @@ function HeroSummaryLayout({
   tipHash?: string;
   localBlocks?: number;
   blockAge: string;
-  activity: ReturnType<typeof useDashboardData>["activity"];
+  activity: DashboardData["activity"];
   connected: boolean;
   synced: boolean;
   syncTarget?: number;
   behind?: number | null;
-  statBoxes: ReactNode;
+  detailColumns: ReactNode;
   networkMetrics: ReactNode;
 }) {
   const showSyncProgress =
@@ -281,36 +291,43 @@ function HeroSummaryLayout({
     localBlocks != null;
 
   return (
-    <div className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-bg-panel shadow-sm">
+    <section
+      aria-label={`${profile.displayName} dashboard`}
+      className="relative min-w-0 overflow-hidden rounded-xl border border-border bg-bg-panel shadow-sm"
+    >
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/35 to-transparent"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-accent/[0.05] blur-3xl"
+        className="pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full bg-accent/[0.04] blur-3xl"
         aria-hidden
       />
 
-      <div className="relative min-w-0 p-4 sm:p-5 md:p-6">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
+      <div className="relative min-w-0 p-5 sm:p-6 xl:p-6">
+        <header className="flex min-w-0 flex-wrap items-center gap-2.5">
           {statusRow}
-        </div>
+        </header>
 
-        <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 md:mt-5 md:grid-cols-[minmax(0,1.15fr)_minmax(220px,1fr)] md:items-stretch md:gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.95fr)] lg:gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,420px)] xl:gap-8">
-          <div className="min-w-0 rounded-xl border border-border/60 bg-gradient-to-br from-bg-subtle/40 via-bg-subtle/20 to-transparent p-3 sm:p-4 md:p-5">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:gap-x-3">
+        {/*
+          Phone / tablet / laptop: stack block, then detail panels (1 col → 2 col).
+          XL+ desktop: block column beside three detail panels.
+        */}
+        <div className="mt-5 grid min-w-0 gap-5 md:gap-4 xl:mt-6 xl:grid-cols-12 xl:items-stretch xl:gap-6">
+          <div className="flex min-h-full min-w-0 flex-col rounded-xl bg-bg-subtle/25 p-4 ring-1 ring-inset ring-border/40 sm:p-5 xl:col-span-3 xl:p-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-subtle">
                 Latest block
               </span>
               {synced && connected && (
                 <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-                  <span className="truncate">Wallet Synced to Network</span>
+                  <span className="truncate">Synced</span>
                 </span>
               )}
             </div>
 
-            <div className="mt-2 min-w-0">
+            <div className="mt-3 min-w-0 xl:mt-2">
               <HeroBlockHeight
                 coin={coin}
                 localBlocks={tipHeight}
@@ -321,14 +338,10 @@ function HeroSummaryLayout({
             </div>
 
             {blockAge !== "—" && (
-              <p className="mt-2 inline-flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-fg-muted">
-                <Clock3
-                  className="h-3.5 w-3.5 shrink-0 opacity-70"
-                  aria-hidden
-                />
+              <p className="mt-3 inline-flex min-w-0 items-center gap-1.5 text-sm text-fg-muted xl:mt-2">
+                <Clock3 className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
                 <span>
-                  Mined <span className="font-medium text-fg">{blockAge}</span>{" "}
-                  ago
+                  Mined <span className="font-medium text-fg">{blockAge}</span> ago
                 </span>
               </p>
             )}
@@ -340,34 +353,36 @@ function HeroSummaryLayout({
             )}
 
             {showSyncProgress && (
-              <SyncProgressBar
-                localBlocks={localBlocks}
-                syncTarget={syncTarget}
-                behind={behind}
-              />
+              <div className="mt-auto pt-4 xl:pt-3">
+                <SyncProgressBar
+                  localBlocks={localBlocks}
+                  syncTarget={syncTarget}
+                  behind={behind}
+                />
+              </div>
             )}
           </div>
 
-          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-2.5 md:grid-cols-1 md:gap-2.5">
-            {statBoxes}
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-3 xl:col-span-9 xl:grid-cols-3 xl:gap-4">
+            {detailColumns}
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl border border-border/60 bg-bg-subtle/25 px-4 py-4 sm:px-5">
-          <div className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">
+        <footer className="mt-6 border-t border-border/50 pt-5 xl:mt-6 xl:pt-5">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle sm:mb-2.5 sm:text-[10px]">
             {profile.displayName} network
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:gap-x-5 md:grid-cols-3 xl:grid-cols-5 xl:gap-y-0">
             {networkMetrics}
           </div>
-        </div>
+        </footer>
       </div>
-    </div>
+    </section>
   );
 }
 
 function buildHeroStatusRow(
-  data: ReturnType<typeof useDashboardData>,
+  data: DashboardData,
   explorerEnabled: boolean,
 ): ReactNode {
   if (data.isLight) {
@@ -415,198 +430,438 @@ function buildHeroStatusRow(
   );
 }
 
-function VeriumSummaryCard() {
-  const coin = "verium" as const;
-  const profile = getCoinProfile(coin);
-  const explorerEnabled = useExplorerQueriesEnabled();
-  const data = useDashboardData(coin);
-  const statusRow = buildHeroStatusRow(data, explorerEnabled);
-
-  const localHashrate = data.localHashrate;
-  const networkHashKhm =
-    data.explorer.data?.network_hash != null
-      ? networkHashToKhm(data.explorer.data.network_hash)
-      : data.mining.data?.networkhashps != null
-        ? networkHashToKhm(data.mining.data.networkhashps)
-        : null;
-  const difficultyValue =
-    data.explorer.data?.difficulty ??
-    data.blockchain.data?.difficulty ??
-    data.mining.data?.difficulty;
-  const blockTimeMin = resolveBlockTimeMinutes(
-    data.explorer.data,
-    data.mining.data,
-  );
-  const mempool =
-    data.mining.data?.pooledtx ?? data.explorer.data?.pooled_tx;
+function buildWalletSection(coin: CoinId, data: DashboardData): ReactNode {
+  const wallet = data.wallet.data;
 
   return (
-    <HeroSummaryLayout
-      coin={coin}
-      profile={profile}
-      statusRow={statusRow}
-      tipHeight={data.tipHeight}
-      tipHash={data.tipHash}
-      localBlocks={data.localBlocks}
-      blockAge={data.blockAge}
-      activity={data.activity}
-      connected={data.connected}
-      synced={data.synced}
-      syncTarget={data.syncTarget}
-      behind={data.behind}
-      statBoxes={
-        data.isLight ? (
-          <>
-            <StatBox
-              icon={<Wallet />}
-              label="Available"
-              compactLabel="Avail."
-              value={
-                data.wallet.data
-                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
-                  : "—"
-              }
-              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
-              sub={
-                data.wallet.data && data.wallet.data.immature_balance > 0
-                  ? `${formatCoinAmount(data.wallet.data.immature_balance, coin, 2)} imm.`
-                  : data.wallet.isLoading
-                    ? "Loading…"
-                    : data.wallet.data && isWalletLocked(data.wallet.data)
-                      ? "Unlock wallet"
-                      : undefined
-              }
-            />
-            <StatBox
-              icon={<Clock3 />}
-              label="Chain tip"
-              value={
-                data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"
-              }
-              sub={data.connected ? "From light server" : "Server offline"}
-            />
-          </>
-        ) : (
-          <>
-            <StatBox
-              icon={<Cpu />}
-              label="Mining"
-              value={
-                <AnimatedHashrate
-                  value={localHashrate > 0 ? localHashrate : undefined}
-                  fractionDigits={0}
-                  className="font-semibold text-fg"
-                  immediate={data.miningActive}
-                />
-              }
-              sub={data.miningActive ? "On" : "Off"}
-              subClassName={
-                data.miningActive ? "font-semibold text-success" : undefined
-              }
-              active={data.miningActive}
-            />
-            <StatBox
-              icon={<Wallet />}
-              label="Available"
-              compactLabel="Avail."
-              value={
-                data.wallet.data
-                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
-                  : "—"
-              }
-              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
-              sub={
-                data.wallet.data && data.wallet.data.immature_balance > 0
-                  ? `${formatCoinAmount(data.wallet.data.immature_balance, coin, 2)} imm.`
-                  : undefined
-              }
-            />
-            <div className="sm:col-span-2 md:col-span-1">
-              <StatBox
-                icon={<Users />}
-                label="Peers"
-                value={formatNumber(data.connections, 0)}
-                sub={
-                  data.connections > 0
-                    ? "Online"
-                    : data.connected
-                      ? "No peers"
-                      : "Offline"
-                }
-              />
-            </div>
-          </>
-        )
-      }
-      networkMetrics={
-        <>
-          <NetworkMetric
-            label="Network hashrate"
-            value={
-              networkHashKhm != null
-                ? `${formatNumber(networkHashKhm, 1)} kH/m`
-                : "—"
-            }
-          />
-          <NetworkMetric
-            label="Difficulty"
-            value={
-              difficultyValue != null
-                ? difficultyValue >= 0.0001
-                  ? formatNumber(difficultyValue, 4)
-                  : formatNumber(difficultyValue, 6)
-                : "—"
-            }
-          />
-          <NetworkMetric
-            label="Avg. block time"
-            value={
-              blockTimeMin != null
-                ? `${formatNumber(blockTimeMin, 1)} min`
-                : "—"
-            }
-          />
-          <NetworkMetric label="Last block" value={data.blockAge} />
-          <NetworkMetric
-            label={`${profile.symbol} price`}
-            value={
-              data.explorer.data?.price_usd != null
-                ? `$${formatNumber(data.explorer.data.price_usd, 4)}`
-                : "—"
-            }
-          />
-          <NetworkMetric
-            label="Mempool"
-            value={mempool != null ? formatNumber(mempool, 0) : "—"}
-          />
-        </>
-      }
-    />
+    <HeroSection title="Wallet" icon={<Wallet />}>
+      <MiniStat
+        label="Balance"
+        value={
+          wallet ? (
+            <span className={lockedWalletBalanceClass(data.wallet.data)}>
+              {formatCoinAmount(wallet.balance, coin, 4)}
+            </span>
+          ) : (
+            "—"
+          )
+        }
+      />
+      <MiniStat
+        label="Immature"
+        value={
+          wallet ? (
+            <span className={lockedWalletBalanceClass(data.wallet.data)}>
+              {formatCoinAmount(wallet.immature_balance, coin, 4)}
+            </span>
+          ) : (
+            "—"
+          )
+        }
+      />
+      {coin === "vericoin" ? (
+        <MiniStat
+          label="Stake weight"
+          value={
+            data.vrcMining.data?.stakeweight?.combined != null
+              ? formatNumber(data.vrcMining.data.stakeweight.combined, 0)
+              : "—"
+          }
+        />
+      ) : (
+        <MiniStat
+          label="Unconfirmed"
+          value={
+            wallet ? formatCoinAmount(wallet.unconfirmed_balance, coin, 4) : "—"
+          }
+        />
+      )}
+      <MiniStat
+        label="Transactions"
+        value={wallet ? formatNumber(wallet.txcount, 0) : "—"}
+      />
+    </HeroSection>
   );
 }
 
-function VericoinSummaryCard() {
-  const coin = "vericoin" as const;
-  const profile = getCoinProfile(coin);
-  const explorerEnabled = useExplorerQueriesEnabled();
-  const data = useDashboardData(coin);
-  const statusRow = buildHeroStatusRow(data, explorerEnabled);
+function buildMarketSection(
+  coin: CoinId,
+  profile: CoinProfile,
+  data: DashboardData,
+): ReactNode {
+  const stats = data.explorer.data;
+  const vrcNetwork =
+    coin === "vericoin"
+      ? mergeStakingNetworkKpis(data.vrcMining.data, stats)
+      : null;
 
+  return (
+    <HeroSection
+      title="Market"
+      icon={<TrendingUp />}
+      action={
+        <ExplorerLink coin={coin} target={{ kind: "home" }} label="Explorer" />
+      }
+    >
+      <MiniStat label={profile.symbol} value={formatUsd(stats?.price_usd)} />
+      <MiniStat label="24h vol" value={formatUsd(stats?.volume_24h_usd)} />
+      <MiniStat
+        label={coin === "vericoin" ? "Interest rate" : "Block reward"}
+        value={
+          coin === "vericoin"
+            ? vrcNetwork?.interestRate != null
+              ? `${formatNumber(vrcNetwork.interestRate, 2)}%`
+              : stats?.stake_interest != null
+                ? `${formatNumber(stats.stake_interest, 2)}%`
+                : "—"
+            : stats?.block_reward != null
+              ? `${formatNumber(stats.block_reward, 4)} ${profile.symbol}`
+              : "—"
+        }
+      />
+      <MiniStat
+        label="Supply"
+        value={stats?.supply != null ? formatNumber(stats.supply, 0) : "—"}
+      />
+    </HeroSection>
+  );
+}
+
+function buildActivitySection(
+  coin: CoinId,
+  data: DashboardData,
+  sectionClassName?: string,
+): ReactNode {
+  if (data.isLight) {
+    return (
+      <HeroSection
+        title="Connection"
+        icon={<Users />}
+        className={sectionClassName}
+      >
+        <MiniStat
+          label="Server"
+          value={data.connected ? "Online" : "Offline"}
+        />
+        <MiniStat
+          label="Chain tip"
+          value={
+            data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"
+          }
+        />
+        <MiniStat
+          label="Sync"
+          value={
+            data.wallet.data?.light_syncing
+              ? "Syncing"
+              : data.connected
+                ? "Ready"
+                : "—"
+          }
+        />
+        <MiniStat
+          label="Mode"
+          value="Light wallet"
+        />
+      </HeroSection>
+    );
+  }
+
+  if (coin === "verium") {
+    const minerBooting = data.poolMinerRunning
+      ? data.localHashrate <= 0
+      : isMinerBooting(
+          data.minerActive,
+          data.localHashrate,
+          data.minerState.data?.started_at,
+        );
+    const networkStats = buildNetworkStats(
+      data.explorer.data,
+      data.mining.data,
+    );
+    const share = networkSharePercent(
+      data.localHashrate,
+      networkStats?.networkHash,
+    );
+    const blocksFound =
+      data.transactions.data?.filter(
+        (t) => t.category === "generate" || t.category === "immature",
+      ).length ?? 0;
+    const daily =
+      networkStats && data.localHashrate > 0
+        ? estimateDailyMining({
+            localHashrateHm: data.localHashrate,
+            networkHashrateHs: networkStats.networkHash!,
+            blocksPerHour: networkStats.blocksPerHour!,
+            blockReward: networkStats.blockReward!,
+            priceUsd: networkStats.priceUsd,
+          })
+        : null;
+
+    return (
+      <HeroSection
+        title="Your mining"
+        icon={
+          <MiningPickaxeAnimation
+            active={data.miningActive && !minerBooting}
+            booting={minerBooting}
+          />
+        }
+        action={
+          <MinerBootBadge booting={minerBooting} active={data.miningActive} />
+        }
+        href="/mining"
+        className={sectionClassName}
+      >
+        <MiniStat label="Blocks found" value={formatNumber(blocksFound, 0)} />
+        <MiniStat
+          label="Hashrate"
+          value={
+            <AnimatedHashrate
+              booting={minerBooting}
+              value={data.localHashrate > 0 ? data.localHashrate : undefined}
+              fractionDigits={0}
+              className="font-semibold text-fg"
+              immediate={data.miningActive}
+            />
+          }
+        />
+        <MiniStat
+          label="Network share"
+          value={share != null ? `${formatNumber(share, 2)}%` : "—"}
+        />
+        <MiniStat
+          label="Est. daily"
+          value={
+            daily
+              ? `${formatNumber(daily.vrmPerDay, 3)} VRM`
+              : "—"
+          }
+        />
+      </HeroSection>
+    );
+  }
+
+  const vrcNetwork = mergeStakingNetworkKpis(
+    data.vrcMining.data,
+    data.explorer.data,
+  );
+  const vrcNetworkStakePct = networkCoinsStakingPercent(
+    vrcNetwork.netStakeWeight,
+  );
+  const vrcStakeShare = walletStakeSharePercent(
+    data.wallet.data?.stake,
+    vrcNetwork.netStakeWeight,
+  );
   const stakingActive = data.stakingState.data?.active ?? false;
+  const stakeTxCount =
+    data.transactions.data?.filter(
+      (t) =>
+        t.category === "stake" ||
+        t.category === "stake-mint" ||
+        t.category === "stake-orphan",
+    ).length ?? 0;
+
+  return (
+    <HeroSection
+      title="Your staking"
+      icon={
+        <Coins
+          className={cn(
+            "h-4 w-4",
+            stakingActive ? "text-success" : "text-accent",
+          )}
+        />
+      }
+      action={
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            stakingActive
+              ? "bg-success/12 text-success"
+              : "bg-bg-subtle text-fg-muted",
+          )}
+        >
+          {stakingActive ? "Active" : "Inactive"}
+        </span>
+      }
+      href="/staking"
+      className={sectionClassName}
+    >
+      <MiniStat label="Stake rewards" value={formatNumber(stakeTxCount, 0)} />
+      <MiniStat
+        label="Interest rate"
+        value={
+          vrcNetwork.interestRate != null
+            ? `${formatNumber(vrcNetwork.interestRate, 2)}%`
+            : "—"
+        }
+      />
+      <MiniStat
+        label="Network staked"
+        value={
+          vrcNetworkStakePct != null
+            ? `${formatNumber(vrcNetworkStakePct, 2)}%`
+            : "—"
+        }
+      />
+      <MiniStat
+        label="Stake share"
+        value={
+          vrcStakeShare != null ? `${formatNumber(vrcStakeShare, 2)}%` : "—"
+        }
+      />
+    </HeroSection>
+  );
+}
+
+function buildDetailColumns(
+  coin: CoinId,
+  profile: CoinProfile,
+  data: DashboardData,
+  explorerEnabled: boolean,
+): ReactNode {
+  const activitySpan = explorerEnabled ? "lg:col-span-2 xl:col-span-1" : undefined;
+
+  return (
+    <>
+      {buildWalletSection(coin, data)}
+      {explorerEnabled ? buildMarketSection(coin, profile, data) : null}
+      {buildActivitySection(coin, data, activitySpan)}
+    </>
+  );
+}
+
+function buildNetworkMetrics(
+  coin: CoinId,
+  data: DashboardData,
+): ReactNode {
+  const peerLabel =
+    data.connections > 0
+      ? formatNumber(data.connections, 0)
+      : data.connected
+        ? "0"
+        : "—";
+  const peerSub =
+    data.connections > 0
+      ? "Online"
+      : data.connected
+        ? "No peers"
+        : "Offline";
+
+  if (coin === "verium") {
+    const networkHashKhm =
+      data.explorer.data?.network_hash != null
+        ? networkHashToKhm(data.explorer.data.network_hash)
+        : data.mining.data?.networkhashps != null
+          ? networkHashToKhm(data.mining.data.networkhashps)
+          : null;
+    const difficultyValue =
+      data.explorer.data?.difficulty ??
+      data.blockchain.data?.difficulty ??
+      data.mining.data?.difficulty;
+    const blockTimeMin = resolveBlockTimeMinutes(
+      data.explorer.data,
+      data.mining.data,
+    );
+    const mempool =
+      data.mining.data?.pooledtx ?? data.explorer.data?.pooled_tx;
+
+    return (
+      <>
+        <NetworkMetric
+          label="Network hashrate"
+          value={
+            networkHashKhm != null
+              ? `${formatNumber(networkHashKhm, 1)} kH/m`
+              : "—"
+          }
+        />
+        <NetworkMetric
+          label="Difficulty"
+          value={
+            difficultyValue != null
+              ? difficultyValue >= 0.0001
+                ? formatNumber(difficultyValue, 4)
+                : formatNumber(difficultyValue, 6)
+              : "—"
+          }
+        />
+        <NetworkMetric
+          label="Avg. block time"
+          value={
+            blockTimeMin != null
+              ? `${formatNumber(blockTimeMin, 1)} min`
+              : "—"
+          }
+        />
+        <NetworkMetric
+          label="Mempool"
+          value={mempool != null ? formatNumber(mempool, 0) : "—"}
+        />
+        <NetworkMetric label={`Peers · ${peerSub}`} value={peerLabel} />
+      </>
+    );
+  }
+
   const vrcNetwork = mergeStakingNetworkKpis(
     data.vrcMining.data,
     data.explorer.data,
   );
   const networkStakePct = networkCoinsStakingPercent(vrcNetwork.netStakeWeight);
-  const mempool = data.vrcMining.data?.pooledtx ?? data.explorer.data?.pooled_tx;
+  const mempool =
+    data.vrcMining.data?.pooledtx ?? data.explorer.data?.pooled_tx;
   const posDifficulty =
     vrcNetwork.posDifficulty ?? data.blockchain.data?.difficulty;
+  const blockTimeMin = resolveBlockTimeMinutes(data.explorer.data, null);
 
   return (
-    <HeroSummaryLayout
+    <>
+      <NetworkMetric
+        label="PoS difficulty"
+        value={
+          posDifficulty != null
+            ? posDifficulty >= 0.0001
+              ? formatNumber(posDifficulty, 4)
+              : formatNumber(posDifficulty, 6)
+            : "—"
+        }
+      />
+      <NetworkMetric
+        label="Network staked"
+        value={
+          networkStakePct != null
+            ? `${formatNumber(networkStakePct, 2)}%`
+            : "—"
+        }
+      />
+      <NetworkMetric
+        label="Block time"
+        value={
+          blockTimeMin != null
+            ? `${formatNumber(blockTimeMin, 1)} min`
+            : "—"
+        }
+      />
+      <NetworkMetric
+        label="Mempool"
+        value={mempool != null ? formatNumber(mempool, 0) : "—"}
+      />
+      <NetworkMetric label={`Peers · ${peerSub}`} value={peerLabel} />
+    </>
+  );
+}
+
+export function DashboardHero({ coin }: { coin: CoinId }) {
+  const profile = getCoinProfile(coin);
+  const explorerEnabled = useExplorerQueriesEnabled();
+  const data = useDashboardData(coin);
+
+  return (
+    <HeroPanel
       coin={coin}
       profile={profile}
-      statusRow={statusRow}
+      statusRow={buildHeroStatusRow(data, explorerEnabled)}
       tipHeight={data.tipHeight}
       tipHash={data.tipHash}
       localBlocks={data.localBlocks}
@@ -616,135 +871,8 @@ function VericoinSummaryCard() {
       synced={data.synced}
       syncTarget={data.syncTarget}
       behind={data.behind}
-      statBoxes={
-        data.isLight ? (
-          <>
-            <StatBox
-              icon={<Wallet />}
-              label="Available"
-              compactLabel="Avail."
-              value={
-                data.wallet.data
-                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
-                  : "—"
-              }
-              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
-              sub={
-                data.wallet.data && data.wallet.data.unconfirmed_balance > 0
-                  ? `${formatCoinAmount(data.wallet.data.unconfirmed_balance, coin, 2)} unconf.`
-                  : data.wallet.data && isWalletLocked(data.wallet.data)
-                    ? "Unlock wallet"
-                    : undefined
-              }
-            />
-            <StatBox
-              icon={<Clock3 />}
-              label="Chain tip"
-              value={
-                data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"
-              }
-              sub={data.connected ? "From light server" : "Server offline"}
-            />
-          </>
-        ) : (
-          <>
-            <StatBox
-              icon={<Coins />}
-              label="Staking"
-              value={
-                data.vrcMining.data?.stakeweight?.combined != null
-                  ? formatNumber(data.vrcMining.data.stakeweight.combined, 0)
-                  : "—"
-              }
-              sub={stakingActive ? "On" : "Off"}
-              subClassName={
-                stakingActive ? "font-semibold text-success" : undefined
-              }
-              active={stakingActive}
-            />
-            <StatBox
-              icon={<Wallet />}
-              label="Available"
-              compactLabel="Avail."
-              value={
-                data.wallet.data
-                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
-                  : "—"
-              }
-              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
-              sub={
-                data.wallet.data && data.wallet.data.unconfirmed_balance > 0
-                  ? `${formatCoinAmount(data.wallet.data.unconfirmed_balance, coin, 2)} unconf.`
-                  : undefined
-              }
-            />
-            <div className="sm:col-span-2 md:col-span-1">
-              <StatBox
-                icon={<Users />}
-                label="Peers"
-                value={formatNumber(data.connections, 0)}
-              sub={
-                data.connections > 0
-                  ? "Online"
-                  : data.connected
-                    ? "No peers"
-                    : "Offline"
-              }
-            />
-          </div>
-        </>
-        )
-      }
-      networkMetrics={
-        <>
-          <NetworkMetric
-            label="PoS difficulty"
-            value={
-              posDifficulty != null
-                ? posDifficulty >= 0.0001
-                  ? formatNumber(posDifficulty, 4)
-                  : formatNumber(posDifficulty, 6)
-                : "—"
-            }
-          />
-          <NetworkMetric
-            label="Network staked"
-            value={
-              networkStakePct != null
-                ? `${formatNumber(networkStakePct, 2)}%`
-                : "—"
-            }
-          />
-          <NetworkMetric
-            label="Interest rate"
-            value={
-              vrcNetwork.interestRate != null
-                ? `${formatNumber(vrcNetwork.interestRate, 2)}%`
-                : "—"
-            }
-          />
-          <NetworkMetric label="Last block" value={data.blockAge} />
-          <NetworkMetric
-            label={`${profile.symbol} price`}
-            value={
-              data.explorer.data?.price_usd != null
-                ? `$${formatNumber(data.explorer.data.price_usd, 4)}`
-                : "—"
-            }
-          />
-          <NetworkMetric
-            label="Mempool"
-            value={mempool != null ? formatNumber(mempool, 0) : "—"}
-          />
-        </>
-      }
+      detailColumns={buildDetailColumns(coin, profile, data, explorerEnabled)}
+      networkMetrics={buildNetworkMetrics(coin, data)}
     />
   );
-}
-
-export function DashboardHero({ coin }: { coin: CoinId }) {
-  if (coin === "verium") {
-    return <VeriumSummaryCard />;
-  }
-  return <VericoinSummaryCard />;
 }

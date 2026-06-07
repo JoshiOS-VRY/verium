@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronRight,
-  Monitor,
-  Moon,
-  Shield,
-  Sun,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Shield } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -23,6 +16,7 @@ import { DaemonConnectionPanel } from "@/components/DaemonConnectionPanel";
 import { WalletBackupCard } from "@/components/WalletBackupCard";
 import { VeriumConfEditorCard } from "@/components/VeriumConfEditorCard";
 import { NetworkModeCard } from "@/components/NetworkModeCard";
+import { ThemeSegmented } from "@/components/ThemeSegmented";
 import { WalletModeCard } from "@/components/WalletModeCard";
 import { useWalletMode } from "@/hooks/useWalletMode";
 import { useTheme } from "@/hooks/useTheme";
@@ -35,7 +29,6 @@ import {
 import { useActiveCoin, useEnabledCoins } from "@/lib/coin/context";
 import { clearStakingStoppedByUser } from "@/hooks/useAutoStake";
 import { clearMiningStoppedByUser } from "@/lib/mining-session";
-import type { ThemeMode } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
   rpcGetConfig,
@@ -146,7 +139,7 @@ export function Settings() {
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <CardDescription>
-            Choose how the desktop UI renders. <strong>System</strong> follows
+            Choose how the desktop UI renders. <strong>Auto</strong> follows
             your OS appearance setting.
           </CardDescription>
         </CardHeader>
@@ -602,56 +595,6 @@ export function Settings() {
           )}
         </Card>
       )}
-    </div>
-  );
-}
-
-interface ThemeOption {
-  value: ThemeMode;
-  label: string;
-  Icon: typeof Monitor;
-}
-
-const THEME_OPTIONS: ThemeOption[] = [
-  { value: "system", label: "System", Icon: Monitor },
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-];
-
-function ThemeSegmented({
-  value,
-  onChange,
-}: {
-  value: ThemeMode;
-  onChange: (mode: ThemeMode) => Promise<void> | void;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Theme"
-      className="inline-flex rounded-md border border-border bg-bg-subtle p-1"
-    >
-      {THEME_OPTIONS.map(({ value: optionValue, label, Icon }) => {
-        const active = value === optionValue;
-        return (
-          <button
-            key={optionValue}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => void onChange(optionValue)}
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
-              active
-                ? "bg-accent text-accent-fg"
-                : "text-fg-muted hover:bg-bg-panel hover:text-fg",
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        );
-      })}
     </div>
   );
 }
