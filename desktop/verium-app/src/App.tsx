@@ -26,8 +26,13 @@ import { useIncomingVrmNotifications } from "@/hooks/useIncomingVrmNotifications
 import { useIncomingVrmWatcher } from "@/hooks/useIncomingVrmWatcher";
 import { useIncomingVrcNotifications } from "@/hooks/useIncomingVrcNotifications";
 import { useIncomingVrcWatcher } from "@/hooks/useIncomingVrcWatcher";
+import { FullNodeOnlyRoute } from "@/components/FullNodeOnlyRoute";
+import { useQuery } from "@tanstack/react-query";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { isCoinSetupComplete } from "@/lib/setup";
+import { useWalletMode } from "@/hooks/useWalletMode";
+import { coinQueryKey } from "@/lib/coin/profile";
+import { lightWalletExists } from "@/lib/light-wallet/client";
+import { isCoinWalletReady } from "@/lib/setup";
 import { useTheme } from "@/hooks/useTheme";
 import { useDeepLinkHandler } from "@/hooks/useDeepLinkHandler";
 import { ToastHost } from "@/components/ToastHost";
@@ -90,14 +95,32 @@ function SetupRedirect() {
   const coin = useActiveCoin();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
-  const { isLoading } = useDaemonStatus(coin);
+  const { isLight } = useWalletMode();
+  const { isLoading: daemonLoading } = useDaemonStatus(coin);
+  const storedLightWallet = useQuery({
+    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryFn: () => lightWalletExists(coin),
+    enabled: loaded,
+    staleTime: 10_000,
+  });
 
   useEffect(() => {
-    if (!loaded || isLoading) return;
-    if (isCoinSetupComplete(coin, prefs)) return;
+    if (!loaded || storedLightWallet.isLoading) return;
+    if (isCoinWalletReady(coin, prefs, storedLightWallet.data)) return;
     if (location.pathname === "/setup") return;
-    navigate("/setup", { replace: true });
-  }, [loaded, isLoading, coin, prefs, location.pathname, navigate]);
+    if (!isLight && daemonLoading) return;
+    navigate("/setup", { replace: true, state: { setupHub: true } });
+  }, [
+    loaded,
+    isLight,
+    daemonLoading,
+    coin,
+    prefs,
+    storedLightWallet.isLoading,
+    storedLightWallet.data,
+    location.pathname,
+    navigate,
+  ]);
 
   return null;
 }
@@ -153,17 +176,19 @@ function AppRoutes() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/wallet" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/mining" element={<Mining />} />
-            <Route path="/staking" element={<Staking />} />
-            <Route path="/network" element={<Network />} />
+            <Route element={<FullNodeOnlyRoute />}>
+              <Route path="/mining" element={<Mining />} />
+              <Route path="/staking" element={<Staking />} />
+              <Route path="/network" element={<Network />} />
+              <Route path="/sign" element={<SignVerify />} />
+              <Route path="/console" element={<RpcConsole />} />
+              <Route path="/logs" element={<Logs />} />
+            </Route>
             {BINARYTEST_ENABLED && (
               <Route path="/binary-chain" element={<BinaryChain />} />
             )}
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/addresses" element={<AddressBook />} />
-            <Route path="/sign" element={<SignVerify />} />
-            <Route path="/console" element={<RpcConsole />} />
-            <Route path="/logs" element={<Logs />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/security" element={<Security />} />

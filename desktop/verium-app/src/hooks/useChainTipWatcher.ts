@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 
 import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
 import { pushChainTip } from "@/lib/chain-tip-store";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { walletTransactionsQueryKey } from "@/lib/wallet-transactions-query";
 
 interface ChainTipPayload {
@@ -24,9 +25,11 @@ const INVALIDATE_DEBOUNCE_MS = 3_000;
  * debounced explorer refetch to enrich the block with miner address/reward.
  */
 export function useChainTipWatcher(): void {
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (isLight) return;
     let cancelled = false;
     let enrichTimer: number | undefined;
     let invalidateTimer: number | undefined;
@@ -73,5 +76,5 @@ export function useChainTipWatcher(): void {
       if (invalidateTimer != null) window.clearTimeout(invalidateTimer);
       void unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [queryClient]);
+  }, [isLight, queryClient]);
 }

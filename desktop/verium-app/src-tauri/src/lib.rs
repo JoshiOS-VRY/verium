@@ -1,4 +1,5 @@
 mod block_height_cache;
+mod chain;
 mod node;
 mod addressbook;
 mod audit_log;
@@ -17,7 +18,6 @@ mod pool_api;
 mod pool_miner;
 mod pool_miner_sidecar;
 mod features;
-mod gpu_miner;
 mod http_shared;
 mod memory_telemetry;
 mod hardware_wallet;
@@ -29,23 +29,47 @@ mod network_mode_commands;
 mod passkey;
 mod prefs;
 mod receive_requests;
+mod hd_wallet_export;
+mod mnemonic_backup;
 mod recovery;
 mod rpc;
+mod rpc_guard;
 mod secret_store;
 mod security_commands;
+mod security_policy;
 mod slip39_recovery;
 mod spending_controls;
 mod state;
 mod two_factor;
 mod updates;
+mod wallet;
+mod wallet_commands;
 mod wallet_secrets;
 
 use state::AppState;
 use tauri::{Manager, WindowEvent};
 use tracing_subscriber::EnvFilter;
 
+fn load_dotenv_files() {
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for rel in [".env", "../.env", "../.env.local"] {
+        let path = manifest_dir.join(rel);
+        if path.exists() {
+            let _ = dotenvy::from_path(&path);
+        }
+    }
+}
+
+fn install_rustls_crypto_provider() {
+    // reqwest enables aws-lc-rs; electrum TLS uses ring — pick one before any TLS handshake.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    load_dotenv_files();
+    install_rustls_crypto_provider();
+
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
@@ -53,11 +77,12 @@ pub fn run() {
         )
         .try_init();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
@@ -75,7 +100,6 @@ pub fn run() {
                 node::orchestrator::startup(startup_app, &startup_state).await;
             });
             app.manage(state);
-            app.manage(gpu_miner::GpuMinerHandle::new());
             app.manage(pool_miner::PoolMinerHandle::new());
             Ok(())
         })
@@ -115,6 +139,7 @@ pub fn run() {
             commands::wallet_set_tx_fee,
             commands::wallet_list_unspent,
             commands::wallet_send_with_inputs,
+            #[cfg(feature = "dev-rpc-console")]
             commands::rpc_raw_call,
             commands::send_to_address,
             commands::get_daemon_config,
@@ -186,15 +211,14 @@ pub fn run() {
             network_mode_commands::network_mode_get,
             network_mode_commands::network_mode_preview,
             network_mode_commands::network_mode_set,
-            gpu_miner::gpu_miner_status,
-            gpu_miner::gpu_miner_start,
-            gpu_miner::gpu_miner_stop,
             security_commands::recovery_generate_mnemonic,
             security_commands::recovery_validate_mnemonic,
             security_commands::recovery_verification_indices,
             security_commands::recovery_verify_words,
             security_commands::recovery_apply_hd_seed,
             security_commands::recovery_wallet_is_hd,
+            security_commands::recovery_mnemonic_backup_exists,
+            security_commands::recovery_export_seed,
             security_commands::two_factor_status,
             security_commands::two_factor_start_enrollment,
             security_commands::two_factor_confirm_enrollment,
@@ -249,9 +273,24 @@ pub fn run() {
             security_commands::build_payment_uri,
             memory_telemetry::get_memory_diagnostics,
             memory_telemetry::set_node_state_listener_count,
+            wallet_commands::wallet_mode_get,
+            wallet_commands::wallet_mode_set,
+            wallet_commands::electrum_servers_get,
+            wallet_commands::electrum_servers_set,
+            wallet_commands::electrum_test_connection,
+            wallet_commands::electrum_validate_defaults,
+            wallet_commands::light_wallet_create,
+            wallet_commands::light_wallet_import,
+            wallet_commands::light_wallet_unlock,
+            wallet_commands::light_wallet_rescan,
+            wallet_commands::light_wallet_lock,
+            wallet_commands::light_wallet_exists,
+            wallet_commands::light_server_status,
+            wallet_commands::electrum_cross_verify_tip,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building tauri application")
+        .expect("error while building tauri application");
+    app
         .run(|app_handle, event| {
             if matches!(event, tauri::RunEvent::Exit) {
                 commands::run_shutdown_on_exit(app_handle);

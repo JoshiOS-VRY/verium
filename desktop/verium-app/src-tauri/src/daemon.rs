@@ -913,7 +913,7 @@ pub fn binary_missing_hint(coin: CoinId) -> Option<String> {
         return Some(format!(
             "{name} was not found. Verium mainnet requires the legacy flat-layout {name} \
              (verium-only v1.x — not the unified vericoin/veriumd build). Set VERIUMD_LOCAL \
-             to a verium-only binary or build from verium-legacy/."
+             to a verium-only binary or build from verium/ with --without-gui."
         ));
     }
     if sidecar_stub_present(coin) {

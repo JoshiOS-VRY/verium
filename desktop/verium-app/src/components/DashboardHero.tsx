@@ -24,6 +24,7 @@ import { useExplorerQueriesEnabled } from "@/lib/network-mode";
 import { AnimatedHashrate } from "@/components/AnimatedHashrate";
 import { cn, formatNumber } from "@/lib/utils";
 import { formatCoinAmount } from "@/lib/units";
+import { isWalletLocked, lockedWalletBalanceClass } from "@/lib/wallet-unlock";
 
 function StatusPill({
   children,
@@ -158,6 +159,7 @@ function StatBox({
   label,
   compactLabel,
   value,
+  valueClassName,
   sub,
   subClassName,
   active = false,
@@ -166,6 +168,7 @@ function StatBox({
   label: string;
   compactLabel?: string;
   value: ReactNode;
+  valueClassName?: string;
   sub?: string;
   subClassName?: string;
   active?: boolean;
@@ -202,7 +205,10 @@ function StatBox({
         </div>
 
         <div
-          className="truncate font-semibold tabular-nums leading-tight tracking-tight text-[clamp(0.6875rem,5.5cqi,1.0625rem)] text-fg"
+          className={cn(
+            "truncate font-semibold tabular-nums leading-tight tracking-tight text-[clamp(0.6875rem,5.5cqi,1.0625rem)] text-fg",
+            valueClassName,
+          )}
           title={typeof value === "string" ? value : undefined}
         >
           {value}
@@ -364,6 +370,21 @@ function buildHeroStatusRow(
   data: ReturnType<typeof useDashboardData>,
   explorerEnabled: boolean,
 ): ReactNode {
+  if (data.isLight) {
+    const online = data.connected;
+    return (
+      <>
+        <StatusPill tone={online ? "success" : "accent"}>
+          {online && (
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+          )}
+          {data.connected ? "Light wallet online" : "Light wallet offline"}
+        </StatusPill>
+        <StatusPill tone="neutral">Light wallet</StatusPill>
+      </>
+    );
+  }
+
   const { activity, synced, blockchain, localBlocks, networkTip } = data;
   const heightDelta =
     localBlocks != null && networkTip != null
@@ -434,54 +455,88 @@ function VeriumSummaryCard() {
       syncTarget={data.syncTarget}
       behind={data.behind}
       statBoxes={
-        <>
-          <StatBox
-            icon={<Cpu />}
-            label="Mining"
-            value={
-              <AnimatedHashrate
-                value={localHashrate > 0 ? localHashrate : undefined}
-                fractionDigits={0}
-                className="font-semibold text-fg"
-                immediate={data.miningActive}
-              />
-            }
-            sub={data.miningActive ? "On" : "Off"}
-            subClassName={
-              data.miningActive ? "font-semibold text-success" : undefined
-            }
-            active={data.miningActive}
-          />
-          <StatBox
-            icon={<Wallet />}
-            label="Available"
-            compactLabel="Avail."
-            value={
-              data.wallet.data
-                ? formatCoinAmount(data.wallet.data.balance, coin, 4)
-                : "—"
-            }
-            sub={
-              data.wallet.data && data.wallet.data.immature_balance > 0
-                ? `${formatCoinAmount(data.wallet.data.immature_balance, coin, 2)} imm.`
-                : undefined
-            }
-          />
-          <div className="sm:col-span-2 md:col-span-1">
+        data.isLight ? (
+          <>
             <StatBox
-              icon={<Users />}
-              label="Peers"
-              value={formatNumber(data.connections, 0)}
+              icon={<Wallet />}
+              label="Available"
+              compactLabel="Avail."
+              value={
+                data.wallet.data
+                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
+                  : "—"
+              }
+              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
               sub={
-                data.connections > 0
-                  ? "Online"
-                  : data.connected
-                    ? "No peers"
-                    : "Offline"
+                data.wallet.data && data.wallet.data.immature_balance > 0
+                  ? `${formatCoinAmount(data.wallet.data.immature_balance, coin, 2)} imm.`
+                  : data.wallet.isLoading
+                    ? "Loading…"
+                    : data.wallet.data && isWalletLocked(data.wallet.data)
+                      ? "Unlock wallet"
+                      : undefined
               }
             />
-          </div>
-        </>
+            <StatBox
+              icon={<Clock3 />}
+              label="Chain tip"
+              value={
+                data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"
+              }
+              sub={data.connected ? "From light server" : "Server offline"}
+            />
+          </>
+        ) : (
+          <>
+            <StatBox
+              icon={<Cpu />}
+              label="Mining"
+              value={
+                <AnimatedHashrate
+                  value={localHashrate > 0 ? localHashrate : undefined}
+                  fractionDigits={0}
+                  className="font-semibold text-fg"
+                  immediate={data.miningActive}
+                />
+              }
+              sub={data.miningActive ? "On" : "Off"}
+              subClassName={
+                data.miningActive ? "font-semibold text-success" : undefined
+              }
+              active={data.miningActive}
+            />
+            <StatBox
+              icon={<Wallet />}
+              label="Available"
+              compactLabel="Avail."
+              value={
+                data.wallet.data
+                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
+                  : "—"
+              }
+              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
+              sub={
+                data.wallet.data && data.wallet.data.immature_balance > 0
+                  ? `${formatCoinAmount(data.wallet.data.immature_balance, coin, 2)} imm.`
+                  : undefined
+              }
+            />
+            <div className="sm:col-span-2 md:col-span-1">
+              <StatBox
+                icon={<Users />}
+                label="Peers"
+                value={formatNumber(data.connections, 0)}
+                sub={
+                  data.connections > 0
+                    ? "Online"
+                    : data.connected
+                      ? "No peers"
+                      : "Offline"
+                }
+              />
+            </div>
+          </>
+        )
       }
       networkMetrics={
         <>
@@ -562,41 +617,72 @@ function VericoinSummaryCard() {
       syncTarget={data.syncTarget}
       behind={data.behind}
       statBoxes={
-        <>
-          <StatBox
-            icon={<Coins />}
-            label="Staking"
-            value={
-              data.vrcMining.data?.stakeweight?.combined != null
-                ? formatNumber(data.vrcMining.data.stakeweight.combined, 0)
-                : "—"
-            }
-            sub={stakingActive ? "On" : "Off"}
-            subClassName={
-              stakingActive ? "font-semibold text-success" : undefined
-            }
-            active={stakingActive}
-          />
-          <StatBox
-            icon={<Wallet />}
-            label="Available"
-            compactLabel="Avail."
-            value={
-              data.wallet.data
-                ? formatCoinAmount(data.wallet.data.balance, coin, 4)
-                : "—"
-            }
-            sub={
-              data.wallet.data && data.wallet.data.unconfirmed_balance > 0
-                ? `${formatCoinAmount(data.wallet.data.unconfirmed_balance, coin, 2)} unconf.`
-                : undefined
-            }
-          />
-          <div className="sm:col-span-2 md:col-span-1">
+        data.isLight ? (
+          <>
             <StatBox
-              icon={<Users />}
-              label="Peers"
-              value={formatNumber(data.connections, 0)}
+              icon={<Wallet />}
+              label="Available"
+              compactLabel="Avail."
+              value={
+                data.wallet.data
+                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
+                  : "—"
+              }
+              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
+              sub={
+                data.wallet.data && data.wallet.data.unconfirmed_balance > 0
+                  ? `${formatCoinAmount(data.wallet.data.unconfirmed_balance, coin, 2)} unconf.`
+                  : data.wallet.data && isWalletLocked(data.wallet.data)
+                    ? "Unlock wallet"
+                    : undefined
+              }
+            />
+            <StatBox
+              icon={<Clock3 />}
+              label="Chain tip"
+              value={
+                data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"
+              }
+              sub={data.connected ? "From light server" : "Server offline"}
+            />
+          </>
+        ) : (
+          <>
+            <StatBox
+              icon={<Coins />}
+              label="Staking"
+              value={
+                data.vrcMining.data?.stakeweight?.combined != null
+                  ? formatNumber(data.vrcMining.data.stakeweight.combined, 0)
+                  : "—"
+              }
+              sub={stakingActive ? "On" : "Off"}
+              subClassName={
+                stakingActive ? "font-semibold text-success" : undefined
+              }
+              active={stakingActive}
+            />
+            <StatBox
+              icon={<Wallet />}
+              label="Available"
+              compactLabel="Avail."
+              value={
+                data.wallet.data
+                  ? formatCoinAmount(data.wallet.data.balance, coin, 4)
+                  : "—"
+              }
+              valueClassName={lockedWalletBalanceClass(data.wallet.data)}
+              sub={
+                data.wallet.data && data.wallet.data.unconfirmed_balance > 0
+                  ? `${formatCoinAmount(data.wallet.data.unconfirmed_balance, coin, 2)} unconf.`
+                  : undefined
+              }
+            />
+            <div className="sm:col-span-2 md:col-span-1">
+              <StatBox
+                icon={<Users />}
+                label="Peers"
+                value={formatNumber(data.connections, 0)}
               sub={
                 data.connections > 0
                   ? "Online"
@@ -607,6 +693,7 @@ function VericoinSummaryCard() {
             />
           </div>
         </>
+        )
       }
       networkMetrics={
         <>

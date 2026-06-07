@@ -45,6 +45,9 @@ import {
 } from "@/lib/transaction-category";
 import { cn, formatNumber } from "@/lib/utils";
 import { consumePendingPaymentUri } from "@/lib/payment-uri-pending";
+import { useWalletMode } from "@/hooks/useWalletMode";
+import { useLightServerConnected } from "@/hooks/useLightServerConnected";
+import { isWalletLocked } from "@/lib/wallet-unlock";
 
 type TransferMode = "send" | "receive";
 
@@ -102,6 +105,8 @@ function TransferModeToggle({
 export function Transactions() {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
+  const { isLight } = useWalletMode();
+  const lightServer = useLightServerConnected();
   const prefs = useUserPreferences((s) => s.prefs);
   const [mode, setMode] = useState<TransferMode>("send");
   const [prefill, setPrefill] = useState<{
@@ -139,7 +144,7 @@ export function Transactions() {
   const addressGroupings = useQuery({
     queryKey: coinQueryKey(coin, "listaddressgroupings"),
     queryFn: () => rpcListAddressGroupings(coin),
-    enabled: coin === "verium",
+    enabled: coin === "verium" && !isLight,
     staleTime: 30_000,
   });
 
@@ -320,7 +325,13 @@ export function Transactions() {
             <CardTitle>Recent transactions</CardTitle>
             <CardDescription>
               {showExplorerFallback
-                ? "Wallet RPC unavailable or empty — showing recent network transactions from the explorer."
+                ? isLight
+                  ? wallet.data && isWalletLocked(wallet.data)
+                    ? "Unlock your light wallet to load transaction history."
+                    : !lightServer.connected
+                      ? "Light wallet server offline — showing recent network transactions from the explorer."
+                      : "No wallet transactions yet — showing recent network activity from the explorer."
+                  : "Wallet RPC unavailable or empty — showing recent network transactions from the explorer."
                 : "Newest first."}
             </CardDescription>
           </CardHeader>

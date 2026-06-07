@@ -19,6 +19,7 @@ import {
   rpcMinerStart,
 } from "@/lib/rpc/client";
 import { isWalletUnlocked } from "@/lib/wallet-unlock";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { wasMiningStoppedByUser } from "@/lib/mining-session";
 
 const RETRY_MS = 10_000;
@@ -30,6 +31,7 @@ const VERIUM = "verium" as const;
  * Thread count follows auto-adjust preference or manual override.
  */
 export function useAutoMine() {
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
@@ -40,7 +42,11 @@ export function useAutoMine() {
     queryKey: ["cpu-topology"],
     queryFn: fetchCpuTopology,
     staleTime: 60_000,
-    enabled: loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
+    enabled:
+      !isLight &&
+      loaded &&
+      prefs.auto_mine_on_open === true &&
+      prefs.verium_enabled !== false,
   });
 
   const explorerEnabled = useExplorerQueriesEnabled();
@@ -49,6 +55,7 @@ export function useAutoMine() {
     queryFn: () => fetchExplorerStats(VERIUM),
     refetchInterval: 30_000,
     enabled:
+      !isLight &&
       loaded &&
       prefs.auto_mine_on_open === true &&
       prefs.verium_enabled !== false &&
@@ -60,24 +67,37 @@ export function useAutoMine() {
     queryKey: coinQueryKey(VERIUM, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(VERIUM),
     refetchInterval: 10_000,
-    enabled: loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
+    enabled:
+      !isLight &&
+      loaded &&
+      prefs.auto_mine_on_open === true &&
+      prefs.verium_enabled !== false,
   });
 
   const wallet = useQuery({
     queryKey: coinQueryKey(VERIUM, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(VERIUM),
     refetchInterval: false,
-    enabled: loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
+    enabled:
+      !isLight &&
+      loaded &&
+      prefs.auto_mine_on_open === true &&
+      prefs.verium_enabled !== false,
   });
 
   const minerState = useQuery({
     queryKey: coinQueryKey(VERIUM, "get_miner_state"),
     queryFn: () => rpcGetMinerState(VERIUM),
     refetchInterval: false,
-    enabled: loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
+    enabled:
+      !isLight &&
+      loaded &&
+      prefs.auto_mine_on_open === true &&
+      prefs.verium_enabled !== false,
   });
 
   useEffect(() => {
+    if (isLight) return;
     if (!loaded || !prefs.auto_mine_on_open || prefs.verium_enabled === false) return;
 
     const tryStart = async () => {
@@ -124,6 +144,7 @@ export function useAutoMine() {
     const id = window.setInterval(() => void tryStart(), RETRY_MS);
     return () => window.clearInterval(id);
   }, [
+    isLight,
     loaded,
     prefs.auto_mine_on_open,
     prefs.verium_enabled,

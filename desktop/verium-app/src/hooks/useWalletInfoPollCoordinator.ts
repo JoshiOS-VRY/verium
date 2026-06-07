@@ -22,6 +22,7 @@ export function useWalletInfoPollCoordinator(): void {
 
   const interval = (data: WalletInfo | undefined) => {
     if (!visible) return false;
+    if (data?.light_syncing) return WALLET_SCAN_POLL_MS;
     return walletScanProgress(data?.scanning)
       ? WALLET_SCAN_POLL_MS
       : WALLET_INFO_POLL_MS;

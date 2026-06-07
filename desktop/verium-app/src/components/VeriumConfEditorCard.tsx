@@ -53,7 +53,7 @@ export function VeriumConfEditorCard({ coin }: { coin: CoinId }) {
   });
 
   const save = useMutation({
-    mutationFn: () => tauriWriteNodeConf(coin, draft),
+    mutationFn: (totpCode?: string) => tauriWriteNodeConf(coin, draft, totpCode),
     onMutate: () => {
       restart.reset();
     },
@@ -145,7 +145,7 @@ export function VeriumConfEditorCard({ coin }: { coin: CoinId }) {
                 <Button
                   size="sm"
                   onClick={() =>
-                    void twoFa.gate("edit_conf", () => save.mutate(), {
+                    void twoFa.gate("edit_conf", (code) => save.mutate(code), {
                       title: "Confirm config change with 2FA",
                     })
                   }

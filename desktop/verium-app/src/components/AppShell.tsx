@@ -1,15 +1,18 @@
 import { Outlet } from "react-router-dom";
 import { useActiveCoin } from "@/lib/coin/context";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { DashboardNodeActivity } from "./DashboardNodeActivity";
 import { NodeRecoveryBanner } from "./NodeRecoveryBanner";
 import { NetworkModeBanner } from "./NetworkModeBanner";
 import { ShutdownProgressOverlay } from "./ShutdownProgressOverlay";
 import { SyncStallBanner } from "./SyncStallBanner";
+import { LightWalletAvailableBanner } from "./LightWalletAvailableBanner";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 export function AppShell() {
   const coin = useActiveCoin();
+  const { isLight } = useWalletMode();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg text-fg">
@@ -22,9 +25,10 @@ export function AppShell() {
         <TopBar />
         <main className="flex-1 overflow-y-auto px-8 py-6">
           <div className="mx-auto flex flex-col gap-4">
-            <DashboardNodeActivity coin={coin} />
-            <NodeRecoveryBanner />
-            <SyncStallBanner />
+            <LightWalletAvailableBanner />
+            {!isLight && <DashboardNodeActivity coin={coin} />}
+            {!isLight && <NodeRecoveryBanner />}
+            {!isLight && <SyncStallBanner />}
             <Outlet />
           </div>
         </main>

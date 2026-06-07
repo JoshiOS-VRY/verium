@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
+import { lightWalletExists } from "@/lib/light-wallet/client";
 import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
+import { useLightServerConnected } from "@/hooks/useLightServerConnected";
 import { useNodeStatus } from "@/hooks/useNodeStatus";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 import {
@@ -11,7 +14,10 @@ import {
 } from "@/lib/bootstrap-policy";
 import { useChainTip } from "@/lib/chain-tip-store";
 import { fetchExplorerStats } from "@/lib/explorer-api";
-import { deriveDashboardActivity } from "@/lib/node/dashboard-activity";
+import {
+  deriveDashboardActivity,
+  type DashboardActivity,
+} from "@/lib/node/dashboard-activity";
 import { useExplorerQueriesEnabled } from "@/lib/network-mode";
 import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
 import {
@@ -28,17 +34,27 @@ import { formatBlockAge } from "@/lib/utils";
 export function useDashboardData(coin: CoinId) {
   const visible = useWindowVisible();
   const explorerEnabled = useExplorerQueriesEnabled();
+  const { isLight } = useWalletMode();
+  const lightExistsForCoin = useQuery({
+    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryFn: () => lightWalletExists(coin),
+    enabled: isLight,
+    staleTime: 5_000,
+  });
+  const lightServer = useLightServerConnected();
   const node = useNodeStatus(coin);
   const chainTip = useChainTip(coin);
   const ageTick = useBlockAgeTick(visible);
 
-  const connected = node.data?.connected === true;
+  const connected = isLight
+    ? lightServer.connected
+    : node.data?.connected === true;
 
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
     refetchInterval: (query) => {
-      if (!visible) return false;
+      if (!visible || isLight) return false;
       const data = query.state.data;
       const syncing =
         data != null &&
@@ -47,12 +63,19 @@ export function useDashboardData(coin: CoinId) {
         data.headers > data.blocks + 1;
       return syncing ? 5_000 : 30_000;
     },
+    enabled: !isLight,
   });
 
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: false,
+    enabled: !isLight || lightExistsForCoin.data !== false,
+    refetchInterval: (q) => {
+      if (!isLight || !visible || !lightServer.connected) return false;
+      if (q.state.data?.light_syncing) return 5_000;
+      return 30_000;
+    },
+    retry: isLight ? 2 : 3,
   });
 
   const explorer = useQuery({
@@ -63,13 +86,15 @@ export function useDashboardData(coin: CoinId) {
     retry: 0,
   });
 
-  const transactions = useWalletTransactions(coin, { enabled: connected });
+  const transactions = useWalletTransactions(coin, {
+    enabled: connected && (!isLight || lightExistsForCoin.data !== false),
+  });
 
   const minerState = useQuery({
     queryKey: coinQueryKey(coin, "get_miner_state"),
     queryFn: () => rpcGetMinerState(coin),
     refetchInterval: false,
-    enabled: coin === "verium",
+    enabled: coin === "verium" && !isLight,
   });
 
   const minerActive = minerState.data?.active ?? false;
@@ -91,7 +116,7 @@ export function useDashboardData(coin: CoinId) {
     queryKey: coinQueryKey(coin, "getmininginfo"),
     queryFn: () => rpcGetMiningInfo(coin),
     refetchInterval: false,
-    enabled: coin === "verium" && miningActive,
+    enabled: coin === "verium" && !isLight && miningActive,
   });
 
   const soloHashrate = mining.data?.hashrate ?? 0;
@@ -101,27 +126,32 @@ export function useDashboardData(coin: CoinId) {
     queryKey: coinQueryKey(coin, "get_staking_state"),
     queryFn: () => rpcGetStakingState(coin),
     refetchInterval: visible ? 5_000 : false,
-    enabled: coin === "vericoin",
+    enabled: coin === "vericoin" && !isLight,
   });
 
   const vrcMining = useQuery({
     queryKey: coinQueryKey("vericoin", "getmininginfo"),
     queryFn: () => rpcGetVericoinMiningInfo(),
     refetchInterval: visible ? 10_000 : false,
-    enabled: coin === "vericoin",
+    enabled: coin === "vericoin" && !isLight,
   });
 
-  const networkTip = explorer.data?.height;
+  const networkTip = explorer.data?.height ?? lightServer.tipHeight ?? undefined;
   const syncCtx = {
     connected,
-    syncStalled: node.data?.sync_stalled === true,
+    syncStalled: isLight ? false : node.data?.sync_stalled === true,
     networkTip,
   };
-  const phase = chainSyncPhase(blockchain.data, syncCtx);
-  const synced = phase === "synced";
-  const localBlocks = blockchain.data?.blocks;
+  const phase = isLight ? "synced" : chainSyncPhase(blockchain.data, syncCtx);
+  const synced = isLight || phase === "synced";
+  const localBlocks = isLight
+    ? (lightServer.tipHeight ?? explorer.data?.height)
+    : blockchain.data?.blocks;
   const blockHash = blockchain.data?.bestblockhash;
-  const tipHeight = chainTip.tip?.height ?? localBlocks;
+  const tipHeight =
+    (isLight ? lightServer.tipHeight : null) ??
+    chainTip.tip?.height ??
+    localBlocks;
   const tipHash = chainTip.tip?.hash ?? blockHash;
   const syncTarget = syncTargetHeight(blockchain.data, networkTip);
   const behind = blocksBehindNetwork(localBlocks, syncTarget);
@@ -130,19 +160,30 @@ export function useDashboardData(coin: CoinId) {
       ? chainTip.tip.time
       : blockchain.data?.mediantime;
   const blockAge = tipTime != null ? formatBlockAge(tipTime, ageTick) : "—";
-  const connections = node.data?.connections ?? 0;
+  const connections = isLight ? 0 : (node.data?.connections ?? 0);
 
-  const activity = deriveDashboardActivity({
-    coin,
-    status: node.data,
-    statusLoading: node.isLoading,
-    isConnecting: node.isConnecting,
-    blockchain: blockchain.data,
-    blockchainLoading: blockchain.isLoading || blockchain.isFetching,
-    networkTip,
-  });
+  const activity: DashboardActivity = isLight
+    ? {
+        kind: connected ? "ready" : "unavailable",
+        title: connected ? "Light wallet online" : "Light wallet offline",
+        detail: connected
+          ? "Connected to Vericonomy servers"
+          : "Cannot reach Electrum servers",
+        showSpinner: false,
+      }
+    : deriveDashboardActivity({
+        coin,
+        status: node.data,
+        statusLoading: node.isLoading,
+        isConnecting: node.isConnecting,
+        blockchain: blockchain.data,
+        blockchainLoading: blockchain.isLoading || blockchain.isFetching,
+        networkTip,
+      });
 
   return {
+    isLight,
+    lightServer,
     node,
     status: node.data,
     activity,

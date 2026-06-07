@@ -62,30 +62,34 @@ fn config_path() -> std::path::PathBuf {
     crate::config::app_config_base().join("two_factor.json")
 }
 
-/// Prefer the plaintext mirror so we do not return a stale encrypted blob after confirm.
 pub fn load() -> AppResult<TwoFactorConfig> {
     let path = config_path();
+    let encrypted = secret_store::load_json(STORE_LABEL, &path, TwoFactorConfig::default());
+    if let Ok(ref config) = encrypted {
+        if config.secret_base32.is_some() || config.enabled || !config.recovery_code_hashes.is_empty()
+        {
+            return encrypted;
+        }
+    }
     if path.exists() {
         if let Ok(raw) = std::fs::read_to_string(&path) {
-            match serde_json::from_str::<TwoFactorConfig>(&raw) {
-                Ok(config) => return Ok(config),
-                Err(e) => tracing::warn!("two_factor: invalid plaintext config: {e}"),
+            if let Ok(legacy) = serde_json::from_str::<TwoFactorConfig>(&raw) {
+                tracing::info!("migrating legacy plaintext two_factor.json to encrypted store");
+                save(&legacy)?;
+                let _ = std::fs::remove_file(&path);
+                return Ok(legacy);
             }
         }
     }
-    secret_store::load_json(STORE_LABEL, &path, TwoFactorConfig::default())
+    encrypted
 }
 
 pub fn save(config: &TwoFactorConfig) -> AppResult<()> {
     secret_store::save_json(STORE_LABEL, config)?;
-    // Plaintext mirror for load_json fallback when the encrypted blob cannot be
-    // decrypted (e.g. Windows Credential Manager reset).
     let path = config_path();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
     }
-    let json = serde_json::to_string_pretty(config)?;
-    std::fs::write(path, json)?;
     Ok(())
 }
 

@@ -1,0 +1,163 @@
+//! Local transaction signing for light wallet (secp256k1, never sent to server).
+
+use bitcoin::absolute::LockTime;
+use bitcoin::transaction::Version;
+use bitcoin::{Amount, OutPoint, ScriptBuf, Sequence, TxIn, TxOut, Witness};
+
+use crate::chain::types::Utxo;
+use crate::coin_profile::CoinId;
+use crate::error::{AppError, AppResult};
+use crate::wallet::hd::{derive_keypair_on_chain, uses_core_hd_paths, GAP_SCAN_MAX_INDEX, HdChain};
+use crate::wallet::vericonomy_tx::{
+    build_signed_tx_hex, current_n_time, display_txid_from_raw, parse_display_txid,
+    serialize_verium_tx, VeriumMutableTx,
+};
+
+pub struct SignedTx {
+    pub hex: String,
+    pub txid: String,
+}
+
+fn assemble_transaction(
+    coin: CoinId,
+    mnemonic: &str,
+    bip39_passphrase: Option<&str>,
+    utxos: &[Utxo],
+    outputs: &[(String, i64)],
+    change_address: &str,
+    fee_sats: i64,
+) -> AppResult<(VeriumMutableTx, Vec<[u8; 32]>)> {
+    let mut inputs = Vec::new();
+    let mut input_keys = Vec::new();
+    let mut input_sum = 0i64;
+    for utxo in utxos {
+        if utxo.script_hex.is_empty() {
+            return Err(AppError::other("utxo missing script for signing"));
+        }
+        let txid = parse_display_txid(&utxo.txid)?;
+        inputs.push(TxIn {
+            previous_output: OutPoint {
+                txid,
+                vout: utxo.vout,
+            },
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            witness: Witness::new(),
+        });
+        input_sum += utxo.value_sats;
+        let (secret, _) = find_signing_key(coin, mnemonic, bip39_passphrase, &utxo.address)?;
+        input_keys.push(secret);
+    }
+    let output_sum: i64 = outputs.iter().map(|(_, v)| *v).sum();
+    let change_sats = input_sum - output_sum - fee_sats;
+    if change_sats < 0 {
+        return Err(AppError::other("insufficient funds for outputs + fee"));
+    }
+    let mut tx_outputs = Vec::new();
+    for (addr, value) in outputs {
+        let script = crate::wallet::hd::address_to_script_pubkey(coin, addr)?;
+        tx_outputs.push(TxOut {
+            value: Amount::from_sat((*value).max(0) as u64),
+            script_pubkey: ScriptBuf::from_bytes(script),
+        });
+    }
+    if change_sats > 546 {
+        let script = crate::wallet::hd::address_to_script_pubkey(coin, change_address)?;
+        tx_outputs.push(TxOut {
+            value: Amount::from_sat(change_sats as u64),
+            script_pubkey: ScriptBuf::from_bytes(script),
+        });
+    }
+    Ok((
+        VeriumMutableTx {
+            version: Version::ONE.0,
+            n_time: current_n_time(),
+            inputs,
+            outputs: tx_outputs,
+            lock_time: LockTime::ZERO.to_consensus_u32(),
+        },
+        input_keys,
+    ))
+}
+
+pub fn build_unsigned_hex(
+    coin: CoinId,
+    mnemonic: &str,
+    bip39_passphrase: Option<&str>,
+    utxos: &[Utxo],
+    outputs: &[(String, i64)],
+    change_address: &str,
+    fee_sats: i64,
+) -> AppResult<String> {
+    let (tx, _) = assemble_transaction(
+        coin,
+        mnemonic,
+        bip39_passphrase,
+        utxos,
+        outputs,
+        change_address,
+        fee_sats,
+    )?;
+    Ok(hex::encode(serialize_verium_tx(&tx)?))
+}
+
+pub fn sign_transaction(
+    coin: CoinId,
+    mnemonic: &str,
+    bip39_passphrase: Option<&str>,
+    utxos: &[Utxo],
+    outputs: &[(String, i64)],
+    change_address: &str,
+    fee_sats: i64,
+) -> AppResult<SignedTx> {
+    let (mut tx, input_keys) = assemble_transaction(
+        coin,
+        mnemonic,
+        bip39_passphrase,
+        utxos,
+        outputs,
+        change_address,
+        fee_sats,
+    )?;
+    let hex = build_signed_tx_hex(&mut tx, utxos, &input_keys)?;
+    let raw = hex::decode(&hex).map_err(|e| AppError::other(format!("signed tx hex: {e}")))?;
+    Ok(SignedTx {
+        hex,
+        txid: display_txid_from_raw(&raw),
+    })
+}
+
+fn find_signing_key(
+    coin: CoinId,
+    mnemonic: &str,
+    bip39_passphrase: Option<&str>,
+    address: &str,
+) -> AppResult<([u8; 32], Vec<u8>)> {
+    if address.is_empty() {
+        return Err(AppError::other("utxo missing address for signing"));
+    }
+    if uses_core_hd_paths(coin, mnemonic) {
+        for chain in [HdChain::External, HdChain::Internal] {
+            for index in 0..GAP_SCAN_MAX_INDEX {
+                let (secret, pubkey) =
+                    derive_keypair_on_chain(coin, mnemonic, bip39_passphrase, chain, index)?;
+                let addr = crate::wallet::hd::pubkey_to_p2pkh_address(coin, &pubkey)?;
+                if addr == address {
+                    return Ok((secret, pubkey));
+                }
+            }
+        }
+    } else {
+        for index in 0..GAP_SCAN_MAX_INDEX {
+            let (secret, pubkey) =
+                derive_keypair_on_chain(coin, mnemonic, bip39_passphrase, HdChain::External, index)?;
+            let addr = crate::wallet::hd::pubkey_to_p2pkh_address(coin, &pubkey)?;
+            if addr == address {
+                return Ok((secret, pubkey));
+            }
+        }
+    }
+    Err(AppError::other(format!(
+        "no signing key found for address {address}"
+    )))
+}

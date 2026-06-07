@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -21,9 +21,18 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey, COIN_PROFILES } from "@/lib/coin/profile";
-import { coinSetupCompletePatch } from "@/lib/setup";
+import {
+  useActiveCoin,
+  useEnabledCoins,
+  useSetActiveCoin,
+} from "@/lib/coin/context";
+import { coinQueryKey, COIN_PROFILES, type CoinId } from "@/lib/coin/profile";
+import {
+  anyEnabledCoinSetupIncomplete,
+  coinSetupCompletePatch,
+  isCoinSetupComplete,
+  isCoinWalletReady,
+} from "@/lib/setup";
 import {
   rpcGetConfig,
   rpcGetWalletInfo,
@@ -54,8 +63,15 @@ import {
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
 import { isNodeReady, nodeStatusLabel } from "@/lib/node/status";
 import { useIsTestNetwork } from "@/lib/network-mode";
+import { LIGHT_WALLET_ENABLED } from "@/lib/features";
+import { lightWalletExists, walletModeSet } from "@/lib/light-wallet/client";
+import { LightWalletSetupForm } from "@/components/LightWalletSetupForm";
+import { SetupWalletHub } from "@/components/SetupWalletHub";
+import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
+import { lightWalletCopy } from "@/lib/light-wallet/copy";
 
 type Step =
+  | "hub"
   | "welcome"
   | "daemon"
   | "wallet"
@@ -65,13 +81,20 @@ type Step =
   | "done"
   | "advanced";
 
-const STEPS: { id: Exclude<Step, "advanced">; label: string }[] = [
+const FULL_STEPS: { id: Exclude<Step, "advanced">; label: string }[] = [
   { id: "welcome", label: "Welcome" },
   { id: "daemon", label: "Start node" },
   { id: "wallet", label: "Wallet" },
   { id: "recovery", label: "Recovery" },
   { id: "twofa", label: "2FA" },
   { id: "bootstrap", label: "Sync" },
+  { id: "done", label: "Finish" },
+];
+
+const LIGHT_STEPS: { id: Exclude<Step, "advanced">; label: string }[] = [
+  { id: "welcome", label: "Welcome" },
+  { id: "wallet", label: "Wallet" },
+  { id: "twofa", label: "2FA" },
   { id: "done", label: "Finish" },
 ];
 
@@ -86,8 +109,19 @@ export function Setup() {
   const coin = useActiveCoin();
   const profile = COIN_PROFILES[coin];
   const navigate = useNavigate();
+  const location = useLocation();
+  const setActiveCoin = useSetActiveCoin();
+  const enabledCoins = useEnabledCoins();
   const isTestNetwork = useIsTestNetwork();
-  const [step, setStep] = useState<Step>("welcome");
+  const { isLight, lightWalletExists: activeLightWalletExists } = useWalletMode();
+  const invalidateWalletMode = useInvalidateWalletMode();
+  const [setupWalletMode, setSetupWalletMode] = useState<"light" | "full_node">(
+    "full_node",
+  );
+  const [showAdvancedLightMode, setShowAdvancedLightMode] = useState(false);
+  const lightSetupActive = isLight || setupWalletMode === "light";
+  const activeSteps = lightSetupActive ? LIGHT_STEPS : FULL_STEPS;
+  const [step, setStep] = useState<Step>("hub");
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
   const [datadirDraft, setDatadirDraft] = useState<string>("");
   const [walletAction, setWalletAction] = useState<WalletAction>("choose");
@@ -95,10 +129,86 @@ export function Setup() {
     null,
   );
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [hubOpeningCoin, setHubOpeningCoin] = useState<CoinId | null>(null);
+  const defaultedFullNodeForExistingWallet = useRef(false);
   const queryClient = useQueryClient();
 
   const updatePrefs = useUserPreferences((s) => s.update);
   const prefs = useUserPreferences((s) => s.prefs);
+
+  const resetCoinOnboarding = useCallback(() => {
+    setWalletAction("choose");
+    setBootstrapOpen(false);
+    setPendingPassphrase(null);
+    setRecoveryError(null);
+  }, []);
+
+  const goToHub = useCallback(() => {
+    resetCoinOnboarding();
+    setStep("hub");
+  }, [resetCoinOnboarding]);
+
+  const openReadyCoinDashboard = useCallback(
+    async (targetCoin: CoinId, hasLightWallet: boolean) => {
+      await updatePrefs({
+        ...coinSetupCompletePatch(targetCoin, prefs),
+        active_coin: targetCoin,
+      });
+      if (hasLightWallet && LIGHT_WALLET_ENABLED) {
+        try {
+          await walletModeSet("light");
+          invalidateWalletMode();
+        } catch {
+          /* prefs may reconcile on next load */
+        }
+      }
+      navigate("/dashboard", { replace: true });
+    },
+    [prefs, updatePrefs, invalidateWalletMode, navigate],
+  );
+
+  const startCoinSetup = useCallback(
+    async (targetCoin: CoinId) => {
+      const hasLightWallet = await lightWalletExists(targetCoin).catch(
+        () => false,
+      );
+      if (isCoinWalletReady(targetCoin, prefs, hasLightWallet)) {
+        await openReadyCoinDashboard(targetCoin, hasLightWallet);
+        return;
+      }
+      setActiveCoin(targetCoin);
+      resetCoinOnboarding();
+      if (LIGHT_WALLET_ENABLED) {
+        try {
+          await walletModeSet(setupWalletMode);
+          invalidateWalletMode();
+        } catch {
+          /* continue with local mode choice */
+        }
+      }
+      setStep("welcome");
+    },
+    [
+      prefs,
+      setActiveCoin,
+      resetCoinOnboarding,
+      setupWalletMode,
+      invalidateWalletMode,
+      openReadyCoinDashboard,
+    ],
+  );
+
+  const handleHubSelectCoin = useCallback(
+    async (targetCoin: CoinId) => {
+      setHubOpeningCoin(targetCoin);
+      try {
+        await startCoinSetup(targetCoin);
+      } finally {
+        setHubOpeningCoin(null);
+      }
+    },
+    [startCoinSetup],
+  );
   const config = useQuery({
     queryKey: coinQueryKey(coin, "daemon-config"),
     queryFn: () => rpcGetConfig(coin),
@@ -117,8 +227,26 @@ export function Setup() {
     queryKey: coinQueryKey(coin, "wallet-file-status"),
     queryFn: () => tauriWalletFileStatus(coin),
     refetchInterval: 4_000,
-    enabled: step === "wallet" || step === "daemon",
+    enabled: step === "wallet" || step === "daemon" || step === "welcome",
   });
+
+  const hasFullNodeWallet =
+    walletFile.data?.exists === true ||
+    walletFile.data?.legacy_wallet_detected === true;
+  const showFullNodeMigrationHint =
+    lightSetupActive && hasFullNodeWallet && !activeLightWalletExists;
+
+  const switchToFullNodeSetup = async () => {
+    setSetupWalletMode("full_node");
+    setWalletAction("choose");
+    try {
+      await walletModeSet("full_node");
+      invalidateWalletMode();
+    } catch {
+      /* still continue into full-node setup */
+    }
+    setStep("daemon");
+  };
 
   const { data: nodeStatus, isConnecting } = useDaemonStatus(coin);
   const connected = isNodeReady(nodeStatus);
@@ -126,13 +254,28 @@ export function Setup() {
   const walletInfo = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    enabled: step === "wallet" && connected,
+    enabled: step === "wallet" && (lightSetupActive || connected),
     retry: 1,
   });
 
+  useEffect(() => {
+    if (defaultedFullNodeForExistingWallet.current || !walletFile.data) return;
+    if (hasFullNodeWallet && !activeLightWalletExists && LIGHT_WALLET_ENABLED) {
+      defaultedFullNodeForExistingWallet.current = true;
+      setSetupWalletMode("full_node");
+    }
+  }, [walletFile.data, hasFullNodeWallet, activeLightWalletExists]);
+
+  useEffect(() => {
+    if (!lightSetupActive || step !== "wallet" || isLight) return;
+    void walletModeSet("light")
+      .then(() => invalidateWalletMode())
+      .catch(() => undefined);
+  }, [lightSetupActive, step, isLight, invalidateWalletMode]);
+
   const walletSetupMode = resolveWalletSetupMode(
     coin,
-    connected,
+    connected || lightSetupActive,
     walletInfo.isLoading,
     walletInfo.data,
     walletFile.data?.exists,
@@ -143,12 +286,12 @@ export function Setup() {
     walletFile.data?.exists === true;
 
   useEffect(() => {
-    setStep("welcome");
-    setWalletAction("choose");
-    setBootstrapOpen(false);
-    setPendingPassphrase(null);
-    setRecoveryError(null);
-  }, [coin]);
+    const state = location.state as { setupHub?: boolean } | null;
+    if (state?.setupHub) {
+      goToHub();
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, goToHub, navigate]);
 
   useEffect(() => {
     if (config.data && !datadirDraft) {
@@ -166,7 +309,7 @@ export function Setup() {
     queryKey: ["two-factor"],
     queryFn: twoFactorStatus,
     staleTime: 30_000,
-    enabled: step !== "welcome" && step !== "advanced",
+    enabled: step !== "hub" && step !== "welcome" && step !== "advanced",
   });
 
   const advanceAfterChainWalletReady = () => {
@@ -174,6 +317,10 @@ export function Setup() {
       queryClient.getQueryData<Awaited<ReturnType<typeof twoFactorStatus>>>([
         "two-factor",
       ])?.enabled ?? twoFa.data?.enabled;
+    if (lightSetupActive) {
+      setStep(twoFaEnabled ? "done" : "twofa");
+      return;
+    }
     setStep(twoFaEnabled ? "bootstrap" : "twofa");
   };
 
@@ -198,12 +345,12 @@ export function Setup() {
 
   useEffect(() => {
     if (step === "twofa" && twoFa.data?.enabled) {
-      setStep("bootstrap");
+      setStep(lightSetupActive ? "done" : "bootstrap");
     }
-  }, [step, twoFa.data?.enabled]);
+  }, [step, twoFa.data?.enabled, lightSetupActive]);
 
   useEffect(() => {
-    if (step !== "wallet") return;
+    if (step !== "wallet" || lightSetupActive) return;
     if (walletSetupMode === "ready" && walletIsHd.data === true) {
       if (twoFa.isLoading) return;
       advanceAfterChainWalletReady();
@@ -224,6 +371,7 @@ export function Setup() {
     walletIsHd.data,
     twoFa.data?.enabled,
     twoFa.isLoading,
+    lightSetupActive,
   ]);
 
   const saveConfig = useMutation({
@@ -246,9 +394,48 @@ export function Setup() {
     }
   }, [step, connected]);
 
+  const onboardingBusy =
+    applyRecovery.isPending ||
+    ensureFirstRun.isPending ||
+    saveConfig.isPending;
+
   const finish = async () => {
+    const nextPrefs = {
+      ...prefs,
+      ...coinSetupCompletePatch(coin, prefs),
+    };
     await updatePrefs(coinSetupCompletePatch(coin, prefs));
+    if (anyEnabledCoinSetupIncomplete(enabledCoins, nextPrefs)) {
+      goToHub();
+      return;
+    }
     navigate("/dashboard");
+  };
+
+  const openDashboardFromHub = async () => {
+    let patch = { ...prefs };
+    for (const targetCoin of enabledCoins) {
+      const hasLightWallet = await lightWalletExists(targetCoin).catch(
+        () => false,
+      );
+      if (isCoinWalletReady(targetCoin, patch, hasLightWallet)) {
+        patch = { ...patch, ...coinSetupCompletePatch(targetCoin, patch) };
+      }
+    }
+    await updatePrefs({
+      setup_completed: patch.setup_completed,
+      setup_completed_by_coin: patch.setup_completed_by_coin,
+      active_coin: coin,
+    });
+    if (LIGHT_WALLET_ENABLED) {
+      try {
+        await walletModeSet("light");
+        invalidateWalletMode();
+      } catch {
+        /* continue */
+      }
+    }
+    navigate("/dashboard", { replace: true });
   };
 
   return (
@@ -256,19 +443,33 @@ export function Setup() {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="!normal-case !tracking-normal !text-base">
-            Set up {profile.displayName}
+            {step === "hub" ? "Vericonomy wallets" : `Set up ${profile.displayName}`}
           </CardTitle>
           <CardDescription>
-            Start the bundled {profile.binaryName} node, set up your{" "}
-            {profile.symbol} wallet and recovery phrase, enable app-wide 2FA,
-            then optionally import a chain bootstrap.
+            {step === "hub"
+              ? "Pick Verium or Vericoin, choose light or full-node mode, then walk through setup for each chain."
+              : lightSetupActive
+                ? `Set up your ${profile.symbol} light wallet, save your recovery phrase, and enable app-wide 2FA. No local node or blockchain sync required.`
+                : `Start the bundled ${profile.binaryName} node, set up your ${profile.symbol} wallet and recovery phrase, enable app-wide 2FA, then optionally import a chain bootstrap.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          {step !== "advanced" && (
+          {step === "hub" && (
+            <SetupWalletHub
+              walletMode={setupWalletMode}
+              onWalletModeChange={setSetupWalletMode}
+              showAdvancedLightMode={showAdvancedLightMode}
+              onShowAdvancedLightMode={() => setShowAdvancedLightMode(true)}
+              onSelectCoin={handleHubSelectCoin}
+              onOpenDashboard={() => void openDashboardFromHub()}
+              openingCoin={hubOpeningCoin}
+            />
+          )}
+
+          {step !== "hub" && step !== "advanced" && (
             <ol className="flex flex-wrap items-center gap-3 text-xs text-fg-subtle">
-              {STEPS.map((s, idx) => {
-                const currentIdx = STEPS.findIndex((x) => x.id === step);
+              {activeSteps.map((s, idx) => {
+                const currentIdx = activeSteps.findIndex((x) => x.id === step);
                 const reached = idx <= currentIdx;
                 return (
                   <li key={s.id} className="flex items-center gap-2">
@@ -278,7 +479,7 @@ export function Setup() {
                       <Circle className="h-3.5 w-3.5" />
                     )}
                     <span className={reached ? "text-fg" : ""}>{s.label}</span>
-                    {idx < STEPS.length - 1 && (
+                    {idx < activeSteps.length - 1 && (
                       <span className="text-fg-subtle">/</span>
                     )}
                   </li>
@@ -290,17 +491,11 @@ export function Setup() {
           {step === "welcome" && (
             <div className="flex flex-col gap-4 text-sm text-fg-muted">
               <p>
-                Welcome. This wallet ships with a bundled{" "}
-                <span className="font-mono">{profile.binaryName}</span> node —
-                there is nothing else to install for {profile.displayName}. If
-                you already use {profile.displayName}-Qt or an older{" "}
-                {profile.symbol} wallet, your existing wallet and chain data in
-                the same data folder will carry over — unlock with your existing
-                passphrase. You can also import a{" "}
-                <span className="font-mono">wallet.dat</span> backup from another
-                machine during setup.
+                {setupWalletMode === "light" && LIGHT_WALLET_ENABLED
+                  ? lightWalletCopy.setupWelcomeLight
+                  : lightWalletCopy.setupWelcomeFull}
               </p>
-              {coin === "vericoin" && (
+              {coin === "vericoin" && setupWalletMode !== "light" && (
                 <p>
                   New to Vericoin? Choose <strong>Create new wallet</strong> on
                   the next steps. We only reuse an older wallet when one is
@@ -308,35 +503,103 @@ export function Setup() {
                 </p>
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <FeatureTile
-                  icon={<Cog className="h-4 w-4" />}
-                  title="Auto-start node"
-                  body={`The wallet starts and stops ${profile.binaryName} when you open and close it.`}
-                />
-                <FeatureTile
-                  icon={<ShieldCheck className="h-4 w-4" />}
-                  title="Encrypted wallet"
-                  body="Strong passphrase, stored only inside wallet.dat."
-                />
-                <FeatureTile
-                  icon={<HardDriveUpload className="h-4 w-4" />}
-                  title="Import backup"
-                  body={`Restore wallet.dat from ${profile.displayName}-Qt or a saved backup.`}
-                />
-                <FeatureTile
-                  icon={<HardDriveDownload className="h-4 w-4" />}
-                  title="Optional bootstrap"
-                  body="Skip the slow P2P sync with the official snapshot."
-                />
+                {setupWalletMode === "light" && LIGHT_WALLET_ENABLED ? (
+                  <>
+                    <FeatureTile
+                      icon={<ShieldCheck className="h-4 w-4" />}
+                      title="Keys on device"
+                      body="Recovery phrase and passphrase never leave this computer."
+                    />
+                    <FeatureTile
+                      icon={<Cog className="h-4 w-4" />}
+                      title="No sync"
+                      body="Balance and history from Vericonomy light wallet servers."
+                    />
+                    <FeatureTile
+                      icon={<HardDriveUpload className="h-4 w-4" />}
+                      title="Import phrase"
+                      body="Restore from your 24-word recovery phrase on any device."
+                    />
+                    <FeatureTile
+                      icon={<Smartphone className="h-4 w-4" />}
+                      title="Optional 2FA"
+                      body="Protect sends and sensitive actions with an authenticator app."
+                    />
+                  </>
+                ) : (
+                  <>
+                    <FeatureTile
+                      icon={<Cog className="h-4 w-4" />}
+                      title="Auto-start node"
+                      body={`The wallet starts and stops ${profile.binaryName} when you open and close it.`}
+                    />
+                    <FeatureTile
+                      icon={<ShieldCheck className="h-4 w-4" />}
+                      title="Encrypted wallet"
+                      body="Strong passphrase, stored only inside wallet.dat."
+                    />
+                    <FeatureTile
+                      icon={<HardDriveUpload className="h-4 w-4" />}
+                      title="Import backup"
+                      body={`Restore wallet.dat from ${profile.displayName}-Qt or a saved backup.`}
+                    />
+                    <FeatureTile
+                      icon={<HardDriveDownload className="h-4 w-4" />}
+                      title="Optional bootstrap"
+                      body="Skip the slow P2P sync with the official snapshot."
+                    />
+                  </>
+                )}
               </div>
+              {showFullNodeMigrationHint && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs text-fg-muted">
+                  <p className="font-medium text-fg">
+                    {lightWalletCopy.setupFullNodeWalletFoundTitle}
+                  </p>
+                  <p className="mt-1">{lightWalletCopy.setupFullNodeWalletFoundBody}</p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-3"
+                    onClick={() => void switchToFullNodeSetup()}
+                  >
+                    {lightWalletCopy.setupUseFullNodeCta}
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs text-fg-subtle">
+                Wallet mode:{" "}
+                <strong className="font-medium text-fg">
+                  {setupWalletMode === "light" ? "Light wallet" : "Full node"}
+                </strong>
+                . Change it from the wallet menu.
+              </p>
               <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={() => setStep("daemon")}>Continue</Button>
+                <Button
+                  onClick={async () => {
+                    if (LIGHT_WALLET_ENABLED) {
+                      await walletModeSet(setupWalletMode);
+                      invalidateWalletMode();
+                    }
+                    setStep(setupWalletMode === "light" ? "wallet" : "daemon");
+                  }}
+                >
+                  Continue
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setStep("advanced")}
                 >
                   Advanced setup
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={onboardingBusy}
+                  onClick={goToHub}
+                >
+                  Back to wallet menu
                 </Button>
               </div>
             </div>
@@ -378,13 +641,131 @@ export function Setup() {
                 </div>
               )}
 
-              {connected && (
-                <Button onClick={() => setStep("wallet")}>Continue</Button>
+              <div className="flex flex-wrap gap-2">
+                {connected && (
+                  <Button onClick={() => setStep("wallet")}>Continue</Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setStep("welcome")}
+                >
+                  Back
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={onboardingBusy}
+                  onClick={goToHub}
+                >
+                  Wallet menu
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === "wallet" && (isLight || setupWalletMode === "light") && (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-md border border-border bg-bg-subtle p-3 text-xs text-fg-muted">
+                <p>
+                  Light wallet — your keys are encrypted on this device. Balance
+                  and history come from Vericonomy Electrum servers.
+                </p>
+              </div>
+              {showFullNodeMigrationHint && walletAction === "choose" && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs text-fg-muted">
+                  <p className="font-medium text-fg">
+                    {lightWalletCopy.setupFullNodeWalletFoundTitle}
+                  </p>
+                  <p className="mt-1">{lightWalletCopy.setupFullNodeWalletFoundBody}</p>
+                  {walletFile.data?.path && (
+                    <p className="mt-2 break-all font-mono text-[11px] text-fg-subtle">
+                      {walletFile.data.path}
+                    </p>
+                  )}
+                  <Button
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => void switchToFullNodeSetup()}
+                  >
+                    {lightWalletCopy.setupUseFullNodeCta}
+                  </Button>
+                </div>
+              )}
+              {walletAction === "choose" && (
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Button onClick={() => setWalletAction("create")}>
+                      Create new wallet
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setWalletAction("restore_phrase")}
+                    >
+                      Import recovery phrase
+                    </Button>
+                    {!activeLightWalletExists && (
+                      <Button
+                        variant="ghost"
+                        className="sm:col-span-2"
+                        onClick={() => setWalletAction("unlock")}
+                      >
+                        Unlock existing light wallet
+                      </Button>
+                    )}
+                  </div>
+                  {showFullNodeMigrationHint && (
+                    <p className="text-xs text-fg-subtle">
+                      {lightWalletCopy.setupCreateNewWarn}
+                    </p>
+                  )}
+                </div>
+              )}
+              {walletAction === "create" && (
+                <LightWalletSetupForm
+                  mode="create"
+                  onDone={() => setStep("twofa")}
+                  onBack={() => setWalletAction("choose")}
+                />
+              )}
+              {walletAction === "restore_phrase" && (
+                <LightWalletSetupForm
+                  mode="import"
+                  onDone={() => setStep("twofa")}
+                  onBack={() => setWalletAction("choose")}
+                />
+              )}
+              {walletAction === "unlock" && (
+                <div className="flex flex-col gap-3">
+                  {!activeLightWalletExists && (
+                    <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-fg-muted">
+                      No light wallet was found for {profile.symbol} on this
+                      device. Choose <strong>Create new wallet</strong> or{" "}
+                      <strong>Import recovery phrase</strong> first.
+                    </p>
+                  )}
+                  <LightWalletSetupForm
+                    mode="unlock"
+                    onDone={() => setStep("twofa")}
+                    onBack={() => setWalletAction("choose")}
+                  />
+                </div>
+              )}
+              {walletAction === "choose" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="self-start"
+                  disabled={onboardingBusy}
+                  onClick={goToHub}
+                >
+                  Back to wallet menu
+                </Button>
               )}
             </div>
           )}
 
-          {step === "wallet" && (
+          {step === "wallet" && !isLight && setupWalletMode !== "light" && (
             <div className="flex flex-col gap-4">
               <div className="rounded-md border border-border bg-bg-subtle p-3 text-xs text-fg-muted">
                 {walletFile.data?.path && (
@@ -555,6 +936,17 @@ export function Setup() {
                   }
                 />
               )}
+              {walletAction === "choose" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="self-start"
+                  disabled={onboardingBusy}
+                  onClick={goToHub}
+                >
+                  Back to wallet menu
+                </Button>
+              )}
             </div>
           )}
 
@@ -609,26 +1001,37 @@ export function Setup() {
               </p>
               <TwoFactorEnrollmentPanel
                 autoStartEnrollment
-                onEnabled={() => setStep("bootstrap")}
+                onEnabled={() => setStep(lightSetupActive ? "done" : "bootstrap")}
               />
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setStep("bootstrap")}
+                  onClick={() => setStep(lightSetupActive ? "done" : "bootstrap")}
                 >
                   Skip for now
                 </Button>
                 {twoFa.data?.enabled && (
-                  <Button size="sm" onClick={() => setStep("bootstrap")}>
+                  <Button
+                    size="sm"
+                    onClick={() => setStep(lightSetupActive ? "done" : "bootstrap")}
+                  >
                     Continue
                   </Button>
                 )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={onboardingBusy}
+                  onClick={goToHub}
+                >
+                  Wallet menu
+                </Button>
               </div>
             </div>
           )}
 
-          {step === "bootstrap" && isTestNetwork && (
+          {step === "bootstrap" && !lightSetupActive && isTestNetwork && (
             <div className="flex flex-col gap-3 text-sm text-fg-muted">
               <div className="flex items-center gap-2 text-fg">
                 <HardDriveDownload className="h-4 w-4" />
@@ -647,7 +1050,7 @@ export function Setup() {
             </div>
           )}
 
-          {step === "bootstrap" && !isTestNetwork && (
+          {step === "bootstrap" && !lightSetupActive && !isTestNetwork && (
             <div className="flex flex-col gap-3 text-sm text-fg-muted">
               <div className="flex items-center gap-2 text-fg">
                 <HardDriveDownload className="h-4 w-4" />
@@ -690,9 +1093,23 @@ export function Setup() {
                 You're ready to go. Settings, wallet backup, and advanced
                 options are available from the sidebar.
               </p>
-              <Button size="sm" onClick={finish}>
-                Open dashboard
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => void finish()}>
+                  {anyEnabledCoinSetupIncomplete(enabledCoins, {
+                    ...prefs,
+                    ...coinSetupCompletePatch(coin, prefs),
+                  })
+                    ? "Finish and return to wallet menu"
+                    : "Open dashboard"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={goToHub}
+                >
+                  Wallet menu
+                </Button>
+              </div>
             </div>
           )}
 
@@ -747,6 +1164,14 @@ export function Setup() {
                   onClick={() => setStep("welcome")}
                 >
                   Back to welcome
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={onboardingBusy}
+                  onClick={goToHub}
+                >
+                  Wallet menu
                 </Button>
               </div>
             </div>

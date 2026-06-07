@@ -22,6 +22,7 @@ import { coinQueryKey } from "@/lib/coin/profile";
 import { BINARYTEST_ENABLED } from "@/lib/features";
 import { useIsTestNetwork } from "@/lib/network-mode";
 import { rpcGetWalletInfo } from "@/lib/rpc/client";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { cn } from "@/lib/utils";
 import { isWalletLocked } from "@/lib/wallet-unlock";
 
@@ -32,6 +33,8 @@ interface NavItem {
   coins?: ("verium" | "vericoin")[];
   /** Shown only while the wallet is in binarytest (DACE) mode. */
   testNetworkOnly?: boolean;
+  /** Hidden in light wallet mode (requires local full node). */
+  fullNodeOnly?: boolean;
   /** Page is gated by WalletUnlockGate and needs the wallet passphrase. */
   requiresPassphrase?: boolean;
 }
@@ -44,6 +47,7 @@ const items: NavItem[] = [
     icon: Cpu,
     coins: ["verium"],
     requiresPassphrase: true,
+    fullNodeOnly: true,
   },
   {
     to: "/staking",
@@ -51,8 +55,9 @@ const items: NavItem[] = [
     icon: Coins,
     coins: ["vericoin"],
     requiresPassphrase: true,
+    fullNodeOnly: true,
   },
-  { to: "/network", label: "Network", icon: NetworkIcon },
+  { to: "/network", label: "Network", icon: NetworkIcon, fullNodeOnly: true },
   {
     to: "/binary-chain",
     label: "Binary Chain",
@@ -72,14 +77,16 @@ const items: NavItem[] = [
     label: "Sign & verify",
     icon: ShieldCheck,
     requiresPassphrase: true,
+    fullNodeOnly: true,
   },
   {
     to: "/console",
     label: "RPC console",
     icon: Terminal,
     requiresPassphrase: true,
+    fullNodeOnly: true,
   },
-  { to: "/logs", label: "Logs", icon: ScrollText },
+  { to: "/logs", label: "Logs", icon: ScrollText, fullNodeOnly: true },
   { to: "/resources", label: "Resources", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
@@ -92,6 +99,7 @@ export function Sidebar() {
   const activeCoin = useActiveCoin();
   const enabledCoins = useEnabledCoins();
   const isTestNetwork = useIsTestNetwork();
+  const { isLight } = useWalletMode();
 
   // Shared with WalletUnlockGate (same query key) so the indicator stays in
   // sync without an extra fetch. Locked == encrypted AND currently locked;
@@ -104,6 +112,7 @@ export function Sidebar() {
   const walletLocked = isWalletLocked(wallet.data);
 
   const visibleItems = items.filter((item) => {
+    if (item.fullNodeOnly && isLight) return false;
     if (item.testNetworkOnly && (!BINARYTEST_ENABLED || !isTestNetwork)) {
       return false;
     }

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChainSynced } from "@/hooks/useChainSynced";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { subscribeChainTip } from "@/lib/chain-tip-store";
 import { addSeenTxid } from "@/lib/seen-txid-set";
@@ -48,6 +49,7 @@ function minedSortKey(tx: TransactionItem): number {
 
 /** Polls verium wallet coinbase transactions and emits new mined blocks. */
 export function useBlockMinedWatcher(): void {
+  const { isLight } = useWalletMode();
   const { data: status } = useDaemonStatus(VERIUM);
   const { synced } = useChainSynced(VERIUM);
   const syncedRef = useRef(synced);
@@ -65,6 +67,7 @@ export function useBlockMinedWatcher(): void {
   // since the tip notification can slightly precede the wallet write) so the
   // chime fires on the same instant the block appears.
   useEffect(() => {
+    if (isLight) return;
     const queryKey = walletTransactionsQueryKey(VERIUM);
     let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
     const recheck = () => {
@@ -79,9 +82,10 @@ export function useBlockMinedWatcher(): void {
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
       unsub();
     };
-  }, [queryClient]);
+  }, [isLight, queryClient]);
 
   useEffect(() => {
+    if (isLight) return;
     if (!txs.isSuccess || txs.data === undefined) return;
 
     const mined = txs.data.filter(isMinedCoinbase);
@@ -115,5 +119,5 @@ export function useBlockMinedWatcher(): void {
       });
       break;
     }
-  }, [txs.data, txs.isSuccess]);
+  }, [isLight, txs.data, txs.isSuccess]);
 }

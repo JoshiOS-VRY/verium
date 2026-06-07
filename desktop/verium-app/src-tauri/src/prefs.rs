@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::fs as async_fs;
 
-use crate::coin_profile::{CoinId, NetworkMode};
+use crate::coin_profile::{CoinId, NetworkMode, parse_coin_id};
+use crate::config::{load_config_for_network, resolve_legacy_wallet_outside_cfg, wallet_dat_exists};
+use crate::wallet::keystore;
+use crate::wallet::mode::WalletMode;
 use crate::config::app_config_base;
 use crate::error::AppResult;
 
@@ -100,6 +103,12 @@ pub struct UserPreferences {
     /// modes restarts the daemons and clears RPC URL overrides.
     #[serde(default)]
     pub network_mode: NetworkMode,
+    /// Full local node vs Electrum light client.
+    #[serde(default)]
+    pub wallet_mode: WalletMode,
+    /// Optional per-coin Electrum server URIs (`host:port` or `tls://host:port`).
+    #[serde(default)]
+    pub electrum_servers_by_coin: Option<HashMap<String, Vec<String>>>,
 }
 
 fn default_active_coin() -> String {
@@ -182,6 +191,8 @@ impl Default for UserPreferences {
             tx_fee_rate_vrm_per_kb: None,
             bootstrap_imported_at_by_coin: None,
             network_mode: NetworkMode::Mainnet,
+            wallet_mode: WalletMode::FullNode,
+            electrum_servers_by_coin: None,
         }
     }
 }
@@ -221,6 +232,8 @@ pub struct PartialUserPreferences {
     pub tx_fee_rate_vrm_per_kb: Option<f64>,
     pub bootstrap_imported_at_by_coin: Option<HashMap<String, i64>>,
     pub network_mode: Option<NetworkMode>,
+    pub wallet_mode: Option<WalletMode>,
+    pub electrum_servers_by_coin: Option<HashMap<String, Vec<String>>>,
 }
 
 pub fn prefs_path() -> PathBuf {
@@ -256,6 +269,48 @@ pub fn wallet_unlock_duration_for(prefs: &UserPreferences, coin: CoinId) -> u32 
 }
 
 const PREFS_STORE_LABEL: &str = "user-preferences";
+
+/// Align setup flags and wallet mode with an on-disk light keystore (e.g. after import).
+fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool> {
+    let mut changed = false;
+    let mut setup = prefs.setup_completed_by_coin.clone().unwrap_or_default();
+
+    for coin in [CoinId::Verium, CoinId::Vericoin] {
+        if keystore::wallet_exists(coin).unwrap_or(false)
+            && setup.get(coin.as_str()) != Some(&true)
+        {
+            setup.insert(coin.as_str().to_string(), true);
+            changed = true;
+        }
+    }
+
+    if changed {
+        prefs.setup_completed_by_coin = Some(setup.clone());
+        if setup.get(CoinId::Verium.as_str()) == Some(&true) {
+            prefs.setup_completed = true;
+        }
+    }
+
+    if !prefs.wallet_mode.is_light() {
+        let active = parse_coin_id(&prefs.active_coin).unwrap_or(CoinId::Verium);
+        if keystore::wallet_exists(active).unwrap_or(false) {
+            if let Ok(cfg) = load_config_for_network(active, prefs.network_mode) {
+                let has_full_node_wallet = wallet_dat_exists(active, &cfg)
+                    || resolve_legacy_wallet_outside_cfg(active, &cfg).is_some();
+                if !has_full_node_wallet {
+                    prefs.wallet_mode = WalletMode::Light;
+                    changed = true;
+                    tracing::info!(
+                        "wallet_mode set to light: {} light wallet exists without wallet.dat",
+                        active.as_str()
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(changed)
+}
 
 /// Load preferences without blocking on the async runtime (safe from Tauri setup and sync commands).
 pub fn load_sync() -> AppResult<UserPreferences> {
@@ -299,6 +354,10 @@ pub fn load_sync() -> AppResult<UserPreferences> {
         let mut m = prefs.setup_completed_by_coin.clone().unwrap_or_default();
         m.entry(CoinId::Verium.as_str().to_string()).or_insert(true);
         prefs.setup_completed_by_coin = Some(m);
+    }
+
+    if reconcile_prefs_with_keystore(&mut prefs)? {
+        save_sync(&prefs)?;
     }
 
     Ok(prefs)
@@ -427,5 +486,9 @@ pub fn merge(current: UserPreferences, partial: PartialUserPreferences) -> UserP
             }
         },
         network_mode: partial.network_mode.unwrap_or(current.network_mode),
+        wallet_mode: partial.wallet_mode.unwrap_or(current.wallet_mode),
+        electrum_servers_by_coin: partial
+            .electrum_servers_by_coin
+            .or(current.electrum_servers_by_coin),
     }
 }

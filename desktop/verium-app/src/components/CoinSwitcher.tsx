@@ -108,7 +108,7 @@ export function CoinSwitcher() {
                   setActiveCoin(coin);
                   setOpen(false);
                   if (!isCoinSetupComplete(coin, prefs)) {
-                    navigate("/setup");
+                    navigate("/setup", { state: { setupHub: true } });
                     return;
                   }
                   if (

@@ -88,6 +88,12 @@ export function DashboardMiddleRow({ coin }: { coin: CoinId }) {
 
   const {
 
+    isLight,
+
+    connected,
+
+    tipHeight,
+
     wallet,
 
     mining,
@@ -400,7 +406,38 @@ export function DashboardMiddleRow({ coin }: { coin: CoinId }) {
 
 
 
-      {coin === "verium" ? (
+      {isLight ? (
+        <Card className="flex h-full flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base normal-case tracking-normal text-fg">
+              <Wallet className="h-4 w-4 text-accent" />
+              Light wallet
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid flex-1 grid-cols-2 gap-3 pb-5 pt-0 text-sm">
+            <MiniStat
+              label="Server"
+              value={connected ? "Online" : "Offline"}
+            />
+            <MiniStat
+              label="Chain tip"
+              value={tipHeight != null ? formatNumber(tipHeight, 0) : "—"}
+            />
+            <MiniStat
+              label="Balance"
+              value={
+                wallet.data
+                  ? formatCoinAmount(wallet.data.balance, coin, 4)
+                  : "—"
+              }
+            />
+            <MiniStat
+              label="Transactions"
+              value={wallet.data ? formatNumber(wallet.data.txcount, 0) : "—"}
+            />
+          </CardContent>
+        </Card>
+      ) : coin === "verium" ? (
 
         <Link
 

@@ -2,12 +2,15 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { subscribeStakeReward } from "@/hooks/useStakeRewardWatcher";
+import { useWalletMode } from "@/hooks/useWalletMode";
 
 /** Refresh wallet and explorer queries when a stake reward is detected locally. */
 export function useStakeRewardDashboardSync(): void {
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (isLight) return;
     return subscribeStakeReward(() => {
       void queryClient.invalidateQueries({ queryKey: ["explorer-blocks"] });
       void queryClient.invalidateQueries({
@@ -24,5 +27,5 @@ export function useStakeRewardDashboardSync(): void {
             q.queryKey[1] === "listaddressgroupings"),
       });
     });
-  }, [queryClient]);
+  }, [isLight, queryClient]);
 }

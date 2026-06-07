@@ -1,22 +1,17 @@
 # Verium Desktop UI Modernization Plan
 
-> Status: Phased migration in progress. The legacy `verium-qt` GUI remains the
-> reference desktop client. A new Tauri + Vite + React + Tailwind application is
-> being built in parallel under `desktop/verium-app/` and will not be the
-> default ship target until feature parity is reached and maintainers approve
-> deprecation of the Qt UI.
+> Status: **Complete.** The legacy Qt GUI (`verium-qt`) has been removed from this
+> repository. The desktop wallet ships as the Tauri + Vite + React application
+> under [`desktop/verium-app/`](../desktop/verium-app/). The C++ core builds
+> headless tools only (`veriumd`, `verium-cli`, `verium-tx`, `verium-wallet`).
 
 ## 1. Executive Summary
 
-Verium today ships as a Bitcoin Core–lineage monolith. The Qt GUI in
-[`src/qt/`](../src/qt/) embeds the full node, wallet, and built-in CPU miner in
-a single process via [`interfaces::Node`](../src/interfaces/node.h) and
-[`interfaces::Wallet`](../src/interfaces/wallet.h). The GUI does not normally
-talk to the node over HTTP JSON-RPC; only the debug console calls
-[`m_node.executeRpc()`](../src/qt/rpcconsole.cpp).
+Verium ships as a Bitcoin Core–lineage node with a separate Tauri desktop wallet.
+The C++ core (`veriumd`) provides consensus, wallet, and mining via JSON-RPC.
 
-This plan modernizes the desktop UI without rewriting consensus, networking,
-wallet cryptography, or the mining algorithm. The strategy is to:
+This plan modernized the desktop UI without rewriting consensus, networking,
+wallet cryptography, or the mining algorithm. The strategy was to:
 
 1. Keep [`veriumd`](../src/bitcoind.cpp), [`src/wallet/`](../src/wallet/),
    [`src/miner.cpp`](../src/miner.cpp), and all consensus and networking code
@@ -32,8 +27,8 @@ wallet cryptography, or the mining algorithm. The strategy is to:
    - [`verium-cli`](../src/bitcoin-cli.cpp) as a fallback CLI adapter.
    - Direct filesystem reads for `debug.log` and `verium.conf`.
    - Tauri-side process management for daemon lifecycle.
-5. Keep [`verium-qt`](../src/qt/) functional throughout the migration so that
-   contributors and end users always have a working desktop client.
+5. ~~Keep `verium-qt` functional throughout the migration~~ — Qt GUI removed;
+   Tauri wallet is the sole desktop UI.
 
 ## 2. Current Architecture Findings
 

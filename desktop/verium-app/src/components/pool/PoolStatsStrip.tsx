@@ -2,12 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatedHashrate } from "@/components/AnimatedHashrate";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { StatCell, StatGrid } from "@/components/ui/StatGrid";
 import { ExternalLinkButton } from "@/components/ExternalLinkButton";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
@@ -33,28 +28,28 @@ export function PoolStatsStrip({ enabled = true }: { enabled?: boolean }) {
   }, [enabled, visible, queryClient]);
 
   const s = stats.data;
-  const poolHm =
-    s?.poolHashrate != null ? hsToHm(s.poolHashrate) : undefined;
+  const poolHm = s?.poolHashrate != null ? hsToHm(s.poolHashrate) : undefined;
 
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle className="normal-case">Official Verium pool</CardTitle>
-        <ExternalLinkButton href={POOL_WEB_URL}>pool.vericonomy.com</ExternalLinkButton>
+        <CardTitle className="normal-case">Public Verium Mining Pool</CardTitle>
+        <ExternalLinkButton href={POOL_WEB_URL}>
+          Mining Pool Dashboard
+        </ExternalLinkButton>
       </CardHeader>
       <CardContent>
         {stats.isError && !s ? (
           <p className="text-sm text-fg-muted">
-            Pool stats unavailable. Build with POOL_SUPABASE_ANON_KEY or check network.
+            Pool stats unavailable. Build with POOL_SUPABASE_ANON_KEY or check
+            network.
           </p>
         ) : (
           <>
             <StatGrid className="lg:grid-cols-5">
               <StatCell
                 label="Pool hashrate"
-                value={
-                  <AnimatedHashrate value={poolHm} fractionDigits={1} />
-                }
+                value={<AnimatedHashrate value={poolHm} fractionDigits={1} />}
               />
               <StatCell
                 label="Active miners"
@@ -86,11 +81,7 @@ export function PoolStatsStrip({ enabled = true }: { enabled?: boolean }) {
               <StatCell
                 label="Pool fee"
                 value={
-                  s?.poolFeePct != null ? (
-                    <span>{s.poolFeePct}%</span>
-                  ) : (
-                    "—"
-                  )
+                  s?.poolFeePct != null ? <span>{s.poolFeePct}%</span> : "—"
                 }
               />
             </StatGrid>

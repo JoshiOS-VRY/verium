@@ -11,15 +11,17 @@ name = "verium_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
 dotenvy = "0.15"
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
+dotenvy = "0.15"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-deep-link = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
@@ -46,13 +48,21 @@ hex = "0.4"
 hidapi = "2"
 rand = "0.8"
 sha2 = "0.10"
+ripemd = "0.1"
 sharks = "0.5"
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
 urlencoding = "2"
 zeroize = { version = "1", features = ["derive"] }
 sysinfo = "0.33"
 verium-pool-miner = { path = "crates/verium-pool-miner" }
+async-trait = "0.1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio-rustls = "0.26"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "0.26"
 
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+# Internal QA only — exposes unrestricted JSON-RPC console in the UI.
+dev-rpc-console = []

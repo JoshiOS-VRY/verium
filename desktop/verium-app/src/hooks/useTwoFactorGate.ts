@@ -5,12 +5,12 @@ import { twoFactorIsGated } from "@/lib/security/client";
 export function useTwoFactorGate(coin: CoinId) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("Two-factor authentication");
-  const pendingRef = useRef<(() => void) | null>(null);
+  const pendingRef = useRef<((code: string) => void) | null>(null);
 
   const gate = useCallback(
     async (
       action: string,
-      onVerified: () => void,
+      onVerified: (code: string) => void,
       options?: { amount?: number; title?: string },
     ) => {
       const gated = await twoFactorIsGated(action, coin, options?.amount);
@@ -20,7 +20,7 @@ export function useTwoFactorGate(coin: CoinId) {
         setOpen(true);
         return;
       }
-      onVerified();
+      onVerified("");
     },
     [coin],
   );
@@ -30,9 +30,9 @@ export function useTwoFactorGate(coin: CoinId) {
     pendingRef.current = null;
   }, []);
 
-  const verified = useCallback(() => {
+  const verified = useCallback((code: string) => {
     setOpen(false);
-    pendingRef.current?.();
+    pendingRef.current?.(code);
     pendingRef.current = null;
   }, []);
 

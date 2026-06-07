@@ -92,7 +92,6 @@ $(host_arch)_$(host_os)_id_string+=$(shell $(host_CXX) --version 2>/dev/null)
 $(host_arch)_$(host_os)_id_string+=$(shell $(host_RANLIB) --version 2>/dev/null)
 $(host_arch)_$(host_os)_id_string+=$(shell $(host_STRIP) --version 2>/dev/null)
 
-qt_packages_$(NO_QT) = $(qt_packages) $(qt_$(host_os)_packages) $(qt_$(host_arch)_$(host_os)_packages)
 wallet_packages_$(NO_WALLET) = $(wallet_packages)
 upnp_packages_$(NO_UPNP) = $(upnp_packages)
 zmq_packages_$(NO_ZMQ) = $(zmq_packages)
@@ -100,14 +99,7 @@ zmq_packages_$(NO_ZMQ) = $(zmq_packages)
 protobuf_packages_$(PROTOBUF) = $(protobuf_packages)
 rapidcheck_packages_$(RAPIDCHECK) = $(rapidcheck_packages)
 
-# When NO_QT is set (e.g. NO_QT=1), skip Qt and all qt_* package lists. The legacy
-# $(qt_packages_) indirection is empty in that case, but CI still saw Qt builds;
-# this branch makes headless daemon depends explicit.
-ifneq ($(NO_QT),)
 packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(wallet_packages_) $(upnp_packages_)
-else
-packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_)
-endif
 native_packages += $($(host_arch)_$(host_os)_native_packages) $($(host_os)_native_packages)
 
 ifeq ($(protobuf_packages_),)

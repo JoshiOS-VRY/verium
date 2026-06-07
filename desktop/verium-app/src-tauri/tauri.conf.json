@@ -31,6 +31,14 @@
       "desktop": {
         "schemes": ["verium", "vericoin"]
       }
+    },
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://files.vericonomy.com/vrm/desktop-updates/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": ""
     }
   },
   "bundle": {

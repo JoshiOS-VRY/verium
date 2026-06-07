@@ -67,18 +67,23 @@ pub async fn recovery_apply_hd_seed(
     phrase: String,
     bip39_passphrase: Option<String>,
     unlock_passphrase: Option<String>,
+    totp_code: Option<String>,
 ) -> AppResult<String> {
+    crate::security_policy::require_gated_action("restore_wallet", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
     let wif = recovery::master_xpriv_to_wif(coin, &phrase, bip39_passphrase.as_deref())?;
     let client = state.rpc_client(coin).await?;
     let info: serde_json::Value = client.call("getwalletinfo", json!([])).await?;
 
     if wallet_info_is_locked(&info) {
-        let pass = unlock_passphrase.filter(|p| !p.is_empty()).ok_or_else(|| {
-            AppError::other(
-                "Wallet is locked. Enter your wallet passphrase to apply the recovery phrase.",
-            )
-        })?;
+        let pass = unlock_passphrase
+            .as_deref()
+            .filter(|p| !p.is_empty())
+            .ok_or_else(|| {
+                AppError::other(
+                    "Wallet is locked. Enter your wallet passphrase to apply the recovery phrase.",
+                )
+            })?;
         client
             .call_no_result(
                 "walletpassphrase",
@@ -98,6 +103,12 @@ pub async fn recovery_apply_hd_seed(
         ));
     }
 
+    if let Some(pass) = unlock_passphrase.as_deref().filter(|p| !p.is_empty()) {
+        if let Err(e) = crate::mnemonic_backup::save(coin, &phrase, pass) {
+            tracing::warn!("could not store encrypted recovery phrase backup: {e}");
+        }
+    }
+
     audit_log::append("set_hd_seed", "Applied BIP39 HD seed via sethdseed", Some(coin.as_str()))?;
     Ok("HD seed applied. Back up wallet.dat immediately.".into())
 }
@@ -108,9 +119,116 @@ pub async fn recovery_wallet_is_hd(
     coin: String,
 ) -> AppResult<bool> {
     let coin = parse_coin_id(&coin)?;
+    wallet_is_hd(&state, coin).await
+}
+
+async fn wallet_is_hd(state: &AppState, coin: CoinId) -> AppResult<bool> {
     let client = state.rpc_client(coin).await?;
     let info: serde_json::Value = client.call("getwalletinfo", json!([])).await?;
     Ok(info.get("hdseedid").is_some())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RecoveryExportResult {
+    Mnemonic {
+        mnemonic: String,
+        word_count: u32,
+    },
+    HdMasterXprv {
+        xprv: String,
+        message: String,
+    },
+}
+
+#[tauri::command]
+pub fn recovery_mnemonic_backup_exists(coin: String) -> AppResult<bool> {
+    let coin = parse_coin_id(&coin)?;
+    Ok(crate::mnemonic_backup::exists(coin))
+}
+
+#[tauri::command]
+pub async fn recovery_export_seed(
+    state: State<'_, AppState>,
+    coin: String,
+    wallet_passphrase: String,
+    totp_code: Option<String>,
+) -> AppResult<RecoveryExportResult> {
+    crate::security_policy::require_gated_action("show_recovery_phrase", totp_code.as_deref())?;
+    let coin = parse_coin_id(&coin)?;
+    if wallet_passphrase.is_empty() {
+        return Err(AppError::other(
+            "Wallet passphrase is required to export your recovery material.",
+        ));
+    }
+
+    let prefs = crate::prefs::load().await?;
+    if prefs.wallet_mode.is_light() {
+        if !crate::wallet::keystore::wallet_exists(coin)? {
+            return Err(AppError::other("No light wallet found for this chain."));
+        }
+        if !crate::wallet::keystore::is_unlocked(coin)? {
+            crate::wallet::keystore::unlock_wallet(
+                coin,
+                &wallet_passphrase,
+                RECOVERY_UNLOCK_SECONDS as u32,
+            )?;
+        }
+        let secret = crate::wallet::keystore::unlocked_mnemonic(coin, &wallet_passphrase)?;
+        if crate::wallet::hd::is_hd_master_secret(coin, &secret) {
+            audit_log::append(
+                "export_hd_xprv",
+                "Exported light wallet HD master xprv",
+                Some(coin.as_str()),
+            )?;
+            return Ok(RecoveryExportResult::HdMasterXprv {
+                xprv: secret,
+                message: "Light wallet was imported from an HD master key (xprv), not a BIP39 phrase."
+                    .into(),
+            });
+        }
+        let word_count = secret.split_whitespace().count() as u32;
+        audit_log::append(
+            "export_recovery_phrase",
+            "Exported light wallet BIP39 phrase",
+            Some(coin.as_str()),
+        )?;
+        return Ok(RecoveryExportResult::Mnemonic {
+            mnemonic: secret,
+            word_count,
+        });
+    }
+
+    if let Some(phrase) = crate::mnemonic_backup::load(coin, &wallet_passphrase)? {
+        let word_count = phrase.split_whitespace().count() as u32;
+        audit_log::append(
+            "export_recovery_phrase",
+            "Exported BIP39 phrase from encrypted backup",
+            Some(coin.as_str()),
+        )?;
+        return Ok(RecoveryExportResult::Mnemonic {
+            mnemonic: phrase,
+            word_count,
+        });
+    }
+
+    if wallet_is_hd(&state, coin).await? {
+        let xprv =
+            crate::hd_wallet_export::dump_hd_master_xprv(&state, coin, &wallet_passphrase).await?;
+        audit_log::append(
+            "export_hd_xprv",
+            "Exported full-node HD master xprv (no BIP39 backup on file)",
+            Some(coin.as_str()),
+        )?;
+        return Ok(RecoveryExportResult::HdMasterXprv {
+            xprv,
+            message: "No BIP39 phrase was stored when this wallet was upgraded. Use this xprv to import into light mode, or set up a new phrase under Security (back up wallet.dat first).".into(),
+        });
+    }
+
+    Err(AppError::other(
+        "This wallet is not HD. Upgrade to HD under Security (back up wallet.dat first), or continue using full-node mode with wallet.dat backups.",
+    ))
 }
 
 // ── 2FA ──────────────────────────────────────────────────────────────────────
@@ -306,8 +424,37 @@ pub async fn hardware_wallet_send_psbt(
     coin: String,
     outputs: serde_json::Map<String, serde_json::Value>,
     fee_rate: Option<f64>,
+    totp_code: Option<String>,
+    wallet_passphrase: Option<String>,
+    extra_confirmed: Option<bool>,
 ) -> AppResult<PsbtSendResult> {
     let coin = parse_coin_id(&coin)?;
+    let coin_str = coin.as_str();
+    let mut output_pairs: Vec<(String, f64)> = Vec::new();
+    for (addr, val) in &outputs {
+        let amount = val
+            .as_f64()
+            .ok_or_else(|| AppError::other(format!("invalid amount for {addr}")))?;
+        crate::wallet::address::validate_send_address(coin, addr)?;
+        output_pairs.push((addr.clone(), amount));
+    }
+    crate::security_policy::authorize_send(
+        &state,
+        coin,
+        totp_code.as_deref(),
+        wallet_passphrase.as_deref(),
+    )
+    .await?;
+    crate::security_policy::require_multi_send_allowed(
+        coin_str,
+        &output_pairs,
+        extra_confirmed.unwrap_or(false),
+    )?;
+    let prefs = crate::prefs::load().await?;
+    let pass = wallet_passphrase.unwrap_or_default();
+    if prefs.wallet_mode.is_light() {
+        return crate::wallet::psbt_light::build_hw_psbt(&state, coin, outputs, fee_rate, &pass).await;
+    }
     let client = state.rpc_client(coin).await?;
     hardware_wallet::send_via_psbt(&client, outputs, fee_rate).await
 }
@@ -317,10 +464,24 @@ pub async fn hardware_wallet_finalize_psbt(
     state: State<'_, AppState>,
     coin: String,
     psbt_base64: String,
+    totp_code: Option<String>,
+    wallet_passphrase: Option<String>,
 ) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
-    let client = state.rpc_client(coin).await?;
-    let txid = hardware_wallet::finalize_and_broadcast(&client, &psbt_base64).await?;
+    crate::security_policy::authorize_send(
+        &state,
+        coin,
+        totp_code.as_deref(),
+        wallet_passphrase.as_deref(),
+    )
+    .await?;
+    let prefs = crate::prefs::load().await?;
+    let txid = if prefs.wallet_mode.is_light() {
+        crate::wallet::psbt_light::finalize_and_broadcast_light(&state, coin, &psbt_base64).await?
+    } else {
+        let client = state.rpc_client(coin).await?;
+        hardware_wallet::finalize_and_broadcast(&client, &psbt_base64).await?
+    };
     audit_log::append("hw_send", &format!("Broadcast PSBT tx {txid}"), Some(coin.as_str()))?;
     Ok(txid)
 }
@@ -620,9 +781,14 @@ pub fn parse_payment_uri(uri: String) -> AppResult<ParsedPaymentUri> {
             }
         }
     }
+    let coin = match scheme {
+        "vericoin" => CoinId::Vericoin,
+        _ => CoinId::Verium,
+    };
+    crate::wallet::address::validate_send_address(coin, address)?;
     Ok(ParsedPaymentUri {
         scheme: scheme.to_string(),
-        address: address.to_string(),
+        address: address.trim().to_string(),
         amount,
         label,
         message,

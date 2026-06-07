@@ -25,10 +25,14 @@ import { invalidateWalletQueries } from "@/lib/invalidate-wallet-queries";
 import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
 import { useTwoFactorGate } from "@/hooks/useTwoFactorGate";
 import { ScheduledBackupControls } from "@/components/ScheduledBackupControls";
+import { LightWalletImportForm } from "@/components/LightWalletImportForm";
 import { RestoreFromPhraseForm } from "@/components/RestoreFromPhraseForm";
+import { useWalletMode } from "@/hooks/useWalletMode";
+import { lightWalletCopy } from "@/lib/light-wallet/copy";
 
 export function WalletBackupCard() {
   const coin = useActiveCoin();
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const twoFa = useTwoFactorGate(coin);
   const fileStatus = useQuery({
@@ -38,6 +42,7 @@ export function WalletBackupCard() {
 
   const [showRestoreNote, setShowRestoreNote] = useState(false);
   const [showPhraseRestore, setShowPhraseRestore] = useState(false);
+  const [showLightImport, setShowLightImport] = useState(false);
   const [pendingRestorePath, setPendingRestorePath] = useState<string | null>(
     null,
   );
@@ -66,12 +71,19 @@ export function WalletBackupCard() {
   });
 
   const changePass = useMutation({
-    mutationFn: () => rpcWalletChangePassphrase(coin, phase.old, phase.next),
+    mutationFn: (totpCode?: string) =>
+      rpcWalletChangePassphrase(coin, phase.old, phase.next, totpCode),
     onSuccess: () => setPhase({ old: "", next: "", confirm: "" }),
   });
 
   const restore = useMutation({
-    mutationFn: (sourcePath: string) => rpcWalletRestore(coin, sourcePath),
+    mutationFn: ({
+      sourcePath,
+      totpCode,
+    }: {
+      sourcePath: string;
+      totpCode?: string;
+    }) => rpcWalletRestore(coin, sourcePath, totpCode),
     onSuccess: async () => {
       setPendingRestorePath(null);
       await invalidateWalletQueries(queryClient, coin);
@@ -109,13 +121,42 @@ export function WalletBackupCard() {
             passphrase
           </CardTitle>
           <CardDescription>
-            Your encrypted <span className="font-mono">wallet.dat</span>{" "}
-            contains your private keys. Back it up to an external drive or
-            password manager. Keep your passphrase somewhere safe.
+            {isLight
+              ? lightWalletCopy.backupLightHint
+              : lightWalletCopy.backupFullHint}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {fileStatus.data && (
+          {isLight && (
+            <>
+              <p className="text-xs text-fg-muted">
+                Export your recovery phrase under{" "}
+                <a href="/security" className="text-accent underline">
+                  Security
+                </a>
+                . Import a different phrase or HD master key below if you created
+                an empty wallet and want to connect your funds later.
+              </p>
+              <div className="space-y-2 border-b border-border pb-3">
+                <div className="text-sm font-medium text-fg">
+                  {lightWalletCopy.importLightTitle}
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShowLightImport((v) => !v)}
+                >
+                  {showLightImport ? "Hide import" : "Import phrase or HD master key"}
+                </Button>
+                {showLightImport && (
+                  <div className="rounded-md border border-border bg-bg p-3">
+                    <LightWalletImportForm />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          {!isLight && fileStatus.data && (
             <div className="rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs">
               <div className="text-fg-muted">Current wallet file</div>
               <div className="mt-0.5 break-all text-[11px]">
@@ -139,6 +180,7 @@ export function WalletBackupCard() {
             </div>
           )}
 
+          {!isLight && (
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
@@ -165,7 +207,8 @@ export function WalletBackupCard() {
               {showRestoreNote ? "Hide" : "Show"} restore instructions
             </Button>
           </div>
-          {pendingRestorePath && (
+          )}
+          {!isLight && pendingRestorePath && (
             <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs">
               <p className="font-medium text-fg">Restore this wallet backup?</p>
               <p className="break-all text-[11px] text-fg-muted">
@@ -194,7 +237,11 @@ export function WalletBackupCard() {
                   onClick={() =>
                     void twoFa.gate(
                       "restore_wallet",
-                      () => restore.mutate(pendingRestorePath),
+                      (code) =>
+                        restore.mutate({
+                          sourcePath: pendingRestorePath,
+                          totpCode: code,
+                        }),
                       { title: "Confirm wallet restore with 2FA" },
                     )
                   }
@@ -216,7 +263,7 @@ export function WalletBackupCard() {
               </div>
             </div>
           )}
-          {restore.data && (
+          {!isLight && restore.data && (
             <div className="space-y-1 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs text-success">
               <p>{restore.data.message}</p>
               {restore.data.previous_wallet_backup && (
@@ -235,25 +282,26 @@ export function WalletBackupCard() {
               )}
             </div>
           )}
-          {restore.error && (
+          {!isLight && restore.error && (
             <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
               {String(restore.error)}
             </div>
           )}
-          {backup.data && (
+          {!isLight && backup.data && (
             <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs text-success">
               Saved to{" "}
               <span className="font-mono">{backup.data.destination}</span>
             </div>
           )}
-          {backup.error && (
+          {!isLight && backup.error && (
             <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
               {String(backup.error)}
             </div>
           )}
 
-          <ScheduledBackupControls />
+          {!isLight && <ScheduledBackupControls />}
 
+          {!isLight && (
           <div className="space-y-2 border-t border-border pt-3">
             <div className="text-sm font-medium text-fg">Restore from recovery phrase</div>
             <p className="text-xs text-fg-muted">
@@ -274,8 +322,9 @@ export function WalletBackupCard() {
               </div>
             )}
           </div>
+          )}
 
-          {showRestoreNote && (
+          {!isLight && showRestoreNote && (
             <div className="space-y-2 rounded-md border border-border bg-bg-subtle px-3 py-3 text-xs text-fg-muted">
               <p className="font-medium text-fg">
                 How to restore a wallet.dat backup
@@ -344,7 +393,7 @@ export function WalletBackupCard() {
               onClick={() =>
                 void twoFa.gate(
                   "change_passphrase",
-                  () => changePass.mutate(),
+                  (code) => changePass.mutate(code),
                   { title: "Confirm passphrase change with 2FA" },
                 )
               }

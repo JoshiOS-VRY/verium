@@ -34,13 +34,43 @@ interface ConsoleEntry {
 const HISTORY_KEY = "verium-rpc-console-history";
 const MAX_HISTORY = 100;
 
+const SENSITIVE_RPC_METHODS = new Set([
+  "dumpprivkey",
+  "dumpwallet",
+  "importprivkey",
+  "importwallet",
+  "sethdseed",
+  "sendtoaddress",
+  "sendmany",
+  "walletpassphrase",
+  "walletpassphrasechange",
+]);
+
+function commandMethod(line: string): string {
+  return line.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+}
+
+function isSensitiveCommand(line: string): boolean {
+  return SENSITIVE_RPC_METHODS.has(commandMethod(line));
+}
+
+function sanitizeHistory(entries: string[]): string[] {
+  return entries.filter((line) => !isSensitiveCommand(line));
+}
+
 function loadHistory(): string[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is string => typeof x === "string");
+    const cleaned = sanitizeHistory(
+      parsed.filter((x): x is string => typeof x === "string"),
+    );
+    if (cleaned.length !== parsed.length) {
+      saveHistory(cleaned);
+    }
+    return cleaned;
   } catch {
     return [];
   }
@@ -50,7 +80,7 @@ function saveHistory(history: string[]) {
   try {
     localStorage.setItem(
       HISTORY_KEY,
-      JSON.stringify(history.slice(-MAX_HISTORY)),
+      JSON.stringify(sanitizeHistory(history).slice(-MAX_HISTORY)),
     );
   } catch {
     /* ignore */
@@ -100,9 +130,11 @@ export function RpcConsole() {
         ...prev,
         { id: crypto.randomUUID(), command, result },
       ]);
-      const nextHistory = [...history.filter((h) => h !== command), command];
-      setHistory(nextHistory);
-      saveHistory(nextHistory);
+      if (!isSensitiveCommand(command)) {
+        const nextHistory = [...history.filter((h) => h !== command), command];
+        setHistory(nextHistory);
+        saveHistory(nextHistory);
+      }
       setDraft("");
       setHistoryIdx(null);
     },
@@ -168,7 +200,8 @@ export function RpcConsole() {
               http://{daemonConfig.data?.rpc_host ?? "127.0.0.1"}:
               {daemonConfig.data?.rpc_port ?? profile.defaultRpcPort}
             </span>
-            . Be careful — these are real commands.
+            . Production builds omit unrestricted RPC; dev builds block sensitive
+            methods. History never stores dumpprivkey, sendtoaddress, or similar.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

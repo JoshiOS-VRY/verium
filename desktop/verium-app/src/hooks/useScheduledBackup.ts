@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useEnabledCoins } from "@/lib/coin/context";
 import { backupRunScheduled } from "@/lib/security/client";
 
@@ -14,12 +15,14 @@ export const BACKUP_HEALTH_REFETCH_MS = 30_000;
  * the app is open and refreshes backup health when a run completes.
  */
 export function useScheduledBackup() {
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const enabledCoins = useEnabledCoins();
   const runningRef = useRef(false);
   const coinsKey = enabledCoins.join(",");
 
   useEffect(() => {
+    if (isLight) return;
     const tick = async () => {
       if (document.visibilityState === "hidden") return;
       if (runningRef.current || enabledCoins.length === 0) return;
@@ -40,5 +43,5 @@ export function useScheduledBackup() {
     void tick();
     const id = window.setInterval(() => void tick(), BACKUP_SCHEDULER_TICK_MS);
     return () => window.clearInterval(id);
-  }, [coinsKey, enabledCoins, queryClient]);
+  }, [isLight, coinsKey, enabledCoins, queryClient]);
 }

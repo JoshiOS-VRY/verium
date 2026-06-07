@@ -6,6 +6,7 @@ import {
   Coins,
   Plus,
   QrCode,
+  Loader2,
   SendHorizontal,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
 import { FeeRateDialog } from "@/components/FeeRateDialog";
 import { QrScanModal } from "@/components/QrScanModal";
 import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
+import { SendPassphrasePrompt } from "@/components/SendPassphrasePrompt";
 import { ExplorerLink } from "@/components/ExplorerLink";
 import {
   rpcGetWalletInfo,
@@ -36,17 +38,17 @@ import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { coinSymbol, formatCoinAmount } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import { listAddressBookEntries, upsertAddressBookEntry } from "@/lib/address-book";
+import { validateSendAddress } from "@/lib/address-validation";
 import {
   auditLogRecord,
   spendingControlsCheckAllowlist,
   spendingControlsCheckSend,
   spendingControlsGet,
-  spendingControlsRecordSend,
   twoFactorIsGated,
 } from "@/lib/security/client";
 
 const EXAMPLE_ADDRESSES: Partial<Record<CoinId, string>> = {
-  verium: "VY6E3KSqrMk1hcy5Cu4EGyHrdDS5ch3YHU",
+  verium: "VRq98Nm2P6anLHPgnHdb6NnibJ6GoG3Jm9",
 };
 const DEFAULT_FEE_RATE = 0.001;
 
@@ -217,10 +219,14 @@ export function SendPanel({
   const [qrOpen, setQrOpen] = useState(false);
   const [qrTargetId, setQrTargetId] = useState<string | null>(null);
   const [twoFaOpen, setTwoFaOpen] = useState(false);
+  const [passphrasePromptOpen, setPassphrasePromptOpen] = useState(false);
+  const sendTotpCodeRef = useRef<string>("");
+  const sendPassphraseRef = useRef<string>("");
   const [clipboardGuardError, setClipboardGuardError] = useState<string | null>(null);
   const [spendWarning, setSpendWarning] = useState<string | null>(null);
   const [extraConfirmDelay, setExtraConfirmDelay] = useState(false);
   const [lastSend, setLastSend] = useState<SendSuccessResult | null>(null);
+  const [preparingConfirm, setPreparingConfirm] = useState(false);
   const clipboardSnapshot = useRef<Map<string, string>>(new Map());
 
   const spendingCfg = useQuery({
@@ -299,9 +305,14 @@ export function SendPanel({
     [balance, feeRate, subtractFee, updateRecipient],
   );
 
-  const validRows = recipients.filter(
-    (row) => row.address.trim().length > 0 && parseAmount(row.amount) != null,
-  );
+  const validRows = recipients.filter((row) => {
+    const address = row.address.trim();
+    return (
+      address.length > 0 &&
+      validateSendAddress(address) == null &&
+      parseAmount(row.amount) != null
+    );
+  });
 
   const confirmRecipients: SendConfirmRecipient[] = validRows.map((row) => ({
     address: row.address.trim(),
@@ -311,6 +322,8 @@ export function SendPanel({
 
   const send = useMutation({
     mutationFn: async () => {
+      const totpCode = sendTotpCodeRef.current || undefined;
+      const walletPassphrase = sendPassphraseRef.current || undefined;
       const sentRecipients: SendConfirmRecipient[] = validRows.map((row) => ({
         address: row.address.trim(),
         label: row.label.trim() || undefined,
@@ -332,6 +345,8 @@ export function SendPanel({
           outputs,
           undefined,
           feeRate,
+          totpCode,
+          walletPassphrase,
         );
         txids = [txid];
       } else {
@@ -343,6 +358,8 @@ export function SendPanel({
             row.address.trim(),
             amount,
             row.label.trim() || undefined,
+            totpCode,
+            walletPassphrase,
           );
           txids.push(txid);
         }
@@ -361,8 +378,9 @@ export function SendPanel({
       setLastSend(result);
       clearAll();
       setCoinControl([]);
+      sendTotpCodeRef.current = "";
+      sendPassphraseRef.current = "";
       for (const row of result.recipients) {
-        await spendingControlsRecordSend(row.amount, coin, row.address);
         if (row.label?.trim()) {
           await upsertAddressBookEntry(coin, {
             id: "",
@@ -385,77 +403,106 @@ export function SendPanel({
       queryClient.invalidateQueries({ queryKey: ["spending-controls"] });
     },
     onError: () => {
-      setConfirmOpen(false);
+      sendTotpCodeRef.current = "";
+      sendPassphraseRef.current = "";
     },
   });
 
-  const canSend = validRows.length > 0 && !send.isPending;
+  const executeSend = () => {
+    send.mutate();
+  };
 
-  const openConfirm = async () => {
-    setClipboardGuardError(null);
-    setSpendWarning(null);
-
-    if (spendingCfg.data?.clipboard_guard_enabled) {
-      for (const row of validRows) {
-        const snap = clipboardSnapshot.current.get(row.id);
-        if (snap && snap !== row.address.trim()) {
-          setClipboardGuardError(
-            "Clipboard contents changed since paste — possible hijack. Re-paste the address.",
-          );
-          return;
-        }
-      }
-    }
-
-    if (spendingCfg.data?.allowlist_only) {
-      const book = await listAddressBookEntries(coin);
-      const allowlist = book
-        .filter((e) => e.category === "send")
-        .map((e) => e.address);
-      for (const row of validRows) {
-        const addr = row.address.trim();
-        const ok = await spendingControlsCheckAllowlist(addr, allowlist);
-        if (!ok) {
-          setSpendWarning(
-            `Allowlist mode: add ${addr.slice(0, 12)}… to Address book (Send) first.`,
-          );
-          return;
-        }
-      }
-    }
-
+  const requestSendAuth = async () => {
     const total = validRows.reduce((s, r) => s + parseAmount(r.amount)!, 0);
-
-    const capCheck = await spendingControlsCheckSend(
-      total,
-      coin,
-      validRows[0]!.address.trim(),
-    );
-    if (!capCheck.allowed) {
-      setSpendWarning(capCheck.reason ?? "Send blocked by spending controls.");
-      return;
-    }
-
-    let extraDelay = false;
-    let lookAlikeWarning = capCheck.look_alike_warning ?? null;
-
-    for (const row of validRows) {
-      const check = await spendingControlsCheckSend(0, coin, row.address.trim());
-      if (check.requires_extra_confirmation) extraDelay = true;
-      if (check.look_alike_warning && !lookAlikeWarning) {
-        lookAlikeWarning = check.look_alike_warning;
-      }
-    }
-
-    if (lookAlikeWarning) setSpendWarning(lookAlikeWarning);
-    setExtraConfirmDelay(extraDelay);
-
     const gated = await twoFactorIsGated("send", coin, total);
+    sendTotpCodeRef.current = "";
+    sendPassphraseRef.current = "";
     if (gated) {
       setTwoFaOpen(true);
       return;
     }
-    setConfirmOpen(true);
+    setPassphrasePromptOpen(true);
+  };
+
+  const canSend =
+    validRows.length > 0 && !send.isPending && !preparingConfirm;
+
+  const openConfirm = async () => {
+    if (preparingConfirm || send.isPending) return;
+
+    setPreparingConfirm(true);
+    setClipboardGuardError(null);
+    setSpendWarning(null);
+
+    try {
+      for (const row of recipients) {
+        const address = row.address.trim();
+        if (!address) continue;
+        const addressError = validateSendAddress(address);
+        if (addressError) {
+          setSpendWarning(addressError);
+          return;
+        }
+      }
+
+      if (spendingCfg.data?.clipboard_guard_enabled) {
+        for (const row of validRows) {
+          const snap = clipboardSnapshot.current.get(row.id);
+          if (snap && snap !== row.address.trim()) {
+            setClipboardGuardError(
+              "Clipboard contents changed since paste — possible hijack. Re-paste the address.",
+            );
+            return;
+          }
+        }
+      }
+
+      if (spendingCfg.data?.allowlist_only) {
+        const book = await listAddressBookEntries(coin);
+        const allowlist = book
+          .filter((e) => e.category === "send")
+          .map((e) => e.address);
+        for (const row of validRows) {
+          const addr = row.address.trim();
+          const ok = await spendingControlsCheckAllowlist(addr, allowlist);
+          if (!ok) {
+            setSpendWarning(
+              `Allowlist mode: add ${addr.slice(0, 12)}… to Address book (Send) first.`,
+            );
+            return;
+          }
+        }
+      }
+
+      const total = validRows.reduce((s, r) => s + parseAmount(r.amount)!, 0);
+
+      const capCheck = await spendingControlsCheckSend(
+        total,
+        coin,
+        validRows[0]!.address.trim(),
+      );
+      if (!capCheck.allowed) {
+        setSpendWarning(capCheck.reason ?? "Send blocked by spending controls.");
+        return;
+      }
+
+      let extraDelay = false;
+      let lookAlikeWarning = capCheck.look_alike_warning ?? null;
+
+      for (const row of validRows) {
+        const check = await spendingControlsCheckSend(0, coin, row.address.trim());
+        if (check.requires_extra_confirmation) extraDelay = true;
+        if (check.look_alike_warning && !lookAlikeWarning) {
+          lookAlikeWarning = check.look_alike_warning;
+        }
+      }
+
+      if (lookAlikeWarning) setSpendWarning(lookAlikeWarning);
+      setExtraConfirmDelay(extraDelay);
+      setConfirmOpen(true);
+    } finally {
+      setPreparingConfirm(false);
+    }
   };
 
   return (
@@ -463,11 +510,21 @@ export function SendPanel({
       <TwoFactorPrompt
         open={twoFaOpen}
         title="Confirm send with 2FA"
-        onVerified={() => {
+        onVerified={(code) => {
+          sendTotpCodeRef.current = code;
           setTwoFaOpen(false);
-          setConfirmOpen(true);
+          executeSend();
         }}
         onCancel={() => setTwoFaOpen(false)}
+      />
+      <SendPassphrasePrompt
+        open={passphrasePromptOpen}
+        onVerified={(passphrase) => {
+          sendPassphraseRef.current = passphrase;
+          setPassphrasePromptOpen(false);
+          executeSend();
+        }}
+        onCancel={() => setPassphrasePromptOpen(false)}
       />
 
       <QrScanModal
@@ -493,7 +550,7 @@ export function SendPanel({
         subtractFeeFromAmount={subtractFee}
         confirming={send.isPending}
         extraConfirmDelay={extraConfirmDelay}
-        onConfirm={() => send.mutate()}
+        onConfirm={() => void requestSendAuth()}
         onCancel={() => {
           if (!send.isPending) setConfirmOpen(false);
         }}
@@ -533,20 +590,25 @@ export function SendPanel({
       />
 
       <div className="flex flex-col gap-3">
-        {recipients.map((row, index) => (
+        {recipients.map((row, index) => {
+          const addressError = row.address.trim()
+            ? validateSendAddress(row.address.trim())
+            : null;
+          return (
           <div
             key={row.id}
             className="rounded-lg border border-border bg-bg-subtle/80 p-4"
           >
             <div className="grid gap-3">
-              <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
+              <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-start">
                 <label
                   htmlFor={`pay-to-${row.id}`}
-                  className="text-sm font-medium text-fg-muted sm:text-right"
+                  className="text-sm font-medium text-fg-muted sm:text-right sm:pt-2"
                 >
                   Pay To
                 </label>
-                <div className="flex min-w-0 gap-1">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <div className="flex min-w-0 gap-1">
                   <input
                     id={`pay-to-${row.id}`}
                     type="text"
@@ -560,7 +622,10 @@ export function SendPanel({
                         ? `Enter a ${profile.displayName} address (e.g. ${exampleAddress})`
                         : `Enter a ${profile.displayName} address`
                     }
-                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-bg-panel px-3 text-xs outline-none focus:border-accent"
+                    className={cn(
+                      "h-10 min-w-0 flex-1 rounded-md border bg-bg-panel px-3 text-xs outline-none focus:border-accent",
+                      addressError ? "border-danger" : "border-border",
+                    )}
                   />
                   <Button
                     type="button"
@@ -605,6 +670,10 @@ export function SendPanel({
                   >
                     <X className="h-4 w-4" />
                   </Button>
+                  </div>
+                  {addressError && (
+                    <p className="text-xs text-danger">{addressError}</p>
+                  )}
                 </div>
               </div>
 
@@ -672,7 +741,8 @@ export function SendPanel({
               </div>
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
@@ -753,8 +823,17 @@ export function SendPanel({
             disabled={!canSend}
             onClick={() => void openConfirm()}
           >
-            <SendHorizontal className="h-4 w-4" />
-            {send.isPending ? "Sending…" : "Send"}
+            {preparingConfirm || send.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                {preparingConfirm ? "Checking…" : "Sending…"}
+              </>
+            ) : (
+              <>
+                <SendHorizontal className="h-4 w-4" />
+                Send
+              </>
+            )}
           </Button>
           <Button
             type="button"

@@ -9,6 +9,7 @@ import {
   rpcGetWalletInfo,
   rpcStakingStart,
 } from "@/lib/rpc/client";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { isWalletUnlocked } from "@/lib/wallet-unlock";
 
 const RETRY_MS = 10_000;
@@ -33,6 +34,7 @@ export function wasStakingStoppedByUser(): boolean {
  * and the wallet is unlocked for minting.
  */
 export function useAutoStake() {
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
@@ -44,6 +46,7 @@ export function useAutoStake() {
     queryFn: () => rpcGetBlockchainInfo(VERICOIN),
     refetchInterval: 10_000,
     enabled:
+      !isLight &&
       loaded &&
       prefs.auto_stake_on_open === true &&
       prefs.vericoin_enabled !== false,
@@ -54,6 +57,7 @@ export function useAutoStake() {
     queryFn: () => rpcGetWalletInfo(VERICOIN),
     refetchInterval: 5_000,
     enabled:
+      !isLight &&
       loaded &&
       prefs.auto_stake_on_open === true &&
       prefs.vericoin_enabled !== false,
@@ -64,12 +68,14 @@ export function useAutoStake() {
     queryFn: () => rpcGetStakingState(VERICOIN),
     refetchInterval: 5_000,
     enabled:
+      !isLight &&
       loaded &&
       prefs.auto_stake_on_open === true &&
       prefs.vericoin_enabled !== false,
   });
 
   useEffect(() => {
+    if (isLight) return;
     if (!loaded || !prefs.auto_stake_on_open || prefs.vericoin_enabled === false) {
       return;
     }
@@ -96,6 +102,7 @@ export function useAutoStake() {
     const id = window.setInterval(() => void tryStart(), RETRY_MS);
     return () => window.clearInterval(id);
   }, [
+    isLight,
     loaded,
     prefs.auto_stake_on_open,
     prefs.vericoin_enabled,

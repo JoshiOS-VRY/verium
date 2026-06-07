@@ -17,8 +17,8 @@ The following are some helpful notes on how to run Verium on your native platfor
 
 Unpack the files into a directory and run:
 
-- `bin/verium-qt` (GUI) or
-- `bin/veriumd` (headless)
+- `bin/veriumd` (daemon) and `bin/verium-cli` (RPC client)
+- Desktop wallet: build from [`desktop/verium-app/`](../desktop/verium-app/)
 
 ### Windows
 

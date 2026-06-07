@@ -33,17 +33,41 @@ export async function recoveryApplyHdSeed(
   phrase: string,
   bip39Passphrase?: string,
   unlockPassphrase?: string,
+  totpCode?: string,
 ): Promise<string> {
   return invoke("recovery_apply_hd_seed", {
     coin,
     phrase,
     bip39Passphrase: bip39Passphrase ?? null,
     unlockPassphrase: unlockPassphrase ?? null,
+    totpCode: totpCode?.trim() || null,
   });
 }
 
 export async function recoveryWalletIsHd(coin: CoinId): Promise<boolean> {
   return invoke("recovery_wallet_is_hd", { coin });
+}
+
+export type RecoveryExportResult =
+  | { kind: "mnemonic"; mnemonic: string; word_count: number }
+  | { kind: "hd_master_xprv"; xprv: string; message: string };
+
+export async function recoveryMnemonicBackupExists(
+  coin: CoinId,
+): Promise<boolean> {
+  return invoke("recovery_mnemonic_backup_exists", { coin });
+}
+
+export async function recoveryExportSeed(
+  coin: CoinId,
+  walletPassphrase: string,
+  totpCode?: string,
+): Promise<RecoveryExportResult> {
+  return invoke("recovery_export_seed", {
+    coin,
+    walletPassphrase,
+    totpCode: totpCode?.trim() || null,
+  });
 }
 
 // ── 2FA ─────────────────────────────────────────────────────────────────────
@@ -273,15 +297,32 @@ export async function hardwareWalletSendPsbt(
   coin: CoinId,
   outputs: Record<string, number>,
   feeRate?: number,
+  totpCode?: string,
+  walletPassphrase?: string,
+  extraConfirmed = true,
 ): Promise<PsbtSendResult> {
-  return invoke("hardware_wallet_send_psbt", { coin, outputs, feeRate: feeRate ?? null });
+  return invoke("hardware_wallet_send_psbt", {
+    coin,
+    outputs,
+    feeRate: feeRate ?? null,
+    totpCode: totpCode?.trim() || null,
+    walletPassphrase: walletPassphrase?.trim() || null,
+    extraConfirmed,
+  });
 }
 
 export async function hardwareWalletFinalizePsbt(
   coin: CoinId,
   psbtBase64: string,
+  totpCode?: string,
+  walletPassphrase?: string,
 ): Promise<string> {
-  return invoke("hardware_wallet_finalize_psbt", { coin, psbtBase64 });
+  return invoke("hardware_wallet_finalize_psbt", {
+    coin,
+    psbtBase64,
+    totpCode: totpCode?.trim() || null,
+    walletPassphrase: walletPassphrase?.trim() || null,
+  });
 }
 
 // ── Multisig ────────────────────────────────────────────────────────────────

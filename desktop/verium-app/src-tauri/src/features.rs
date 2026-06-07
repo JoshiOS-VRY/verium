@@ -20,3 +20,12 @@ pub fn effective_network_mode(stored: NetworkMode) -> NetworkMode {
         stored
     }
 }
+
+/// Light wallet mode (Electrum client). Enabled in non-alpha builds or when
+/// `VERICONOMY_LIGHT_WALLET=1` is set for local development.
+pub fn light_wallet_enabled() -> bool {
+    if std::env::var("VERICONOMY_LIGHT_WALLET").ok().as_deref() == Some("1") {
+        return true;
+    }
+    !env!("CARGO_PKG_VERSION").contains("alpha")
+}

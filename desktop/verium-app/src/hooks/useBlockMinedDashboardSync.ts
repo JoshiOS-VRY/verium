@@ -2,12 +2,15 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { subscribeBlockMined } from "@/hooks/useBlockMinedWatcher";
+import { useWalletMode } from "@/hooks/useWalletMode";
 
 /** Refresh wallet and explorer queries as soon as a mined block is detected locally. */
 export function useBlockMinedDashboardSync(): void {
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (isLight) return;
     return subscribeBlockMined(() => {
       void queryClient.invalidateQueries({ queryKey: ["explorer-blocks"] });
       void queryClient.invalidateQueries({
@@ -24,5 +27,5 @@ export function useBlockMinedDashboardSync(): void {
             q.queryKey[1] === "listaddressgroupings"),
       });
     });
-  }, [queryClient]);
+  }, [isLight, queryClient]);
 }

@@ -20,6 +20,7 @@ import { MiningStatTile } from "@/components/MiningStatTile";
 import { MiningStatusBanner } from "@/components/MiningStatusBanner";
 import { MinerHashrateDisplay } from "@/components/MinerBootIndicator";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { fetchExplorerStats } from "@/lib/explorer-api";
@@ -71,6 +72,7 @@ const SAMPLE_MIN_MS = MINING_HASHRATE_POLL_MS;
 
 export function Mining() {
   const coin = useActiveCoin();
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const updatePrefs = useUserPreferences((s) => s.update);
@@ -97,7 +99,7 @@ export function Mining() {
   const [samples, setSamples] = useState<HashSample[]>([]);
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("day");
   const [miningMode, setMiningMode] = useState<MiningMode>(
-    prefs.mining_mode ?? "pool",
+    isLight ? "pool" : (prefs.mining_mode ?? "pool"),
   );
   const poolMinerRunning = usePoolMinerRunning();
   const lastSampleRef = useRef<{ t: number; hr: number } | null>(null);
@@ -316,43 +318,51 @@ export function Mining() {
   return (
     <WalletUnlockGate
       title="Unlock to mine"
-      description="Enter your wallet passphrase to access solo CPU mining or mine on the official Verium pool."
+      description={
+        isLight
+          ? "Enter your wallet passphrase to mine on the official Verium pool."
+          : "Enter your wallet passphrase to access solo CPU mining or mine on the official Verium pool."
+      }
     >
       <div className="flex flex-col gap-4">
-        <MiningStatusBanner
-          syncStalled={syncStalled}
-          chainSynced={chainSynced}
-          ibd={ibd}
-          localBlocks={blockchain.data?.blocks}
-          syncTarget={syncTarget}
-          blocksBehind={blocksBehind}
-          immatureBalance={immature}
-        />
+        {!isLight && (
+          <MiningStatusBanner
+            syncStalled={syncStalled}
+            chainSynced={chainSynced}
+            ibd={ibd}
+            localBlocks={blockchain.data?.blocks}
+            syncTarget={syncTarget}
+            blocksBehind={blocksBehind}
+            immatureBalance={immature}
+          />
+        )}
 
-        <div
-          role="radiogroup"
-          aria-label="Mining mode"
-          className="inline-flex rounded-md border border-border bg-bg-subtle p-1"
-        >
-          <Button
-            type="button"
-            variant={miningMode === "solo" ? "primary" : "ghost"}
-            className="h-8 px-4 text-sm"
-            onClick={() => setMiningModePersist("solo")}
+        {!isLight && (
+          <div
+            role="radiogroup"
+            aria-label="Mining mode"
+            className="inline-flex rounded-md border border-border bg-bg-subtle p-1"
           >
-            Solo (built-in)
-          </Button>
-          <Button
-            type="button"
-            variant={miningMode === "pool" ? "primary" : "ghost"}
-            className="h-8 px-4 text-sm"
-            onClick={() => setMiningModePersist("pool")}
-          >
-            Pool (official)
-          </Button>
-        </div>
+            <Button
+              type="button"
+              variant={miningMode === "solo" ? "primary" : "ghost"}
+              className="h-8 px-4 text-sm"
+              onClick={() => setMiningModePersist("solo")}
+            >
+              Solo (built-in)
+            </Button>
+            <Button
+              type="button"
+              variant={miningMode === "pool" ? "primary" : "ghost"}
+              className="h-8 px-4 text-sm"
+              onClick={() => setMiningModePersist("pool")}
+            >
+              Pool (official)
+            </Button>
+          </div>
+        )}
 
-        {miningMode === "pool" ? (
+        {miningMode === "pool" || isLight ? (
           <PoolMiningPanel
             prefs={prefs}
             enabled={explorerEnabled}
@@ -392,7 +402,7 @@ export function Mining() {
           />
         ) : null}
 
-        {miningMode === "solo" ? (
+        {!isLight && miningMode === "solo" ? (
           <>
         <MiningHero
           active={active}

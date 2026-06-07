@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { ArrowLeftRight, Coins, Cpu, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getCoinProfile, type CoinId } from "@/lib/coin/profile";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { type TransactionItem } from "@/lib/rpc/client";
 import { formatCoinAmount } from "@/lib/units";
@@ -32,10 +31,8 @@ function isEarnActivity(tx: TransactionItem, coin: CoinId): boolean {
 
 export function DashboardStrip({ coin }: { coin: CoinId }) {
   const profile = getCoinProfile(coin);
-  const { data: status } = useDaemonStatus(coin);
-  const connected = status?.connected === true;
-  const showRpcData = connected;
   const {
+    connected,
     wallet,
     transactions: txs,
     mining: vrmMining,
@@ -44,6 +41,8 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
     vrcMining,
     explorer: stats,
   } = useDashboardData(coin);
+
+  const showRpcData = connected;
 
   const vrcNetwork =
     coin === "vericoin"

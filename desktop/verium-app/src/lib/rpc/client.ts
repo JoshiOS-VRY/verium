@@ -104,6 +104,8 @@ export interface WalletInfo {
   /** While staking: estimated hours until a reward (`GetTimeToStake` / Qt), not seconds. */
   staketime?: number;
   unlocked_minting_only?: boolean;
+  light_wallet?: boolean;
+  light_syncing?: boolean;
 }
 
 export interface TransactionItem {
@@ -311,12 +313,18 @@ export async function rpcSendToAddress(
   address: string,
   amount: number,
   comment?: string,
+  totpCode?: string,
+  walletPassphrase?: string,
+  extraConfirmed = true,
 ): Promise<string> {
   return invoke<string>("send_to_address", {
     coin,
     address,
     amount,
     comment: comment ?? "",
+    totpCode: totpCode?.trim() || null,
+    walletPassphrase: walletPassphrase?.trim() || null,
+    extraConfirmed,
   });
 }
 
@@ -337,11 +345,13 @@ export async function rpcWalletChangePassphrase(
   coin: CoinId,
   oldPassphrase: string,
   newPassphrase: string,
+  totpCode?: string,
 ): Promise<void> {
   return invoke<void>("wallet_change_passphrase", {
     coin,
     oldPassphrase,
     newPassphrase,
+    totpCode: totpCode?.trim() || null,
   });
 }
 
@@ -373,12 +383,25 @@ export interface WalletRestoreResult {
 export async function rpcWalletRestore(
   coin: CoinId,
   sourcePath: string,
+  totpCode?: string,
 ): Promise<WalletRestoreResult> {
-  return invoke<WalletRestoreResult>("wallet_restore", { coin, sourcePath });
+  return invoke<WalletRestoreResult>("wallet_restore", {
+    coin,
+    sourcePath,
+    totpCode: totpCode?.trim() || null,
+  });
 }
 
-export async function rpcWalletDumpPrivKey(coin: CoinId, address: string): Promise<string> {
-  return invoke<string>("wallet_dump_privkey", { coin, address });
+export async function rpcWalletDumpPrivKey(
+  coin: CoinId,
+  address: string,
+  totpCode?: string,
+): Promise<string> {
+  return invoke<string>("wallet_dump_privkey", {
+    coin,
+    address,
+    totpCode: totpCode?.trim() || null,
+  });
 }
 
 export async function rpcWalletImportPrivKey(
@@ -386,8 +409,15 @@ export async function rpcWalletImportPrivKey(
   privkey: string,
   label?: string,
   rescan = true,
+  totpCode?: string,
 ): Promise<void> {
-  return invoke<void>("wallet_import_privkey", { coin, privkey, label, rescan });
+  return invoke<void>("wallet_import_privkey", {
+    coin,
+    privkey,
+    label,
+    rescan,
+    totpCode: totpCode?.trim() || null,
+  });
 }
 
 export async function rpcWalletSignMessage(
@@ -446,6 +476,9 @@ export async function rpcWalletSendWithInputs(
   outputs: Record<string, number>,
   changeAddress?: string,
   feeRatePerKb?: number,
+  totpCode?: string,
+  walletPassphrase?: string,
+  extraConfirmed = true,
 ): Promise<string> {
   return invoke<string>("wallet_send_with_inputs", {
     coin,
@@ -453,6 +486,9 @@ export async function rpcWalletSendWithInputs(
     outputs,
     changeAddress,
     feeRateVrmPerKb: feeRatePerKb,
+    totpCode: totpCode?.trim() || null,
+    walletPassphrase: walletPassphrase?.trim() || null,
+    extraConfirmed,
   });
 }
 
@@ -568,30 +604,17 @@ export async function tauriReadNodeConf(coin: CoinId): Promise<NodeConfFile> {
 export async function tauriWriteNodeConf(
   coin: CoinId,
   content: string,
+  totpCode?: string,
 ): Promise<NodeConfFile> {
-  return invoke<NodeConfFile>("write_verium_conf", { coin, content });
+  return invoke<NodeConfFile>("write_verium_conf", {
+    coin,
+    content,
+    totpCode: totpCode?.trim() || null,
+  });
 }
 
 export async function tauriOpenNodeConf(coin: CoinId): Promise<string> {
   return invoke<string>("open_verium_conf", { coin });
-}
-
-/** @deprecated use tauriReadNodeConf(coin) */
-export async function tauriReadVeriumConf(coin: CoinId = "verium"): Promise<NodeConfFile> {
-  return tauriReadNodeConf(coin);
-}
-
-/** @deprecated use tauriWriteNodeConf(coin, content) */
-export async function tauriWriteVeriumConf(
-  coin: CoinId,
-  content: string,
-): Promise<NodeConfFile> {
-  return tauriWriteNodeConf(coin, content);
-}
-
-/** @deprecated use tauriOpenNodeConf(coin) */
-export async function tauriOpenVeriumConf(coin: CoinId = "verium"): Promise<string> {
-  return tauriOpenNodeConf(coin);
 }
 
 export interface DebugLogStatus {
@@ -635,8 +658,6 @@ export interface DaemonRuntimeStatus {
   message: string;
   hint?: string;
 }
-
-export type VeriumdRuntimeStatus = DaemonRuntimeStatus;
 
 export async function tauriDetectDaemonRuntime(coin: CoinId): Promise<DaemonRuntimeStatus> {
   return invoke<DaemonRuntimeStatus>("detect_veriumd_runtime", { coin });
@@ -690,11 +711,6 @@ export interface DaemonBinaryStatus {
 
 export async function tauriDetectDaemon(coin: CoinId): Promise<DaemonBinaryStatus> {
   return invoke<DaemonBinaryStatus>("detect_daemon", { coin });
-}
-
-/** @deprecated use tauriDetectDaemon(coin) */
-export async function tauriDetectVeriumd(coin: CoinId = "verium"): Promise<DaemonBinaryStatus> {
-  return tauriDetectDaemon(coin);
 }
 
 export async function tauriImportBootstrap(

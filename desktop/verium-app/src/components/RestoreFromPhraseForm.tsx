@@ -23,7 +23,7 @@ export function RestoreFromPhraseForm({
   const [bip39Pass, setBip39Pass] = useState("");
 
   const restore = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (totpCode?: string) => {
       const valid = await recoveryValidateMnemonic(phrase);
       if (!valid) throw new Error("Invalid recovery phrase checksum");
       return recoveryApplyHdSeed(
@@ -31,6 +31,7 @@ export function RestoreFromPhraseForm({
         phrase,
         bip39Pass || undefined,
         walletPassphrase || undefined,
+        totpCode,
       );
     },
     onSuccess: () => onRestored?.(),
@@ -48,7 +49,7 @@ export function RestoreFromPhraseForm({
         className="flex flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void twoFa.gate("restore_wallet", () => restore.mutate(), {
+          void twoFa.gate("restore_wallet", (code) => restore.mutate(code), {
             title: "Confirm phrase restore with 2FA",
           });
         }}

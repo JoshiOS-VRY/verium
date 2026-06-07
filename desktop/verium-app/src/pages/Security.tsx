@@ -10,10 +10,12 @@ import {
 } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ExportRecoveryPhrasePanel } from "@/components/ExportRecoveryPhrasePanel";
 import { RecoveryPhraseWizard } from "@/components/RecoveryPhraseWizard";
 import { RestoreFromPhraseForm } from "@/components/RestoreFromPhraseForm";
 import { TwoFactorEnrollmentPanel } from "@/components/TwoFactorEnrollmentPanel";
 import { useActiveCoin } from "@/lib/coin/context";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import {
   autoLockGetConfig,
   autoLockSetConfig,
@@ -49,11 +51,13 @@ const DEFAULT_SPENDING: SpendingControlsConfig = {
 
 export function Security() {
   const coin = useActiveCoin();
+  const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const [totpCode, setTotpCode] = useState("");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [showRecovery, setShowRecovery] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [showPhraseRestore, setShowPhraseRestore] = useState(false);
   const [walletUnlockPass, setWalletUnlockPass] = useState("");
 
@@ -131,7 +135,9 @@ export function Security() {
         <h1 className="text-2xl font-semibold">Security center</h1>
         <p className="mt-1 text-sm text-fg-muted">
           Recovery phrase, app PIN, 2FA, spending controls, and auto-lock.
-          Wallet.dat backups are in Settings.
+          {isLight
+            ? " Light wallets use an encrypted keystore — export your recovery phrase regularly."
+            : " wallet.dat backups are in Settings."}
         </p>
       </div>
 
@@ -141,28 +147,28 @@ export function Security() {
             <KeyRound className="h-4 w-4 text-accent" /> Recovery phrase (BIP39)
           </CardTitle>
           <CardDescription>
-            {walletIsHd
-              ? "Restore or rotate access using your 24-word phrase. wallet.dat backup is in Settings."
+            {walletIsHd || isLight
+              ? "Export, restore, or rotate access using your recovery phrase (or HD master xprv). wallet.dat backup is in Settings."
               : "Upgrade to HD to generate a recovery phrase."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {!walletIsHd && (
+          {!walletIsHd && !isLight && (
             <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               Non-HD wallet detected. Generate a phrase and upgrade to enable recovery.
             </div>
           )}
-          {walletIsHd && (
+          {(walletIsHd || isLight) && (
             <p className="text-xs text-success">
               HD recovery is enabled. To restore keys from a phrase, use the form below
               (replaces wallet keys — back up wallet.dat first).
             </p>
           )}
-          {!walletIsHd && !showRecovery && (
+          {!walletIsHd && !isLight && !showRecovery && (
             <Button onClick={() => setShowRecovery(true)}>Set up recovery phrase</Button>
           )}
-          {showRecovery && !walletIsHd && (
+          {showRecovery && !walletIsHd && !isLight && (
             <div className="flex flex-col gap-3">
               <input
                 type="password"
@@ -181,12 +187,26 @@ export function Security() {
               />
             </div>
           )}
-          {walletIsHd && (
+          {(walletIsHd || isLight) && (
             <div className="flex flex-col gap-3 border-t border-border pt-3">
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => setShowPhraseRestore((v) => !v)}
+                onClick={() => {
+                  setShowExport((v) => !v);
+                  if (showPhraseRestore) setShowPhraseRestore(false);
+                }}
+              >
+                {showExport ? "Hide export" : "Export recovery phrase"}
+              </Button>
+              {showExport && <ExportRecoveryPhrasePanel />}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setShowPhraseRestore((v) => !v);
+                  if (showExport) setShowExport(false);
+                }}
               >
                 {showPhraseRestore ? "Hide" : "Restore from recovery phrase"}
               </Button>

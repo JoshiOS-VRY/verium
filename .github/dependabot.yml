@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /desktop/verium-app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      npm-production:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@tauri-apps/*"
+
+  - package-ecosystem: cargo
+    directory: /desktop/verium-app/src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10

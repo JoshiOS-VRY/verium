@@ -17,7 +17,6 @@ AC_CONFIG_MACRO_DIR([build-aux/m4])
 AM_PROG_AS
 
 BITCOIN_DAEMON_NAME=veriumd
-BITCOIN_GUI_NAME=verium-qt
 BITCOIN_CLI_NAME=verium-cli
 BITCOIN_TX_NAME=verium-tx
 BITCOIN_WALLET_TOOL_NAME=verium-wallet
@@ -1072,10 +1071,10 @@ if test "x$enable_fuzz" = "xyes"; then
   use_upnp=no
   use_zmq=no
 else
-  BITCOIN_QT_INIT
-
-  dnl sets $bitcoin_enable_qt, $bitcoin_enable_qt_test, $bitcoin_enable_qt_dbus
-  BITCOIN_QT_CONFIGURE([$use_pkgconfig])
+  dnl Qt GUI removed; desktop wallet ships as Tauri app under desktop/verium-app/
+  bitcoin_enable_qt=no
+  bitcoin_enable_qt_test=no
+  bitcoin_enable_qt_dbus=no
 fi
 
 if test x$enable_wallet != xno; then
@@ -1301,12 +1300,6 @@ if test x$use_pkgconfig = xyes; then
     [
       PKG_CHECK_MODULES([SSL], [libssl],, [AC_MSG_ERROR(openssl not found.)])
       PKG_CHECK_MODULES([CRYPTO], [libcrypto],,[AC_MSG_ERROR(libcrypto not found.)])
-      if test x$enable_bip70 != xno; then
-        BITCOIN_QT_CHECK([PKG_CHECK_MODULES([PROTOBUF], [protobuf], [have_protobuf=yes], [have_protobuf=no])])
-      fi
-      if test x$use_qr != xno; then
-        BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
-      fi
       if test x$build_bitcoin_cli$build_bitcoind$bitcoin_enable_qt$use_tests != xnononono; then
         PKG_CHECK_MODULES([EVENT], [libevent],, [AC_MSG_ERROR(libevent not found.)])
         if test x$TARGET_OS != xwindows; then
@@ -1363,13 +1356,6 @@ else
     esac
   fi
 
-  if test x$enable_bip70 != xno; then
-    BITCOIN_QT_CHECK(AC_CHECK_LIB([protobuf] ,[main],[PROTOBUF_LIBS=-lprotobuf], [have_protobuf=no]))
-  fi
-  if test x$use_qr != xno; then
-    BITCOIN_QT_CHECK([AC_CHECK_LIB([qrencode], [main],[QR_LIBS=-lqrencode], [have_qrencode=no])])
-    BITCOIN_QT_CHECK([AC_CHECK_HEADER([qrencode.h],, have_qrencode=no)])
-  fi
 fi
 
 save_CXXFLAGS="${CXXFLAGS}"
@@ -1443,11 +1429,6 @@ AM_CONDITIONAL([EMBEDDED_UNIVALUE],[test x$need_bundled_univalue = xyes])
 AC_SUBST(UNIVALUE_CFLAGS)
 AC_SUBST(UNIVALUE_LIBS)
 
-
-if test x$have_protobuf != xno &&
-   test x$enable_bip70 != xno; then
-  BITCOIN_QT_PATH_PROGS([PROTOC], [protoc],$protoc_bin_path)
-fi
 
 AC_MSG_CHECKING([whether to build veriumd])
 AM_CONDITIONAL([BUILD_BITCOIND], [test x$build_bitcoind = xyes])
@@ -1607,8 +1588,8 @@ else
   AC_MSG_RESULT([no])
 fi
 
-if test x$build_bitcoin_wallet$build_bitcoin_cli$build_bitcoin_tx$build_bitcoin_libs$build_bitcoind$bitcoin_enable_qt$use_bench$use_tests = xnononononononono; then
-  AC_MSG_ERROR([No targets! Please specify at least one of: --with-utils --with-libs --with-daemon --with-gui --enable-bench or --enable-tests])
+if test x$build_bitcoin_wallet$build_bitcoin_cli$build_bitcoin_tx$build_bitcoin_libs$build_bitcoind$use_bench$use_tests = xnonononononono; then
+  AC_MSG_ERROR([No targets! Please specify at least one of: --with-utils --with-libs --with-daemon --enable-bench or --enable-tests])
 fi
 
 AM_CONDITIONAL([TARGET_DARWIN], [test x$TARGET_OS = xdarwin])
@@ -1654,7 +1635,6 @@ AC_SUBST(COPYRIGHT_HOLDERS, "_COPYRIGHT_HOLDERS")
 AC_SUBST(COPYRIGHT_HOLDERS_SUBSTITUTION, "_COPYRIGHT_HOLDERS_SUBSTITUTION")
 AC_SUBST(COPYRIGHT_HOLDERS_FINAL, "_COPYRIGHT_HOLDERS_FINAL")
 AC_SUBST(BITCOIN_DAEMON_NAME)
-AC_SUBST(BITCOIN_GUI_NAME)
 AC_SUBST(BITCOIN_CLI_NAME)
 AC_SUBST(BITCOIN_TX_NAME)
 AC_SUBST(BITCOIN_WALLET_TOOL_NAME)
@@ -1698,7 +1678,7 @@ AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
-AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi share/qt/Info.plist test/config.ini])
+AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi test/config.ini])
 AC_CONFIG_FILES([contrib/devtools/split-debug.sh],[chmod +x contrib/devtools/split-debug.sh])
 AC_CONFIG_LINKS([contrib/filter-lcov.py:contrib/filter-lcov.py])
 AC_CONFIG_LINKS([test/functional/test_runner.py:test/functional/test_runner.py])
@@ -1759,11 +1739,7 @@ esac
 echo
 echo "Options used to compile and link:"
 echo "  with wallet   = $enable_wallet"
-echo "  with gui / qt = $bitcoin_enable_qt"
-if test x$bitcoin_enable_qt != xno; then
-    echo "    with bip70  = $enable_bip70"
-    echo "    with qr     = $use_qr"
-fi
+echo "  with gui / qt = no (use desktop/verium-app Tauri wallet)"
 echo "  with zmq      = $use_zmq"
 echo "  with test     = $use_tests"
 if test x$use_tests != xno; then

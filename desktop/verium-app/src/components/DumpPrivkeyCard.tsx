@@ -22,12 +22,16 @@ export function DumpPrivkeyCard() {
   const twoFa = useTwoFactorGate(coin);
 
   const dump = useMutation({
-    mutationFn: async () => {
-      const key = await rpcWalletDumpPrivKey(coin, address.trim());
+    mutationFn: async (totpCode?: string) => {
+      const key = await rpcWalletDumpPrivKey(coin, address.trim(), totpCode);
       await auditLogRecord("dump_privkey", address.trim(), coin);
       return key;
     },
-    onSuccess: (key) => setPrivkey(key),
+    onSuccess: (key) => {
+      setPrivkey(key);
+      void navigator.clipboard.writeText(key);
+      window.setTimeout(() => void navigator.clipboard.writeText(""), 30_000);
+    },
   });
 
   return (
@@ -61,7 +65,7 @@ export function DumpPrivkeyCard() {
             variant="danger"
             disabled={!address.trim() || dump.isPending}
             onClick={() =>
-              void twoFa.gate("dump_privkey", () => dump.mutate(), {
+              void twoFa.gate("dump_privkey", (code) => dump.mutate(code), {
                 title: "Confirm key export with 2FA",
               })
             }

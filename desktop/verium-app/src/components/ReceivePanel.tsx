@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useIsTestNetwork } from "@/lib/network-mode";
 
 interface ReceivePanelProps {
@@ -27,6 +28,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
   const isTestNetwork = useIsTestNetwork();
+  const { isLight } = useWalletMode();
   const { data: nodeStatus } = useDaemonStatus(coin);
   const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
@@ -111,6 +113,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   };
 
   const networkReceiveBlocked =
+    !isLight &&
     coin === "vericoin" &&
     nodeStatus?.connected === true &&
     (nodeStatus.txindex_network_paused === true ||

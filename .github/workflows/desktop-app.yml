@@ -3,13 +3,7 @@ name: Build Vericonomy Wallet (Tauri)
 on:
   push:
     branches:
-      [
-        main,
-        master,
-        testnet,
-        tippy-gui-changes-modern-template,
-        tippy-binary-chain-implementation,
-      ]
+      [main, master, testnet]
     tags:
       - "desktop-v*"
     paths:
@@ -351,6 +345,15 @@ jobs:
       - name: Frontend unit tests
         run: npm test
 
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        run: cargo audit --manifest-path src-tauri/Cargo.toml
+
       - name: Download Vericonomy daemon sidecar
         uses: actions/download-artifact@v7
         with:
@@ -472,11 +475,31 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/desktop-v')
         shell: bash
         run: |
-          for f in artifacts/*; do
-            cosign sign-blob --yes "$f" --output-signature "${f}.sig" || true
+          set -euo pipefail
+          shopt -s nullglob
+          files=(artifacts/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release artifacts to sign"
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            case "$f" in
+              *.sig|release-hashes.json) continue ;;
+            esac
+            cosign sign-blob --yes "$f" --output-signature "${f}.sig"
           done
         env:
           COSIGN_EXPERIMENTAL: "1"
+
+      - name: Generate SBOM (npm)
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: npx @cyclonedx/cyclonedx-npm --output-file artifacts/sbom-npm.json
+
+      - name: Generate SBOM (cargo)
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: |
+          cargo install cargo-cyclonedx --locked
+          cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json --output artifacts/sbom-cargo.json
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5

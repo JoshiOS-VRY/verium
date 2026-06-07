@@ -33,7 +33,13 @@ export function WalletImportForm({
   const [pendingPath, setPendingPath] = useState<string | null>(null);
 
   const restore = useMutation({
-    mutationFn: (sourcePath: string) => rpcWalletRestore(coin, sourcePath),
+    mutationFn: ({
+      sourcePath,
+      totpCode,
+    }: {
+      sourcePath: string;
+      totpCode?: string;
+    }) => rpcWalletRestore(coin, sourcePath, totpCode),
     onSuccess: async () => {
       setPendingPath(null);
       await invalidateWalletQueries(queryClient, coin);
@@ -105,7 +111,8 @@ export function WalletImportForm({
                 onClick={() =>
                   void twoFa.gate(
                     "restore_wallet",
-                    () => restore.mutate(pendingPath),
+                    (code) =>
+                      restore.mutate({ sourcePath: pendingPath, totpCode: code }),
                     { title: "Confirm wallet import with 2FA" },
                   )
                 }

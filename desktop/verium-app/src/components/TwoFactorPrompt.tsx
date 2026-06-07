@@ -6,7 +6,7 @@ import { twoFactorVerify } from "@/lib/security/client";
 interface TwoFactorPromptProps {
   open: boolean;
   title?: string;
-  onVerified: () => void;
+  onVerified: (code: string) => void;
   onCancel: () => void;
 }
 
@@ -57,8 +57,9 @@ export function TwoFactorPrompt({
               const ok = await twoFactorVerify(code);
               setChecking(false);
               if (ok) {
+                const verified = code;
                 setCode("");
-                onVerified();
+                onVerified(verified);
               } else {
                 setError("Invalid code. Try again or use a recovery code.");
               }

@@ -325,7 +325,7 @@ function assertLegacyFlatVeriumd(destPath) {
     throw new Error(
       `Refusing to install unified vericoin/veriumd as the Verium mainnet sidecar (${destPath}). ` +
         "Verium mainnet requires the legacy flat-layout verium-only binary (no -verium flag). " +
-        "Set VERIUMD_LOCAL to a verium-only build from verium-legacy/ or verium v1.x.",
+        "Set VERIUMD_LOCAL to a verium-only build from verium/ (legacy flat-layout v1.x binary).",
     );
   }
 }
@@ -377,9 +377,6 @@ function sidecarArchMismatch(dest, triple) {
 function discoverMonorepoBinary(isWindows) {
   const name = isWindows ? "veriumd.exe" : "veriumd";
   const candidates = [
-    path.join(ROOT, "..", "..", "..", "verium-legacy", "verium", "src", name),
-    path.join(ROOT, "..", "..", "..", "verium-legacy", "verium", "src", "qt", name),
-    path.join(ROOT, "..", "..", "..", "verium-legacy", "verium", "build_msvc", "x64", "Release", name),
     path.join(ROOT, "..", "..", "..", "verium", "src", name),
     path.join(ROOT, "..", "..", "..", "vericoin", "src", name),
     path.join(ROOT, "..", "..", "..", "vericoin", "src", "qt", name),

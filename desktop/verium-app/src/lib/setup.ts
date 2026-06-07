@@ -1,6 +1,23 @@
 import type { CoinId } from "@/lib/coin/profile";
 import type { UserPreferences } from "@/lib/user-preferences";
 
+/** True if any enabled chain still needs first-run setup. */
+export function anyEnabledCoinSetupIncomplete(
+  enabledCoins: CoinId[],
+  prefs: Pick<UserPreferences, "setup_completed" | "setup_completed_by_coin">,
+): boolean {
+  return enabledCoins.some((coin) => !isCoinSetupComplete(coin, prefs));
+}
+
+/** Wizard done or a persisted light wallet exists for this chain. */
+export function isCoinWalletReady(
+  coin: CoinId,
+  prefs: Pick<UserPreferences, "setup_completed" | "setup_completed_by_coin">,
+  hasLightWallet?: boolean,
+): boolean {
+  return isCoinSetupComplete(coin, prefs) || hasLightWallet === true;
+}
+
 /** True when the user finished (or migrated) first-run setup for this chain. */
 export function isCoinSetupComplete(
   coin: CoinId,

@@ -28,6 +28,7 @@ import {
   EXPLORER_HOME,
 } from "@/lib/verium-links";
 import { POOL_WEB_URL } from "@/lib/verium-pool";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import releases from "@/lib/releases-manifest.json";
 
 interface ResourceCardProps {
@@ -58,6 +59,7 @@ function ResourceCard({ icon: Icon, title, description, href, cta }: ResourceCar
 }
 
 export function Resources() {
+  const { isLight } = useWalletMode();
   const latest = releases.latest;
   return (
     <div className="flex flex-col gap-6">
@@ -94,20 +96,24 @@ export function Resources() {
           href={POOL_WEB_URL}
           cta="Open pool"
         />
-        <ResourceCard
-          icon={HardDriveDownload}
-          title="Chain Bootstrap"
-          description="Download a fresh snapshot of the chain to speed up the initial sync on a new install."
-          href={BOOTSTRAP_URL_X64}
-          cta="Download (x64)"
-        />
-        <ResourceCard
-          icon={HardDriveDownload}
-          title="Chain Bootstrap (ARM)"
-          description="Same snapshot built for ARM hosts such as Raspberry Pi."
-          href={BOOTSTRAP_URL_ARM}
-          cta="Download (ARM)"
-        />
+        {!isLight && (
+          <>
+            <ResourceCard
+              icon={HardDriveDownload}
+              title="Chain Bootstrap"
+              description="Download a fresh snapshot of the chain to speed up the initial sync on a new install."
+              href={BOOTSTRAP_URL_X64}
+              cta="Download (x64)"
+            />
+            <ResourceCard
+              icon={HardDriveDownload}
+              title="Chain Bootstrap (ARM)"
+              description="Same snapshot built for ARM hosts such as Raspberry Pi."
+              href={BOOTSTRAP_URL_ARM}
+              cta="Download (ARM)"
+            />
+          </>
+        )}
         <ResourceCard
           icon={BookOpen}
           title="Documentation"

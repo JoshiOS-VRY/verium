@@ -179,6 +179,44 @@ impl CoinId {
             CoinId::Vericoin => "vericoin-wallet",
         }
     }
+
+    /// Default Electrum server URIs for light wallet mode (existing infrastructure).
+    pub fn default_electrum_servers(self, network: NetworkMode) -> Vec<String> {
+        if network.is_test() {
+            return match self {
+                CoinId::Verium => vec![
+                    "tls://electrumx-vrm1.vericonomy.com:51002".into(),
+                ],
+                CoinId::Vericoin => vec![
+                    "tls://electrumx-vrc1.vericonomy.com:51012".into(),
+                ],
+            };
+        }
+        let env_key = match self {
+            CoinId::Verium => "VERICONOMY_VRM_ELECTRUM_SERVERS",
+            CoinId::Vericoin => "VERICONOMY_VRC_ELECTRUM_SERVERS",
+        };
+        if let Ok(raw) = std::env::var(env_key) {
+            let servers: Vec<String> = raw
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !servers.is_empty() {
+                return servers;
+            }
+        }
+        match self {
+            CoinId::Verium => vec![
+                "tls://electrumx-vrm1.vericonomy.com:51002".into(),
+                "tls://electrumx-vrm2.vericonomy.com:52002".into(),
+            ],
+            CoinId::Vericoin => vec![
+                "tls://electrumx-vrc1.vericonomy.com:50012".into(),
+                "tls://electrumx-vrc2.vericonomy.com:50012".into(),
+            ],
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

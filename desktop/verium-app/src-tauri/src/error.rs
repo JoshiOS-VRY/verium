@@ -20,6 +20,9 @@ pub enum AppError {
     #[error("invalid config: {0}")]
     Config(String),
 
+    #[error("electrum error {code}: {message}")]
+    Electrum { code: i32, message: String },
+
     #[error("{0}")]
     Other(String),
 }
@@ -27,6 +30,39 @@ pub enum AppError {
 impl AppError {
     pub fn other(msg: impl Into<String>) -> Self {
         AppError::Other(msg.into())
+    }
+
+    pub fn is_electrum_rate_limited(&self) -> bool {
+        matches!(
+            self,
+            AppError::Electrum {
+                code: -101,
+                message: _
+            }
+        ) || matches!(
+            self,
+            AppError::Other(msg) if msg.contains("error -101")
+                || msg.to_ascii_lowercase().contains("excessive resource")
+        )
+    }
+
+    pub fn is_indexing_budget_exhausted(&self) -> bool {
+        matches!(
+            self,
+            AppError::Other(msg) if msg.contains("indexing batch limit reached")
+        )
+    }
+
+    pub fn is_electrum_transport(&self) -> bool {
+        matches!(
+            self,
+            AppError::Other(msg) if msg.contains("electrum connect")
+                || msg.contains("electrum connection closed")
+                || msg.contains("electrum read:")
+                || msg.contains("electrum write:")
+                || msg.contains("electrum TLS")
+                || msg.contains("electrum call timed out")
+        )
     }
 }
 

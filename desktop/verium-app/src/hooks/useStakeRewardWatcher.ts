@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChainSynced } from "@/hooks/useChainSynced";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { subscribeChainTip } from "@/lib/chain-tip-store";
 import { addSeenTxid } from "@/lib/seen-txid-set";
@@ -46,6 +47,7 @@ function stakeSortKey(tx: TransactionItem): number {
 
 /** Polls vericoin wallet for new stake-mint rewards and emits when synced. */
 export function useStakeRewardWatcher(): void {
+  const { isLight } = useWalletMode();
   const { data: status } = useDaemonStatus(VERICOIN);
   const { synced } = useChainSynced(VERICOIN);
   const syncedRef = useRef(synced);
@@ -59,6 +61,7 @@ export function useStakeRewardWatcher(): void {
   });
 
   useEffect(() => {
+    if (isLight) return;
     const queryKey = walletTransactionsQueryKey(VERICOIN);
     let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
     const recheck = () => {
@@ -73,9 +76,10 @@ export function useStakeRewardWatcher(): void {
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
       unsub();
     };
-  }, [queryClient]);
+  }, [isLight, queryClient]);
 
   useEffect(() => {
+    if (isLight) return;
     if (!txs.isSuccess || txs.data === undefined) return;
 
     const rewards = txs.data.filter(isStakeMintReward);
@@ -109,5 +113,5 @@ export function useStakeRewardWatcher(): void {
       });
       break;
     }
-  }, [txs.data, txs.isSuccess]);
+  }, [isLight, txs.data, txs.isSuccess]);
 }

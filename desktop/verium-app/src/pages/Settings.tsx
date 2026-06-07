@@ -23,6 +23,8 @@ import { DaemonConnectionPanel } from "@/components/DaemonConnectionPanel";
 import { WalletBackupCard } from "@/components/WalletBackupCard";
 import { VeriumConfEditorCard } from "@/components/VeriumConfEditorCard";
 import { NetworkModeCard } from "@/components/NetworkModeCard";
+import { WalletModeCard } from "@/components/WalletModeCard";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useTheme } from "@/hooks/useTheme";
 import {
   ALL_COINS,
@@ -72,6 +74,7 @@ import { ADVANCED_SETTINGS_ENABLED } from "@/lib/features";
 export function Settings() {
   const enabledCoins = useEnabledCoins();
   const activeCoin = useActiveCoin();
+  const { isLight } = useWalletMode();
   const [daemonCoin, setDaemonCoin] = useState<CoinId>("verium");
   const config = useQuery({
     queryKey: coinQueryKey(daemonCoin, "daemon-config"),
@@ -156,6 +159,8 @@ export function Settings() {
 
       <NetworkModeCard />
 
+      <WalletModeCard />
+
       <Card>
         <CardHeader>
           <CardTitle>Chains</CardTitle>
@@ -186,6 +191,13 @@ export function Settings() {
             />
             <span>Vericoin (VRC) — staking</span>
           </label>
+          <Link
+            to="/setup"
+            state={{ setupHub: true }}
+            className="text-xs text-accent hover:underline"
+          >
+            Open wallet setup menu
+          </Link>
         </CardContent>
       </Card>
 
@@ -226,6 +238,8 @@ export function Settings() {
         </CardContent>
       </Card>
 
+      {!isLight && (
+      <>
       <Card>
         <CardHeader>
           <CardTitle>Staking</CardTitle>
@@ -334,6 +348,8 @@ export function Settings() {
           </label>
         </CardContent>
       </Card>
+      </>
+      )}
 
       <Card>
         <CardHeader>
@@ -409,9 +425,9 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      <VeriumConfEditorCard coin={activeCoin} />
+      {!isLight && <VeriumConfEditorCard coin={activeCoin} />}
 
-      {ADVANCED_SETTINGS_ENABLED && (
+      {!isLight && ADVANCED_SETTINGS_ENABLED && (
         <Card>
           <CardHeader
             className="cursor-pointer select-none"

@@ -26,17 +26,37 @@ fn config_path() -> std::path::PathBuf {
 }
 
 pub fn load() -> AppResult<PasskeyConfig> {
-    secret_store::load_json(STORE_LABEL, &config_path(), PasskeyConfig::default())
+    let path = config_path();
+    let config = secret_store::load_json(STORE_LABEL, &path, PasskeyConfig::default())?;
+    if config.enabled || config.pin_hash_hex.is_some() {
+        return Ok(config);
+    }
+    if path.exists() {
+        migrate_legacy_plaintext()?;
+        return secret_store::load_json(STORE_LABEL, &path, PasskeyConfig::default());
+    }
+    Ok(config)
 }
 
 pub fn save(config: &PasskeyConfig) -> AppResult<()> {
     secret_store::save_json(STORE_LABEL, config)?;
     let path = config_path();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
     }
-    let json = serde_json::to_string_pretty(config)?;
-    std::fs::write(path, json)?;
+    Ok(())
+}
+
+fn migrate_legacy_plaintext() -> AppResult<()> {
+    let path = config_path();
+    if !path.exists() {
+        return Ok(());
+    }
+    let raw = std::fs::read_to_string(&path)?;
+    let legacy: PasskeyConfig = serde_json::from_str(&raw)
+        .map_err(|e| AppError::other(format!("legacy passkey.json invalid: {e}")))?;
+    tracing::info!("migrating legacy plaintext passkey.json to encrypted store");
+    save(&legacy)?;
     Ok(())
 }
 

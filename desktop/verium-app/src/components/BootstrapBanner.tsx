@@ -14,10 +14,12 @@ import {
 import { fetchExplorerStats } from "@/lib/explorer-api";
 import { useIsTestNetwork } from "@/lib/network-mode";
 import { useUserPreferences } from "@/lib/user-preferences";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { formatNumber, formatPercent } from "@/lib/utils";
 
 export function BootstrapBanner() {
   const coin = useActiveCoin();
+  const { isLight } = useWalletMode();
   const isTestNetwork = useIsTestNetwork();
   const [dialogOpen, setDialogOpen] = useState(false);
   const prefs = useUserPreferences((s) => s.prefs);
@@ -27,24 +29,24 @@ export function BootstrapBanner() {
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
     refetchInterval: 15_000,
-    enabled: !isTestNetwork,
+    enabled: !isLight && !isTestNetwork,
   });
   const peers = useQuery({
     queryKey: coinQueryKey(coin, "getpeerinfo"),
     queryFn: () => rpcGetPeerInfo(coin),
     refetchInterval: 15_000,
-    enabled: !isTestNetwork,
+    enabled: !isLight && !isTestNetwork,
   });
   const explorer = useQuery({
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
     refetchInterval: 30_000,
     retry: 0,
-    enabled: !isTestNetwork,
+    enabled: !isLight && !isTestNetwork,
   });
 
-  // Binarytest has no canonical snapshot CDN — never offer bootstrap.
-  if (isTestNetwork) return null;
+  // Light mode and binarytest never show bootstrap (Dashboard also gates light mode).
+  if (isLight || isTestNetwork) return null;
 
   const networkTip = explorer.data?.height;
   const offer = shouldOfferBootstrap(

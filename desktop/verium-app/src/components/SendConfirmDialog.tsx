@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { CoinId } from "@/lib/coin/profile";
 import { estimateSendFee } from "@/lib/send-fee-estimate";
@@ -115,11 +115,27 @@ export function SendConfirmDialog({
               <p className="mt-1 text-xs text-fg-muted">
                 Please, review your transaction.
               </p>
-              {extraConfirmDelay && (
+              {extraConfirmDelay && !confirming && (
                 <p className="mt-2 text-xs text-warning">
                   First send to this address — extra review time before confirm
                   is enabled.
                 </p>
+              )}
+              {confirming && (
+                <div
+                  className="mt-3 flex items-start gap-2 rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Loader2
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin"
+                    aria-hidden
+                  />
+                  <span>
+                    Signing and broadcasting your transaction. This may take a
+                    few seconds.
+                  </span>
+                </div>
               )}
             </div>
 
@@ -212,13 +228,18 @@ export function SendConfirmDialog({
             size="sm"
             disabled={secDelay > 0 || confirming}
             onClick={onConfirm}
-            className={cn(secDelay > 0 && "min-w-[5.5rem]")}
+            className={cn((secDelay > 0 || confirming) && "min-w-[5.5rem]")}
           >
-            {confirming
-              ? "Sending…"
-              : secDelay > 0
-                ? `Yes (${secDelay})`
-                : "Yes"}
+            {confirming ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Sending…
+              </>
+            ) : secDelay > 0 ? (
+              `Yes (${secDelay})`
+            ) : (
+              "Yes"
+            )}
           </Button>
         </div>
       </div>

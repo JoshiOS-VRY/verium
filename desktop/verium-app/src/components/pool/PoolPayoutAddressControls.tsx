@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { SearchableAddressSelect } from "@/components/SearchableAddressSelect";
 import { Button } from "@/components/ui/Button";
 import { coinQueryKey } from "@/lib/coin/profile";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { rpcGetNewAddress, rpcListAddressGroupings } from "@/lib/rpc/client";
 
 const VERIUM = "verium" as const;
@@ -16,13 +17,19 @@ export function PoolPayoutAddressControls({
   disabled?: boolean;
   onAddressChange: (address: string) => void;
 }) {
+  const { isLight } = useWalletMode();
   const addresses = useQuery({
     queryKey: coinQueryKey(VERIUM, "listaddressgroupings"),
     queryFn: () => rpcListAddressGroupings(VERIUM),
     staleTime: 30_000,
+    enabled: !isLight,
   });
 
-  const knownAddresses = addresses.data ?? [];
+  const knownAddresses = isLight
+    ? address.trim()
+      ? [address.trim()]
+      : []
+    : (addresses.data ?? []);
 
   const newAddress = useMutation({
     mutationFn: () => rpcGetNewAddress(VERIUM),

@@ -32,7 +32,8 @@ Default `<data-dir>`:
 
 ## Two-factor authentication (TOTP)
 
-- TOTP (RFC 6238) gates sensitive actions: send above threshold, change passphrase, show recovery phrase, `dumpprivkey`, restore wallet, edit `verium.conf`.
+- TOTP (RFC 6238) gates sensitive actions **in the Rust backend** (`security_policy.rs`): send, change passphrase, show recovery phrase, `dumpprivkey`, restore/import wallet, write node config.
+- The UI collects the TOTP code and passes it to Tauri commands; direct invoke cannot bypass gates when 2FA is enabled.
 - 10 single-use recovery codes are generated at enrollment (hashed at rest).
 - Disabling 2FA triggers a 24-hour cooling-off period.
 
@@ -60,7 +61,8 @@ Default `<data-dir>`:
 
 ## Spending controls
 
-- Clipboard hijack detection re-checks pasted addresses at send time.
+- Enforced in the Rust backend on every send (`require_send_allowed`).
+- Clipboard hijack detection re-checks pasted addresses at send time (UI).
 - Daily spend caps, first-send-to-new-address confirmation, address allowlist mode.
 - Look-alike address warnings for similar prefixes/suffixes.
 
@@ -90,8 +92,22 @@ Default `<data-dir>`:
 
 - RPC binds to `127.0.0.1` only by default (`rpcbind` + `rpcallowip` enforced on managed restarts).
 - Managed nodes authenticate with static `rpcuser` / `rpcpassword` in `vericonomy.conf` only (no cookie auth).
-- Passwords are random UUIDs; the desktop app does not return RPC passwords to the UI after setup.
+- Passwords are random UUIDs; conf reads return **redacted** RPC credentials to the UI.
+- The unrestricted RPC console is **not available in production builds** (`dev-rpc-console` feature only).
 - Legacy flat `verium.conf` is migrated once into `vericonomy.conf` and no longer written on each start.
+
+## Wallet modes
+
+- **Full node** is the exchange-grade default (local chain validation). See `desktop/verium-app/docs/wallet-modes.md`.
+- **Light wallet** is a convenience tier that trusts Electrum index servers for balance/UTXO data; keys still sign locally.
+
+## Security documentation pack
+
+Formal diligence artifacts live under `docs/security/`:
+
+- `THREAT_MODEL.md`, `DATA_CLASSIFICATION.md`, `KEY_LIFECYCLE.md`
+- `INCIDENT_RESPONSE.md`, `SECURITY_TEST_PLAN.md`, `CEX_SUBMISSION_PACKAGE.md`
+- Release verification: `RELEASE_SECURITY.md`
 
 ## Reporting vulnerabilities
 
@@ -99,7 +115,9 @@ Email **security@vericonomy.com** — do not open public GitHub issues for secur
 
 ## Known limitations
 
-- Installers may not be code-signed on all platforms; verify hashes from official releases.
-- UI-layer 2FA/PIN does not stop an attacker with disk access who runs their own `veriumd` — the wallet passphrase is the root of trust on disk.
+- Installers may not be code-signed on all platforms until production promotion; verify hashes and cosign attestations from official releases (`RELEASE_SECURITY.md`).
+- PIN gate is UI-layer only; an attacker with disk access who runs their own `veriumd` bypasses the app shell — the wallet passphrase is the root of trust on disk.
+- Light wallet mode trusts Electrum servers for index data (not recommended for high-value custody).
 - Ledger support uses manual xpub import; Verium BIP44 coin type is unregistered.
+- Auto-update is integrated but disabled until a production signing key is configured.
 - Regtest is disabled in chain parameters.

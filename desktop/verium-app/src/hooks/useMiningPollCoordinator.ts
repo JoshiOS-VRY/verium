@@ -10,6 +10,7 @@ import {
 import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { rpcGetMinerState, rpcGetMiningInfo } from "@/lib/rpc/client";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 
 const VERIUM = "verium" as const;
@@ -22,13 +23,15 @@ const VERIUM = "verium" as const;
  * components → WebView OOM while mining).
  */
 export function useMiningPollCoordinator(): void {
+  const { isLight } = useWalletMode();
   const visible = useWindowVisible();
   const veriumEnabled = useUserPreferences((s) => s.prefs.verium_enabled !== false);
+  const pollEnabled = veriumEnabled && !isLight;
 
   useQuery({
     queryKey: ["pool-miner", "status"],
     queryFn: fetchPoolMinerStatus,
-    enabled: veriumEnabled,
+    enabled: pollEnabled,
     refetchInterval: (query) => {
       if (!visible) return false;
       return query.state.data?.running
@@ -42,7 +45,7 @@ export function useMiningPollCoordinator(): void {
   const miner = useQuery({
     queryKey: coinQueryKey(VERIUM, "get_miner_state"),
     queryFn: () => rpcGetMinerState(VERIUM),
-    enabled: veriumEnabled,
+    enabled: pollEnabled,
     refetchInterval: (query) => {
       if (!visible) return false;
       return query.state.data?.active
@@ -58,7 +61,7 @@ export function useMiningPollCoordinator(): void {
   useQuery({
     queryKey: coinQueryKey(VERIUM, "getmininginfo"),
     queryFn: () => rpcGetMiningInfo(VERIUM),
-    enabled: veriumEnabled && soloActive,
+    enabled: pollEnabled && soloActive,
     refetchInterval: visible && soloActive ? MINING_INFO_POLL_MS : false,
     staleTime: 10_000,
     gcTime: 30_000,

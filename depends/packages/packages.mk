@@ -3,14 +3,7 @@ packages:=boost openssl libevent curl minizip zlib
 protobuf_native_packages = native_protobuf
 protobuf_packages = protobuf
 
-qt_packages = qrencode
-
-qt_linux_packages:=qt expat libxcb xcb_proto libXau xproto freetype fontconfig
-
 rapidcheck_packages = rapidcheck
-
-qt_darwin_packages=qt
-qt_mingw32_packages=qt
 
 wallet_packages=bdb
 

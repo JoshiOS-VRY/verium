@@ -100,6 +100,10 @@ export function CoinControlDialog({
             <div className="px-5 py-8 text-center text-xs text-fg-muted">
               Loading UTXOs…
             </div>
+          ) : utxos.isError ? (
+            <div className="px-5 py-8 text-center text-xs text-danger">
+              {String(utxos.error)}
+            </div>
           ) : rows.length === 0 ? (
             <div className="px-5 py-8 text-center text-xs text-fg-muted">
               No spendable UTXOs.

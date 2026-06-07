@@ -196,7 +196,6 @@ async fn lock_wallet_best_effort(app: Option<&AppHandle>, state: &AppState, coin
 pub async fn shutdown_all_vericonomy_processes(
     app: Option<&AppHandle>,
     state: &AppState,
-    gpu: Option<&crate::gpu_miner::GpuMinerHandle>,
     pool_miner: Option<&crate::pool_miner::PoolMinerHandle>,
     stop_all_coins: bool,
 ) {
@@ -209,13 +208,6 @@ pub async fn shutdown_all_vericonomy_processes(
 
     for coin in CoinId::all() {
         request_bootstrap_cancel(state, *coin);
-    }
-
-    if let Some(gpu) = gpu {
-        emit_shutdown_progress(app, "gpu", "Stopping GPU miner…", 12.0);
-        if let Err(e) = gpu.stop().await {
-            tracing::warn!("shutdown: GPU miner stop failed: {e}");
-        }
     }
 
     if let Some(pool) = pool_miner {
@@ -275,7 +267,7 @@ pub async fn shutdown_all_vericonomy_processes(
 
 /// Stop earn mode and daemons when the wallet UI closes.
 pub async fn shutdown_daemon_on_app_exit(state: &AppState) {
-    shutdown_all_vericonomy_processes(None, state, None, None, true).await;
+    shutdown_all_vericonomy_processes(None, state, None, true).await;
 }
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(20);
@@ -284,14 +276,12 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(20);
 pub async fn graceful_shutdown_and_exit(app: AppHandle) {
     tracing::info!("graceful_shutdown: starting");
     if let Some(state) = app.try_state::<AppState>() {
-        let gpu = app.try_state::<crate::gpu_miner::GpuMinerHandle>();
         let pool = app.try_state::<crate::pool_miner::PoolMinerHandle>();
         match tokio::time::timeout(
             SHUTDOWN_TIMEOUT,
             shutdown_all_vericonomy_processes(
                 Some(&app),
                 state.inner(),
-                gpu.as_ref().map(|s| s.inner()),
                 pool.as_ref().map(|s| s.inner()),
                 true,
             ),
@@ -319,7 +309,6 @@ pub fn run_shutdown_on_exit(app: &AppHandle) {
         .name("verium-app-shutdown".into())
         .spawn(move || {
             if let Some(state) = app.try_state::<AppState>() {
-                let gpu = app.try_state::<crate::gpu_miner::GpuMinerHandle>();
                 let pool = app.try_state::<crate::pool_miner::PoolMinerHandle>();
                 let _ = tauri::async_runtime::block_on(async {
                     tokio::time::timeout(
@@ -327,7 +316,6 @@ pub fn run_shutdown_on_exit(app: &AppHandle) {
                         shutdown_all_vericonomy_processes(
                             Some(&app),
                             state.inner(),
-                            gpu.as_ref().map(|s| s.inner()),
                             pool.as_ref().map(|s| s.inner()),
                             true,
                         ),
@@ -1480,6 +1468,11 @@ pub async fn get_wallet_info(
     coin: String,
 ) -> AppResult<Option<Value>> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    let light_keystore_wallet = crate::wallet::keystore::wallet_exists(coin).unwrap_or(false);
+    if prefs.wallet_mode.is_light() || light_keystore_wallet {
+        return crate::wallet::service::get_wallet_info_json(&state, coin, None).await;
+    }
     let client = state.rpc_client(coin).await?;
     match client.call::<Value>("getwalletinfo", json!([])).await {
         Ok(v) => Ok(Some(v)),
@@ -1495,6 +1488,11 @@ pub async fn get_new_address(
     label: Option<String>,
 ) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    if prefs.wallet_mode.is_light() {
+        let _ = label;
+        return crate::wallet::service::get_new_address(&state, coin, None).await;
+    }
     let cfg = state.config_fresh(coin).await?;
     let client = state.rpc_client(coin).await?;
     assert_rpc_matches_coin(&client, coin, &cfg).await?;
@@ -1573,6 +1571,18 @@ pub async fn list_transactions(
     skip: Option<u32>,
 ) -> AppResult<Value> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    if prefs.wallet_mode.is_light() {
+        let txs = crate::wallet::service::list_transactions(
+            &state,
+            coin,
+            count.unwrap_or(25) as usize,
+            None,
+        )
+        .await?;
+        let _ = skip;
+        return Ok(Value::Array(txs));
+    }
     let client = state.rpc_client(coin).await?;
     let params = json!(["*", count.unwrap_or(25), skip.unwrap_or(0)]);
     let mut value: Value = client.call("listtransactions", params).await?;
@@ -1796,6 +1806,11 @@ pub async fn wallet_unlock(
     minting_only: Option<bool>,
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    if prefs.wallet_mode.is_light() {
+        let seconds = timeout_seconds.max(1).min(i64::from(u32::MAX)) as u32;
+        return crate::wallet::keystore::unlock_wallet(coin, &passphrase, seconds);
+    }
     let cfg = state.config_fresh(coin).await?;
     let client = state.rpc_client(coin).await?;
     let params = if minting_only.unwrap_or(false) {
@@ -1819,6 +1834,10 @@ pub async fn wallet_lock(
     coin: String,
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    if prefs.wallet_mode.is_light() {
+        return crate::wallet::keystore::lock_wallet(coin);
+    }
     let cfg = state.config_fresh(coin).await?;
     wallet_secrets::clear_passphrase(coin, &cfg.datadir);
     state
@@ -1937,7 +1956,9 @@ pub async fn wallet_change_passphrase(
     coin: String,
     old_passphrase: String,
     new_passphrase: String,
+    totp_code: Option<String>,
 ) -> AppResult<()> {
+    crate::security_policy::require_gated_action("change_passphrase", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
     if old_passphrase.is_empty() || new_passphrase.is_empty() {
         return Err(AppError::other("passphrases must not be empty"));
@@ -2083,7 +2104,9 @@ pub async fn wallet_restore(
     state: State<'_, AppState>,
     coin: String,
     source_path: String,
+    totp_code: Option<String>,
 ) -> AppResult<WalletRestoreResult> {
+    crate::security_policy::require_gated_action("restore_wallet", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
     if source_path.trim().is_empty() {
         return Err(AppError::other("source_path must not be empty"));
@@ -2193,7 +2216,9 @@ pub async fn wallet_dump_privkey(
     state: State<'_, AppState>,
     coin: String,
     address: String,
+    totp_code: Option<String>,
 ) -> AppResult<String> {
+    crate::security_policy::require_gated_action("dump_privkey", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
     state
         .rpc_client(coin)
@@ -2209,7 +2234,9 @@ pub async fn wallet_import_privkey(
     privkey: String,
     label: Option<String>,
     rescan: Option<bool>,
+    totp_code: Option<String>,
 ) -> AppResult<()> {
+    crate::security_policy::require_gated_action("dump_privkey", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
     let params = json!([
         privkey,
@@ -2276,6 +2303,17 @@ pub async fn wallet_list_unspent(
     maxconf: Option<u32>,
 ) -> AppResult<Value> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    if prefs.wallet_mode.is_light() {
+        let rows = crate::wallet::service::list_unspent_json(
+            &state,
+            coin,
+            minconf.unwrap_or(1),
+            "",
+        )
+        .await?;
+        return Ok(Value::Array(rows));
+    }
     state
         .rpc_client(coin)
         .await?
@@ -2296,8 +2334,55 @@ pub async fn wallet_send_with_inputs(
     outputs: serde_json::Map<String, Value>,
     change_address: Option<String>,
     fee_rate_vrm_per_kb: Option<f64>,
+    totp_code: Option<String>,
+    wallet_passphrase: Option<String>,
+    extra_confirmed: Option<bool>,
 ) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
+    let coin_str = coin.as_str();
+    let mut output_pairs: Vec<(String, f64)> = Vec::new();
+    for (addr, val) in &outputs {
+        let amount = val
+            .as_f64()
+            .ok_or_else(|| AppError::other(format!("invalid amount for {addr}")))?;
+        output_pairs.push((addr.clone(), amount));
+    }
+    crate::security_policy::authorize_send(
+        &state,
+        coin,
+        totp_code.as_deref(),
+        wallet_passphrase.as_deref(),
+    )
+    .await?;
+    crate::security_policy::require_multi_send_allowed(
+        coin_str,
+        &output_pairs,
+        extra_confirmed.unwrap_or(false),
+    )?;
+    for addr in outputs.keys() {
+        crate::wallet::address::validate_send_address(coin, addr)?;
+    }
+    if let Some(addr) = change_address.as_deref().filter(|s| !s.trim().is_empty()) {
+        crate::wallet::address::validate_send_address(coin, addr)?;
+    }
+    let prefs = crate::prefs::load().await?;
+    let pass = wallet_passphrase.unwrap_or_default();
+    if prefs.wallet_mode.is_light() {
+        let txid = crate::wallet::service::send_with_inputs(
+            &state,
+            coin,
+            &inputs,
+            &outputs,
+            change_address.as_deref(),
+            fee_rate_vrm_per_kb,
+            &pass,
+        )
+        .await?;
+        for (addr, amount) in &output_pairs {
+            let _ = crate::security_policy::record_send(coin_str, *amount, addr);
+        }
+        return Ok(txid);
+    }
     let client = state.rpc_client(coin).await?;
     let raw: String = client
         .call("createrawtransaction", json!([inputs, outputs]))
@@ -2326,9 +2411,13 @@ pub async fn wallet_send_with_inputs(
         .ok_or_else(|| AppError::other("signrawtransactionwithwallet returned no hex"))?
         .to_string();
     let txid: String = client.call("sendrawtransaction", json!([signed_hex])).await?;
+    for (addr, amount) in &output_pairs {
+        let _ = crate::security_policy::record_send(coin_str, *amount, addr);
+    }
     Ok(txid)
 }
 
+#[cfg(feature = "dev-rpc-console")]
 #[tauri::command]
 pub async fn rpc_raw_call(
     state: State<'_, AppState>,
@@ -2337,9 +2426,7 @@ pub async fn rpc_raw_call(
     params: Option<Value>,
 ) -> AppResult<Value> {
     let coin = parse_coin_id(&coin)?;
-    if method.is_empty() {
-        return Err(AppError::other("method must not be empty"));
-    }
+    crate::rpc_guard::assert_rpc_method_allowed(&method)?;
     let p = params.unwrap_or(Value::Array(Vec::new()));
     let inner = state.inner();
     let mut cfg = state.config_fresh(coin).await?;
@@ -2371,14 +2458,48 @@ pub async fn send_to_address(
     address: String,
     amount: f64,
     comment: Option<String>,
+    totp_code: Option<String>,
+    wallet_passphrase: Option<String>,
+    extra_confirmed: Option<bool>,
 ) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
-    let params = json!([address, amount, comment.unwrap_or_default()]);
-    state
-        .rpc_client(coin)
+    crate::wallet::address::validate_send_address(coin, &address)?;
+    crate::security_policy::authorize_send(
+        &state,
+        coin,
+        totp_code.as_deref(),
+        wallet_passphrase.as_deref(),
+    )
+    .await?;
+    crate::security_policy::require_send_allowed(
+        coin.as_str(),
+        amount,
+        &address,
+        extra_confirmed.unwrap_or(false),
+    )?;
+    let prefs = crate::prefs::load().await?;
+    let pass = wallet_passphrase.unwrap_or_default();
+    let txid = if prefs.wallet_mode.is_light() {
+        let _ = comment;
+        crate::wallet::service::send_to_address(
+            &state,
+            coin,
+            &address,
+            amount,
+            prefs.tx_fee_rate_vrm_per_kb,
+            &pass,
+        )
         .await?
-        .call("sendtoaddress", params)
-        .await
+    } else {
+        let params = json!([address, amount, comment.unwrap_or_default()]);
+        state
+            .rpc_client(coin)
+            .await?
+            .call("sendtoaddress", params)
+            .await?
+    };
+    let _ = crate::security_policy::record_send(coin.as_str(), amount, &address);
+    Ok(txid)
 }
 
 #[tauri::command]
@@ -2815,10 +2936,11 @@ pub async fn read_verium_conf(
     let coin = parse_coin_id(&coin)?;
     let cfg = state.config_fresh(coin).await?;
     let content = read_node_conf_file(coin, &cfg)?;
+    let redacted = crate::security_policy::redact_conf_content(&content);
     Ok(VeriumConfFile {
         path: node_conf_path(coin, &cfg).display().to_string(),
         backup_path: node_conf_backup_path(coin, &cfg).display().to_string(),
-        content,
+        content: redacted,
     })
 }
 
@@ -2827,17 +2949,22 @@ pub async fn write_verium_conf(
     state: State<'_, AppState>,
     coin: String,
     content: String,
+    totp_code: Option<String>,
 ) -> AppResult<VeriumConfFile> {
+    crate::security_policy::require_gated_action("edit_conf", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
     let mut cfg = state.config_fresh(coin).await?;
-    write_node_conf_file(coin, &cfg, &content)?;
+    let existing = read_node_conf_file(coin, &cfg).unwrap_or_default();
+    let to_write = crate::security_policy::restore_conf_secrets(&content, &existing);
+    write_node_conf_file(coin, &cfg, &to_write)?;
     refresh_config_paths(coin, &mut cfg)?;
     save_app_daemon_config(coin, &cfg)?;
     state.replace_config(coin, cfg.clone()).await?;
+    let redacted = crate::security_policy::redact_conf_content(&content);
     Ok(VeriumConfFile {
         path: node_conf_path(coin, &cfg).display().to_string(),
         backup_path: node_conf_backup_path(coin, &cfg).display().to_string(),
-        content,
+        content: redacted,
     })
 }
 

@@ -50,6 +50,20 @@ pub async fn startup(app: AppHandle, state: &AppState) {
     }
 
     let prefs = prefs::load().await.unwrap_or_default();
+    let light_mode = prefs.wallet_mode.is_light();
+
+    if light_mode {
+        tracing::info!("startup: light wallet mode — skipping local daemon orchestration");
+        let sync_state = state.clone();
+        tauri::async_runtime::spawn(async move {
+            for coin in CoinId::all() {
+                if crate::wallet::keystore::wallet_exists(*coin).unwrap_or(false) {
+                    let _ = crate::wallet::sync::sync_light_wallet(&sync_state, *coin).await;
+                }
+            }
+        });
+        return;
+    }
 
     for coin in CoinId::all() {
         if !prefs::coin_enabled(&prefs, *coin) {
