@@ -84,6 +84,7 @@ export function PoolMiningPanel({
   const localStatus = useQuery({
     queryKey: ["pool-miner", "status"],
     queryFn: fetchPoolMinerStatus,
+    enabled,
     refetchInterval: false,
   });
   const localPoolMining = localStatus.data?.running === true;
@@ -124,6 +125,7 @@ export function PoolMiningPanel({
         onManualThreadsChange={onManualThreadsChange}
         chainSynced={chainSynced}
         syncStalled={syncStalled}
+        nodeRpcConnected={enabled}
         onStartPool={onStartPool}
         onStopSolo={onStopSolo}
       />

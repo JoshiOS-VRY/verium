@@ -13,6 +13,7 @@
 #include <key_io.h>
 #include <crypto/scrypt_dispatch.h>
 #include <miner.h>
+#include <poolminer.h>
 #include <net.h>
 #include <policy/fees.h>
 #include <pow.h>
@@ -220,6 +221,11 @@ UniValue minerstart(const JSONRPCRequest& request)
 
     LOCK(cs_main);
 
+    const std::string pool_stop_err = PoolMinerStop();
+    if (!pool_stop_err.empty()) {
+        throw JSONRPCError(RPC_MISC_ERROR, pool_stop_err);
+    }
+
     GenerateVerium(true, pwallet, nThreads, payout_address);
 
     UniValue obj(UniValue::VOBJ);
@@ -260,6 +266,129 @@ UniValue minerstop(const JSONRPCRequest& request)
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("status",   "stopped");
     obj.pushKV("nthreads", 0);
+    return obj;
+}
+
+UniValue poolminerstart(const JSONRPCRequest& request)
+{
+    RPCHelpMan{"poolminerstart",
+        "\nStart in-process Stratum pool mining. Stops in-node solo mining if active.",
+        {
+            {"nthreads", RPCArg::Type::NUM, RPCArg::Optional::NO, "Number of hashing threads."},
+            {"stratum_url", RPCArg::Type::STR, RPCArg::Optional::NO, "Stratum URL (e.g. stratum+tcp://pool.example:3333)."},
+            {"username", RPCArg::Type::STR, RPCArg::Optional::NO, "Worker username (payout address or pool worker name)."},
+            {"password", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "Worker password (default \"x\")."},
+        },
+        RPCResult{
+            "{                           (json object)\n"
+            "  \"status\" : \"active\",   (string)\n"
+            "  \"nthreads\" : n,          (numeric)\n"
+            "  \"backend\" : \"native\" (string)\n"
+            "}\n"
+        },
+        RPCExamples{
+            HelpExampleCli("poolminerstart", "4 \"stratum+tcp://127.0.0.1:3333\" \"vrm1q...\"")
+            + HelpExampleRpc("poolminerstart", "4, \"stratum+tcp://127.0.0.1:3333\", \"vrm1q...\"")
+        },
+    }.Check(request);
+
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+    if (pwallet != nullptr) {
+        LOCK(cs_main);
+        GenerateVerium(false, pwallet, 0);
+    }
+
+    const int nThreads = request.params[0].get_int();
+    const std::string stratum_url = request.params[1].get_str();
+    const std::string username = request.params[2].get_str();
+    std::string password = "x";
+    if (request.params.size() > 3 && !request.params[3].isNull()) {
+        password = request.params[3].get_str();
+    }
+
+    const std::string err = PoolMinerStart(nThreads, stratum_url, username, password);
+    if (!err.empty()) {
+        throw JSONRPCError(RPC_MISC_ERROR, err);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("status", "active");
+    obj.pushKV("nthreads", nThreads);
+    obj.pushKV("backend", "native");
+    return obj;
+}
+
+UniValue poolminerstop(const JSONRPCRequest& request)
+{
+    RPCHelpMan{"poolminerstop",
+        "\nStop in-process Stratum pool mining.",
+        {},
+        RPCResult{
+            "{                           (json object)\n"
+            "  \"status\" : \"stopped\",  (string)\n"
+            "}\n"
+        },
+        RPCExamples{
+            HelpExampleCli("poolminerstop", "")
+            + HelpExampleRpc("poolminerstop", "")
+        },
+    }.Check(request);
+
+    const std::string err = PoolMinerStop();
+    if (!err.empty()) {
+        throw JSONRPCError(RPC_MISC_ERROR, err);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("status", "stopped");
+    return obj;
+}
+
+UniValue getpoolminerinfo(const JSONRPCRequest& request)
+{
+    RPCHelpMan{"getpoolminerinfo",
+        "\nReturn in-process pool miner status (hashrate, worker, threads).",
+        {},
+        RPCResult{
+            "{                           (json object)\n"
+            "  \"running\" : true|false,  (boolean)\n"
+            "  \"hashrate_hm\" : n,       (numeric) Hashes per minute\n"
+            "  \"worker\" : \"...\",        (string)\n"
+            "  \"backend\" : \"veriumMiner\", (string)\n"
+            "  \"threads\" : n,           (numeric)\n"
+            "  \"last_log_line\" : \"...\", (string)\n"
+            "}\n"
+        },
+        RPCExamples{
+            HelpExampleCli("getpoolminerinfo", "")
+            + HelpExampleRpc("getpoolminerinfo", "")
+        },
+    }.Check(request);
+
+    return PoolMinerStatusToJSON(GetPoolMinerStatus());
+}
+
+UniValue poolminerdetect(const JSONRPCRequest& request)
+{
+    RPCHelpMan{"poolminerdetect",
+        "\nReport whether in-process Stratum pool mining is available in veriumd.",
+        {},
+        RPCResult{
+            "{                           (json object)\n"
+            "  \"found\" : true,          (boolean)\n"
+            "  \"backend\" : \"native\",  (string)\n"
+            "}\n"
+        },
+        RPCExamples{
+            HelpExampleCli("poolminerdetect", "")
+            + HelpExampleRpc("poolminerdetect", "")
+        },
+    }.Check(request);
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("found", true);
+    obj.pushKV("backend", "native");
     return obj;
 }
 
@@ -727,6 +856,10 @@ static const CRPCCommand commands[] =
 
     { "miner",              "minerstop",              &minerstop,              {} },
     { "miner",              "minerstart",             &minerstart,             {"nthreads", "address"} },
+    { "miner",              "poolminerstart",         &poolminerstart,         {"nthreads", "stratum_url", "username", "password"} },
+    { "miner",              "poolminerstop",          &poolminerstop,          {} },
+    { "miner",              "getpoolminerinfo",       &getpoolminerinfo,       {} },
+    { "miner",              "poolminerdetect",        &poolminerdetect,        {} },
 
     { "generating",         "generatetoaddress",      &generatetoaddress,      {"nblocks","address","maxtries"} },
 };

@@ -49,12 +49,11 @@ hidapi = "2"
 rand = "0.8"
 sha2 = "0.10"
 ripemd = "0.1"
-sharks = "0.5"
+blahaj = "0.6"
 totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
 urlencoding = "2"
 zeroize = { version = "1", features = ["derive"] }
 sysinfo = "0.33"
-verium-pool-miner = { path = "crates/verium-pool-miner" }
 vericonomy-node-supervisor = { path = "crates/vericonomy-node-supervisor" }
 vericonomy-wallet-core = { path = "crates/vericonomy-wallet-core" }
 async-trait = "0.1"

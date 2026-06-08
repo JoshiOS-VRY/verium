@@ -136,13 +136,24 @@ pub async fn startup(app: AppHandle, state: &AppState) {
     for task in wait_tasks {
         if let Ok((coin, ok)) = task.await {
             if !ok {
+                let cfg = match state.config_fresh(coin).await {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+                if crate::daemon::native_daemon_image_running(coin)
+                    || crate::commands::daemon_boot_in_progress(&state, coin, &cfg).await
+                {
+                    tracing::info!(
+                        "startup ({}): still booting after {wait_secs}s — not spawning another",
+                        coin.as_str()
+                    );
+                    continue;
+                }
                 tracing::warn!(
                     "startup ({}): daemon not reachable after {wait_secs}s — retrying spawn",
                     coin.as_str()
                 );
-                if let Ok(cfg) = state.config_fresh(coin).await {
-                    ensure_daemon_running(&state, coin, &cfg).await;
-                }
+                ensure_daemon_running(&state, coin, &cfg).await;
             }
         }
     }

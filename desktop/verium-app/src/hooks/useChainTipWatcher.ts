@@ -17,7 +17,7 @@ interface ChainTipPayload {
 /** Delay before refreshing the explorer feed so it can index the new block. */
 const ENRICH_DELAY_MS = 4_000;
 /** Coalesce burst tip events during sync (avoids invalidation storms). */
-const INVALIDATE_DEBOUNCE_MS = 3_000;
+const INVALIDATE_DEBOUNCE_MS = 5_000;
 
 /**
  * Listens for `chain-tip-changed` events from the node watcher, pushes them

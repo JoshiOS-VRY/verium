@@ -68,9 +68,7 @@ export function PoolMinerLogPanel() {
             <Badge tone="neutral">Idle</Badge>
           )}
           {backend ? (
-            <Badge tone={backend === "veriumMiner" ? "success" : "warning"}>
-              {backend === "veriumMiner" ? "veriumMiner" : "native"}
-            </Badge>
+            <Badge tone="success">native</Badge>
           ) : null}
           {running ? (
             <button
@@ -83,8 +81,7 @@ export function PoolMinerLogPanel() {
           ) : null}
         </div>
         <CardDescription>
-          Output from the pool miner process. Hashrate is polled separately from
-          the miner API.
+          Status from veriumd&apos;s in-process Stratum pool miner.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -95,7 +92,7 @@ export function PoolMinerLogPanel() {
         >
           {!running ? (
             <p className="text-fg-subtle">
-              Start pool mining to stream veriumMiner logs here.
+              Start pool mining to see status updates here.
             </p>
           ) : !liveLogsEnabled ? (
             <p className="text-fg-subtle">

@@ -113,7 +113,7 @@ export function useDashboardData(coin: CoinId) {
     queryFn: fetchPoolMinerStatus,
     refetchInterval: false,
     gcTime: 30_000,
-    enabled: coin === "verium",
+    enabled: coin === "verium" && connected && !isLight,
   });
 
   const poolMinerRunning = poolMiner.data?.running ?? false;

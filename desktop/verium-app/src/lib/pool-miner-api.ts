@@ -12,16 +12,17 @@ export interface PoolMinerStatus {
   hashrateHm: number;
   worker: string;
   lastLogLine: string;
-  /** `veriumMiner` (sidecar) or `native` (in-wallet fallback). */
+  /** `native` — hashing inside veriumd. */
   backend: string;
   activeThreads: number;
 }
 
 export interface PoolMinerDetectResult {
   found: boolean;
+  /** True when the running veriumd answered poolminerdetect. */
+  rpcReady: boolean;
   sidecarFound: boolean;
   path?: string | null;
-  /** `veriumMiner` when sidecar is present, else `native`. */
   source: string;
 }
 
@@ -30,7 +31,6 @@ export interface PoolMinerMemoryLimits {
   scratchpadMib: number;
   totalRamMib: number;
   availableRamMib: number;
-  /** True when veriumMiner sidecar backend is available. */
   usesSidecar: boolean;
 }
 

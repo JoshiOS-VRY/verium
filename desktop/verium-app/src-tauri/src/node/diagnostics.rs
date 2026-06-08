@@ -77,7 +77,8 @@ const TXINDEX_POS_STALL_MARKERS: &[&str] = &[
 ];
 
 const CORRUPTION_MAX_AGE_SECS: i64 = 20 * 60;
-const NODE_STARTING_MAX_AGE_SECS: i64 = 180;
+const NODE_STARTING_MAX_AGE_SECS: i64 = 300;
+const DAEMON_WARMING_MAX_AGE_SECS: i64 = 300;
 
 fn parse_log_timestamp(line: &str) -> Option<DateTime<Utc>> {
     let ts = line.get(0..20)?;
@@ -263,6 +264,13 @@ const DATADIR_LOCK_MARKERS: &[&str] = &[
 ];
 
 const NODE_STARTING_MARKERS: &[&str] = &[
+    "Scrypt dispatch",
+    "Using the '",
+    "SHA256 implementation",
+    "Validating signatures",
+    "Binding RPC on address",
+    "HTTP: creating work queue",
+    "HTTP: starting",
     "Loading block index",
     "Opening LevelDB",
     "init message",
@@ -274,6 +282,39 @@ const NODE_STARTING_MARKERS: &[&str] = &[
     "Pre-allocating up to",
     "Reindexing block file",
 ];
+
+/// Log lines that indicate a live node is syncing even when RPC is not up yet.
+const CHAIN_ACTIVE_MARKERS: &[&str] = &[
+    "UpdateTip:",
+    "Leaving InitialBlockDownload",
+    "New outbound peer connected",
+    "net thread start",
+    "block tree size",
+    "nBestHeight",
+    "Loaded best chain",
+];
+
+pub fn detect_daemon_chain_active(lines: &[String]) -> bool {
+    let now = Utc::now();
+    for line in lines.iter().rev().take(60) {
+        if !CHAIN_ACTIVE_MARKERS.iter().any(|m| line.contains(m)) {
+            continue;
+        }
+        if let Some(ts) = parse_log_timestamp(line) {
+            let age = now.signed_duration_since(ts).num_seconds();
+            if age > DAEMON_WARMING_MAX_AGE_SECS {
+                continue;
+            }
+        }
+        return true;
+    }
+    false
+}
+
+/// True while debug.log shows startup or post-boot chain activity (RPC may still be down).
+pub fn detect_daemon_warming(lines: &[String]) -> bool {
+    detect_node_starting(lines) || detect_daemon_chain_active(lines)
+}
 
 pub fn detect_node_starting(lines: &[String]) -> bool {
     let now = Utc::now();
@@ -506,6 +547,16 @@ mod tests {
     fn detects_node_starting_marker() {
         let lines = vec![format!("{} Loading block index", recent_ts())];
         assert!(detect_node_starting(&lines));
+    }
+
+    #[test]
+    fn detects_daemon_chain_active_marker() {
+        let lines = vec![format!(
+            "{} UpdateTip: height=1101768 version=0x00000007",
+            recent_ts()
+        )];
+        assert!(detect_daemon_chain_active(&lines));
+        assert!(detect_daemon_warming(&lines));
     }
 
     #[test]

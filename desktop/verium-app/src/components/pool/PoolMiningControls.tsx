@@ -41,6 +41,7 @@ export function PoolMiningControls({
   onManualThreadsChange,
   chainSynced,
   syncStalled,
+  nodeRpcConnected,
   onStartPool,
   onStopSolo,
 }: {
@@ -61,6 +62,8 @@ export function PoolMiningControls({
   onManualThreadsChange: (threads: number) => void;
   chainSynced: boolean;
   syncStalled: boolean;
+  /** True when veriumd RPC is up (avoids probing while the node is still booting). */
+  nodeRpcConnected: boolean;
   onStartPool: () => void;
   onStopSolo: () => void;
 }) {
@@ -69,26 +72,33 @@ export function PoolMiningControls({
   const detect = useQuery({
     queryKey: ["pool-miner", "detect"],
     queryFn: detectPoolMiner,
+    enabled: nodeRpcConnected,
     staleTime: 60_000,
+    refetchInterval: (query) => {
+      if (!nodeRpcConnected) return false;
+      const d = query.state.data;
+      if (d?.found && !d.rpcReady) return 10_000;
+      return false;
+    },
   });
 
   const status = useQuery({
     queryKey: ["pool-miner", "status"],
     queryFn: fetchPoolMinerStatus,
+    enabled: nodeRpcConnected && (detect.data?.rpcReady ?? false),
     refetchInterval: false,
     gcTime: 60_000,
   });
 
   const running = status.data?.running ?? false;
-  const sidecarReady = usesSidecar ?? detect.data?.sidecarFound ?? false;
-  const backendLabel =
-    running && status.data?.backend
-      ? status.data.backend === "veriumMiner"
-        ? "veriumMiner"
-        : "native fallback"
-      : sidecarReady
-        ? "veriumMiner"
-        : "native fallback";
+  const poolMinerBundled = detect.data?.found ?? false;
+  const poolMinerRpcReady = detect.data?.rpcReady ?? false;
+  const poolMinerReady = poolMinerRpcReady;
+  const backendLabel = running || poolMinerRpcReady
+    ? "native"
+    : poolMinerBundled
+      ? "restart node"
+      : "upgrade node";
   const username = poolWorkerUsername(payoutAddress, workerName || "wallet");
 
   const start = useMutation({
@@ -121,6 +131,7 @@ export function PoolMiningControls({
   });
 
   const canStart =
+    poolMinerReady &&
     chainSynced &&
     !syncStalled &&
     poolPayoutAddressConfigured({ pool_payout_address: payoutAddress }) &&
@@ -138,23 +149,36 @@ export function PoolMiningControls({
           ) : (
             <Badge tone="neutral">Stopped</Badge>
           )}
-          <Badge tone={sidecarReady ? "success" : "warning"}>
+          <Badge
+            tone={
+              running || poolMinerRpcReady
+                ? "success"
+                : poolMinerBundled
+                  ? "warning"
+                  : "warning"
+            }
+          >
             {backendLabel}
           </Badge>
         </div>
         <CardDescription>
-          {sidecarReady ? (
+          {poolMinerRpcReady || running ? (
             <>
-              veriumMiner (AVX2 SIMD) connected via Stratum to{" "}
-              <span className="font-mono text-xs">{POOL_STRATUM_URL}</span> —
-              same performance class as solo mining.
+              Pool mining runs inside veriumd (Stratum to{" "}
+              <span className="font-mono text-xs">{POOL_STRATUM_URL}</span>) —
+              same SIMD path as solo mining, no separate miner binary.
+            </>
+          ) : poolMinerBundled ? (
+            <>
+              A pool-capable veriumd is bundled, but the running node is still
+              on an older build. Stop and restart the Verium node (or restart
+              the wallet) to enable in-process pool mining.
             </>
           ) : (
             <>
-              Native pool miner (portable scrypt²) via Stratum to{" "}
-              <span className="font-mono text-xs">{POOL_STRATUM_URL}</span>. Run{" "}
-              <code className="text-xs">npm run fetch:cpuminer</code> or set{" "}
-              <code className="text-xs">CPUMINER_PATH</code> for full speed.
+              This veriumd build does not support in-process pool mining.
+              Rebuild veriumd from the latest sources and restart the Verium
+              node.
             </>
           )}
         </CardDescription>
@@ -199,11 +223,13 @@ export function PoolMiningControls({
           liveAdaptive={false}
           disabled={running}
           memoryNote={
-            !sidecarReady && scratchpadMib != null
-              ? `Native fallback is limited to 1 thread in the wallet (~${scratchpadMib} MiB RAM). Install veriumMiner to mine out-of-process at full thread count.`
-              : sidecarReady
-                ? "veriumMiner runs in a separate process — thread count is limited to logical CPUs minus one."
-                : undefined
+            poolMinerRpcReady
+              ? "Each thread uses ~128 MiB scrypt scratchpad inside veriumd — thread count is limited to logical CPUs minus one."
+              : poolMinerBundled
+                ? "Restart the Verium node to load the bundled pool-capable veriumd."
+                : scratchpadMib != null
+                  ? "Upgrade veriumd to enable native pool mining."
+                  : undefined
           }
           onAutoAdjustChange={onAutoAdjustChange}
           onManualThreadsChange={onManualThreadsChange}
@@ -269,10 +295,11 @@ export function PoolMiningControls({
   );
 }
 
-export function usePoolMinerRunning(): boolean {
+export function usePoolMinerRunning(nodeRpcConnected = false): boolean {
   const status = useQuery({
     queryKey: ["pool-miner", "status"],
     queryFn: fetchPoolMinerStatus,
+    enabled: nodeRpcConnected,
     refetchInterval: false,
     gcTime: 60_000,
   });

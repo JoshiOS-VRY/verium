@@ -1,5 +1,7 @@
 #include <fs.h>
 
+#include <limits>
+
 #ifndef WIN32
 #include <fcntl.h>
 #else

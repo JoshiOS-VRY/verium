@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-/// Max wait for RPC after spawn on startup.
-pub const STARTUP_RPC_WAIT: Duration = Duration::from_secs(90);
+/// Max wait for RPC after spawn on startup (Verium scrypt init + block index can take 2+ min).
+pub const STARTUP_RPC_WAIT: Duration = Duration::from_secs(180);
 
 /// Cooldown after spawn before supervisor may start another daemon.
-pub const SPAWN_COOLDOWN: Duration = Duration::from_secs(60);
+pub const SPAWN_COOLDOWN: Duration = Duration::from_secs(180);
 
 /// How long to avoid auto-starting a second daemon after bootstrap restart.
 pub const BOOTSTRAP_LOADING_GRACE: Duration = Duration::from_secs(300);

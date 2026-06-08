@@ -35,7 +35,8 @@ use crate::config::{
 use crate::daemon::{
     apply_wallet_p2p_subversion, binary_supports_unified_chain_selector, bundled_sidecar_available,
     binary_missing_hint, detect_binary, force_stop_native_daemon, free_rpc_port,
-    kill_port_listeners, native_daemon_image_running, pids_listening_on_port,
+    kill_port_listeners, native_daemon_image_running, native_daemon_process_count,
+    pids_listening_on_port,
     sidecar_supports_binarytest, wallet_p2p_subversion, wait_for_native_daemon_exit,
     wait_for_rpc_port_free, DaemonBinaryStatus,
 };
@@ -53,7 +54,8 @@ use crate::pool_api::{
 };
 use crate::logs::{
     current_log_session, detect_chain_corruption_session,
-    detect_datadir_lock_conflict, detect_node_starting, detect_reindex_active_session,
+    detect_daemon_warming, detect_datadir_lock_conflict,
+    detect_node_starting, detect_reindex_active_session,
     detect_reindex_file_rebuild_session,
     detect_invalid_block_hashes, detect_recent_coin_age_failure, detect_reindex_progress,
     detect_sync_stall, detect_txindex_complete, detect_txindex_pos_stall, effective_txindex_height,
@@ -198,7 +200,6 @@ async fn lock_wallet_best_effort(app: Option<&AppHandle>, state: &AppState, coin
 pub async fn shutdown_all_vericonomy_processes(
     app: Option<&AppHandle>,
     state: &AppState,
-    pool_miner: Option<&crate::pool_miner::PoolMinerHandle>,
     stop_all_coins: bool,
 ) {
     if SHUTDOWN_ONCE.swap(true, Ordering::SeqCst) {
@@ -212,11 +213,9 @@ pub async fn shutdown_all_vericonomy_processes(
         request_bootstrap_cancel(state, *coin);
     }
 
-    if let Some(pool) = pool_miner {
-        emit_shutdown_progress(app, "pool-miner", "Stopping pool miner…", 15.0);
-        if let Err(e) = pool.stop().await {
-            tracing::warn!("shutdown: pool miner stop failed: {e}");
-        }
+    emit_shutdown_progress(app, "pool-miner", "Stopping pool miner…", 15.0);
+    if let Err(e) = crate::pool_miner::stop_pool_miner_rpc(state).await {
+        tracing::warn!("shutdown: pool miner stop failed: {e}");
     }
 
     for coin in CoinId::all() {
@@ -269,7 +268,7 @@ pub async fn shutdown_all_vericonomy_processes(
 
 /// Stop earn mode and daemons when the wallet UI closes.
 pub async fn shutdown_daemon_on_app_exit(state: &AppState) {
-    shutdown_all_vericonomy_processes(None, state, None, true).await;
+    shutdown_all_vericonomy_processes(None, state, true).await;
 }
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(20);
@@ -278,15 +277,9 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(20);
 pub async fn graceful_shutdown_and_exit(app: AppHandle) {
     tracing::info!("graceful_shutdown: starting");
     if let Some(state) = app.try_state::<AppState>() {
-        let pool = app.try_state::<crate::pool_miner::PoolMinerHandle>();
         match tokio::time::timeout(
             SHUTDOWN_TIMEOUT,
-            shutdown_all_vericonomy_processes(
-                Some(&app),
-                state.inner(),
-                pool.as_ref().map(|s| s.inner()),
-                true,
-            ),
+            shutdown_all_vericonomy_processes(Some(&app), state.inner(), true),
         )
         .await
         {
@@ -311,16 +304,10 @@ pub fn run_shutdown_on_exit(app: &AppHandle) {
         .name("verium-app-shutdown".into())
         .spawn(move || {
             if let Some(state) = app.try_state::<AppState>() {
-                let pool = app.try_state::<crate::pool_miner::PoolMinerHandle>();
                 let _ = tauri::async_runtime::block_on(async {
                     tokio::time::timeout(
                         Duration::from_secs(15),
-                        shutdown_all_vericonomy_processes(
-                            Some(&app),
-                            state.inner(),
-                            pool.as_ref().map(|s| s.inner()),
-                            true,
-                        ),
+                        shutdown_all_vericonomy_processes(Some(&app), state.inner(), true),
                     )
                     .await
                 });
@@ -430,7 +417,7 @@ pub(crate) async fn daemon_boot_in_progress(
                 .await
                 .unwrap_or_default();
             if detect_reindex_active_session(&lines, state.pending_reindex_active(coin))
-                || detect_node_starting(&lines)
+                || detect_daemon_warming(&lines)
             {
                 return true;
             }
@@ -459,7 +446,7 @@ pub(crate) async fn daemon_log_suggests_loading(
     let lines = tail_coin_debug_log(coin, cfg, 40)
         .await
         .unwrap_or_default();
-    detect_reindex_active_session(&lines, false) || detect_node_starting(&lines)
+    detect_reindex_active_session(&lines, false) || detect_daemon_warming(&lines)
 }
 
 async fn suppress_competing_auto_start(
@@ -635,6 +622,28 @@ pub(crate) async fn start_inner_impl(state: &AppState, coin: CoinId, force: bool
             state.daemon(coin)?.mark_managed().await;
             state.mark_spawn(coin);
             return Ok(());
+        }
+    }
+    let proc_count = native_daemon_process_count(coin);
+    if proc_count > 1 {
+        tracing::warn!(
+            "start: {proc_count} {binary} processes detected — stopping all before respawn"
+        );
+        stop_daemon_fully_for_repair(state, coin, &cfg).await;
+    } else if proc_count == 1 {
+        let lines = tail_coin_debug_log(coin, &cfg, 80).await.unwrap_or_default();
+        if daemon_boot_in_progress(state, coin, &cfg).await
+            || detect_daemon_warming(&lines)
+            || state.spawn_recent(coin)
+        {
+            tracing::debug!("start: {binary} already booting — waiting for RPC");
+            state.daemon(coin)?.mark_managed().await;
+            state.mark_spawn(coin);
+            return Ok(());
+        }
+        if !rpc_reachable(coin, &cfg).await {
+            tracing::info!("start: stopping stale {binary} before fresh spawn");
+            stop_daemon_fully_for_repair(state, coin, &cfg).await;
         }
     }
     let daemon = state.daemon(coin)?;
@@ -3398,11 +3407,40 @@ async fn ensure_daemon_running_locked(state: &AppState, coin: CoinId, cfg: &Daem
         return;
     }
 
+    if native_daemon_process_count(coin) > 1 {
+        tracing::warn!(
+            "ensure ({}): duplicate {} processes — stopping all",
+            coin.as_str(),
+            coin.binary_base()
+        );
+        force_stop_native_daemon(coin);
+        tokio::time::sleep(Duration::from_millis(2000)).await;
+    }
+
     if native_daemon_image_running(coin) && pids_listening_on_port(cfg.rpc_port).is_empty() {
         if reindex_running_live(state, coin, cfg).await || state.pending_reindex_active(coin) {
             state.set_daemon_phase(coin, "reindexing");
             tracing::debug!(
                 "ensure ({}): native {} reindex in progress without RPC — not interrupting",
+                coin.as_str(),
+                coin.binary_base()
+            );
+            return;
+        }
+        if daemon_boot_in_progress(state, coin, cfg).await {
+            state.set_daemon_phase(coin, "starting");
+            tracing::debug!(
+                "ensure ({}): {} booting without RPC yet — waiting (scrypt warmup / index load)",
+                coin.as_str(),
+                coin.binary_base()
+            );
+            return;
+        }
+        let lines = tail_coin_debug_log(coin, cfg, 80).await.unwrap_or_default();
+        if detect_daemon_warming(&lines) || state.spawn_recent(coin) {
+            state.set_daemon_phase(coin, "starting");
+            tracing::debug!(
+                "ensure ({}): {} active in debug.log without RPC yet — waiting",
                 coin.as_str(),
                 coin.binary_base()
             );
@@ -3511,7 +3549,24 @@ async fn ensure_daemon_running_locked(state: &AppState, coin: CoinId, cfg: &Daem
             );
             return;
         }
-        if !native_daemon_image_running(coin) && !pids_listening_on_port(cfg.rpc_port).is_empty() {
+        if native_daemon_process_count(coin) == 1 {
+            state.set_daemon_phase(coin, "starting");
+            tracing::debug!(
+                "ensure ({}): single {} process alive — not spawning another",
+                coin.as_str(),
+                coin.binary_base()
+            );
+            return;
+        } else if native_daemon_image_running(coin) {
+            if daemon_boot_in_progress(state, coin, cfg).await {
+                state.set_daemon_phase(coin, "starting");
+                tracing::debug!(
+                    "ensure ({}): native process booting — not spawning another",
+                    coin.as_str()
+                );
+                return;
+            }
+        } else if !pids_listening_on_port(cfg.rpc_port).is_empty() {
             kill_port_listeners(cfg.rpc_port);
             tokio::time::sleep(Duration::from_millis(500)).await;
         }

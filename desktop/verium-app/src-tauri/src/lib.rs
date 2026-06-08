@@ -17,7 +17,6 @@ mod explorer_api;
 mod local_block_feed;
 mod pool_api;
 mod pool_miner;
-mod pool_miner_sidecar;
 mod features;
 mod http_shared;
 mod memory_telemetry;
@@ -102,7 +101,6 @@ pub fn run() {
                 node::orchestrator::startup(startup_app, &startup_state).await;
             });
             app.manage(state);
-            app.manage(pool_miner::PoolMinerHandle::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

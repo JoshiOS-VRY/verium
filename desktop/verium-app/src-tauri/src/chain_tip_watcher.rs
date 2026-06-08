@@ -27,6 +27,11 @@ const WATCHER_RPC_TIMEOUT: Duration = Duration::from_secs(70);
 /// Backoff while the node is unreachable or a call fails.
 const RETRY_BACKOFF: Duration = Duration::from_secs(5);
 
+/// Minimum gap between `chain-tip-changed` events while the node is flushing blocks.
+/// Without this, catch-up sync can emit dozens of tips per second and overwhelm the
+/// WebView / React layer (observed as STATUS_STACK_BUFFER_OVERRUN in dev builds).
+const MIN_EMIT_INTERVAL: Duration = Duration::from_millis(1500);
+
 /// Idle wait when the coin is disabled in preferences.
 const DISABLED_BACKOFF: Duration = Duration::from_secs(30);
 
@@ -47,6 +52,7 @@ pub fn spawn_chain_tip_watchers(app: AppHandle, state: AppState) {
 
 async fn watch_loop(app: AppHandle, state: AppState, coin: CoinId) {
     let mut last_hash: Option<String> = None;
+    let mut last_emit = tokio::time::Instant::now() - MIN_EMIT_INTERVAL;
 
     loop {
         let prefs = crate::prefs::load().await.unwrap_or_default();
@@ -82,10 +88,13 @@ async fn watch_loop(app: AppHandle, state: AppState, coin: CoinId) {
 
         match current_tip(&client).await {
             Some((height, hash)) if last_hash.as_deref() != Some(hash.as_str()) => {
-                emit_tip(&app, &client, coin, height, &hash).await;
-                last_hash = Some(hash);
-                // Re-evaluate immediately in case several blocks arrived close
-                // together (or the explorer is several blocks behind).
+                last_hash = Some(hash.clone());
+                if last_emit.elapsed() >= MIN_EMIT_INTERVAL {
+                    emit_tip(&app, &client, coin, height, &hash).await;
+                    last_emit = tokio::time::Instant::now();
+                }
+                // Brief pause so catch-up sync cannot tight-loop RPC + IPC.
+                sleep(Duration::from_millis(400)).await;
                 continue;
             }
             Some(_) => {

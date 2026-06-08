@@ -71,11 +71,6 @@ function main() {
         "Clone/build vericoin (see scripts/build-vericoind-macos.sh), then " +
         "VERICOIND_LOCAL=/path/to/vericoind npm run fetch:vericoind",
     },
-    {
-      name: "cpuminer",
-      optional: true,
-      hint: "npm run fetch:cpuminer  or  CPUMINER_LOCAL=... npm run fetch:cpuminer (native pool fallback works without it)",
-    },
   ];
   let failed = false;
   for (const { name, hint, optional } of coins) {
@@ -84,10 +79,7 @@ function main() {
       log(`OK ${name} (${(r.size / 1_000_000).toFixed(1)} MB) at ${r.file}`);
       continue;
     }
-    const impact =
-      name === "cpuminer"
-        ? "Pool mining will use the slower native fallback until you install veriumMiner."
-        : "Vericoin/VRC will not run until you install a real binary.";
+    const impact = "Vericoin/VRC will not run until you install a real binary.";
     const msg =
       r.reason === "stub"
         ? `${name} is a build placeholder (${r.size} bytes) at ${r.file}. ${impact} ${hint}`

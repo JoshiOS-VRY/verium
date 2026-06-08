@@ -23,8 +23,13 @@ export interface ChainTipSnapshot {
 const MAX_RECENT = 12;
 const EMPTY: ChainTipSnapshot = { tip: null, recentBlocks: [] };
 
+/** Coalesce burst tip events during catch-up sync (protects WebView from IPC storms). */
+const TIP_NOTIFY_DEBOUNCE_MS = 500;
+
 const snapshots = new Map<CoinId, ChainTipSnapshot>();
 const listeners = new Map<CoinId, Set<() => void>>();
+const pendingTips = new Map<CoinId, ChainTip>();
+const tipNotifyTimers = new Map<CoinId, number>();
 
 function getSnapshot(coin: CoinId): ChainTipSnapshot {
   return snapshots.get(coin) ?? EMPTY;
@@ -36,8 +41,7 @@ function notify(coin: CoinId): void {
   for (const listener of set) listener();
 }
 
-/** Record a new tip from the node watcher; ignores duplicate hashes. */
-export function pushChainTip(tip: ChainTip): void {
+function applyChainTip(tip: ChainTip): void {
   const prev = snapshots.get(tip.coin) ?? EMPTY;
   if (prev.tip?.hash === tip.hash) return;
 
@@ -62,6 +66,19 @@ export function pushChainTip(tip: ChainTip): void {
 
   snapshots.set(tip.coin, { tip: { ...tip, block }, recentBlocks });
   notify(tip.coin);
+}
+
+/** Record a new tip from the node watcher; ignores duplicate hashes. */
+export function pushChainTip(tip: ChainTip): void {
+  pendingTips.set(tip.coin, tip);
+  if (tipNotifyTimers.has(tip.coin)) return;
+  const timer = window.setTimeout(() => {
+    tipNotifyTimers.delete(tip.coin);
+    const latest = pendingTips.get(tip.coin);
+    pendingTips.delete(tip.coin);
+    if (latest) applyChainTip(latest);
+  }, TIP_NOTIFY_DEBOUNCE_MS);
+  tipNotifyTimers.set(tip.coin, timer);
 }
 
 export function subscribeChainTip(coin: CoinId, listener: () => void): () => void {

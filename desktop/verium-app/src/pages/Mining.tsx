@@ -103,7 +103,6 @@ export function Mining() {
   const [miningMode, setMiningMode] = useState<MiningMode>(
     isLight ? "pool" : (prefs.mining_mode ?? "pool"),
   );
-  const poolMinerRunning = usePoolMinerRunning();
   const lastSampleRef = useRef<{ t: number; hr: number } | null>(null);
 
   const visible = useWindowVisible();
@@ -133,6 +132,8 @@ export function Mining() {
     refetchInterval: false,
   });
   const daemonStatus = useDaemonStatus(coin);
+  const nodeRpcConnected = daemonStatus.data?.connected === true;
+  const poolMinerRunning = usePoolMinerRunning(nodeRpcConnected);
   const explorerEnabled = useExplorerQueriesEnabled();
   const explorerStats = useQuery({
     queryKey: coinQueryKey(coin, "explorer-stats"),

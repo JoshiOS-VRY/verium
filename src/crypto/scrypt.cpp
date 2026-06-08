@@ -944,11 +944,32 @@ bool scrypt_N_1_1_256_multi(void *input, uint256 hashTarget, int *nHashesDone, u
     return false;
 }
 
+namespace {
+// Per-thread reusable single-lane scratchpad for block validation hashing.
+//
+// scryptHash runs only the single-lane scrypt_N_1_1_256, which needs
+// SCRYPT_SCRATCHPAD_SIZE (~128 MB), NOT the multi-way mining buffer
+// (N * SCRYPT_MAX_WAYS * 128 ≈ 1.5 GB). Previously every PoW check allocated,
+// MEM_COMMITed, and prefaulted the full 1.5 GB buffer, then freed it. During
+// catch-up sync with parallel script-verification threads, dozens of these
+// overlapped and exhausted the system commit charge (~97 GB), crashing the
+// node and any other process that needed memory. Reusing one heap buffer per
+// thread keeps steady-state usage at ~128 MB per validation thread and lets the
+// OS commit pages lazily as scrypt_core touches them.
+struct SingleLaneScratch {
+    unsigned char* buf = nullptr;
+    SingleLaneScratch() : buf(static_cast<unsigned char*>(malloc(SCRYPT_SCRATCHPAD_SIZE))) {}
+    ~SingleLaneScratch() { free(buf); }
+};
+} // namespace
+
 void scryptHash(const void *input, char *output)
 {
     uint32_t midstate[8];
     uint32_t data[20];
-    unsigned char *scratchbuf = ScryptScratchAlloc(0);
+
+    static thread_local SingleLaneScratch scratch;
+    unsigned char *scratchbuf = scratch.buf;
 
     memset(output, 0, 32);
     if (!scratchbuf)
@@ -961,6 +982,4 @@ void scryptHash(const void *input, char *output)
     sha256_transform(midstate, data, 0);
 
     scrypt_N_1_1_256(data, (uint32_t*)output, midstate, scratchbuf);
-
-    ScryptScratchFree(scratchbuf);
 }

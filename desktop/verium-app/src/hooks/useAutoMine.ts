@@ -12,6 +12,7 @@ import {
   resolveMiningThreads,
 } from "@/lib/mining-opt";
 import { miningRewardAddressForStart } from "@/lib/mining-reward-address";
+import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
 import {
   rpcGetBlockchainInfo,
   rpcGetMinerState,
@@ -103,6 +104,12 @@ export function useAutoMine() {
     const tryStart = async () => {
       if (wasMiningStoppedByUser()) return;
       if (minerState.data?.active) return;
+      try {
+        const pool = await fetchPoolMinerStatus();
+        if (pool.running) return;
+      } catch {
+        /* veriumd may be offline */
+      }
       if (!status?.connected || status.warming_up || status.sync_stalled) return;
       if (
         !isChainSynced(blockchain.data, {

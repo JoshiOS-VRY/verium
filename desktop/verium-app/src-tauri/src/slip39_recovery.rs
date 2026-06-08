@@ -1,7 +1,7 @@
 //! Shamir secret sharing for social recovery of the BIP39 mnemonic.
 
 use serde::{Deserialize, Serialize};
-use sharks::{Share, Sharks};
+use blahaj::{Share, Sharks};
 
 use crate::error::{AppError, AppResult};
 

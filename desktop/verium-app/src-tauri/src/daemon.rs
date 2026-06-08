@@ -157,11 +157,17 @@ impl DaemonManager {
         };
         let legacy_flat = self.coin == CoinId::Verium && verium_uses_legacy_flat(&cfg);
         if legacy_flat && binary_supports_unified_chain_selector(&bin, self.coin) {
-            return Err(AppError::other(format!(
-                "Refusing to start unified vericoin/veriumd for Verium mainnet ({}) — \
-                 install the legacy verium-only v1.x sidecar (npm run fetch:veriumd).",
+            if !binary_supports_native_pool_mining(&bin) {
+                return Err(AppError::other(format!(
+                    "Refusing to start unified vericoin/veriumd for Verium mainnet ({}) — \
+                     install the legacy verium-only v1.x sidecar (npm run fetch:veriumd).",
+                    bin.display()
+                )));
+            }
+            tracing::info!(
+                "{}: unified veriumd on legacy-flat mainnet (native pool mining)",
                 bin.display()
-            )));
+            );
         }
         let unified_chain =
             !legacy_flat && binary_supports_unified_chain_selector(&bin, self.coin);
@@ -336,7 +342,7 @@ impl DaemonManager {
                 )
             })));
         }
-        stage_sidecar_for_spawn(&bin)
+        stage_sidecar_for_spawn(self.coin, &bin)
     }
 
     pub async fn record_pid(&self, pid: Option<u32>) {
@@ -706,17 +712,26 @@ fn unix_pids_with_image_prefix(prefix: &str) -> Vec<u32> {
     pids
 }
 
-/// True when a native daemon process for this coin is running (any datadir).
-/// Matches `veriumd.exe`, `veriumd-legacy.exe`, `veriumd-x86_64-pc-windows-msvc.exe`, etc.
-pub fn native_daemon_image_running(coin: CoinId) -> bool {
+/// PIDs for processes whose image name starts with `veriumd` / `vericoind`.
+pub fn native_daemon_process_pids(coin: CoinId) -> Vec<u32> {
     #[cfg(windows)]
     {
-        !windows_pids_with_image_prefix(coin.binary_base()).is_empty()
+        windows_pids_with_image_prefix(coin.binary_base())
     }
     #[cfg(not(windows))]
     {
-        !unix_pids_with_image_prefix(coin.binary_base()).is_empty()
+        unix_pids_with_image_prefix(coin.binary_base())
     }
+}
+
+pub fn native_daemon_process_count(coin: CoinId) -> usize {
+    native_daemon_process_pids(coin).len()
+}
+
+/// True when a native daemon process for this coin is running (any datadir).
+/// Matches `veriumd.exe`, `veriumd-legacy.exe`, `veriumd-x86_64-pc-windows-msvc.exe`, etc.
+pub fn native_daemon_image_running(coin: CoinId) -> bool {
+    native_daemon_process_count(coin) > 0
 }
 
 /// When no dedicated `vericoind` sidecar exists, a unified `veriumd` that advertises
@@ -730,7 +745,7 @@ fn detect_unified_veriumd_for_vericoin() -> Option<PathBuf> {
     }
 }
 
-fn resolve_daemon_binary(coin: CoinId) -> Option<PathBuf> {
+pub fn resolve_daemon_binary(coin: CoinId) -> Option<PathBuf> {
     detect_binary(coin).path.map(PathBuf::from)
 }
 
@@ -792,6 +807,70 @@ pub fn binary_supports_unified_chain_selector(path: &Path, coin: CoinId) -> bool
     }
 }
 
+const POOL_MINER_DETECT_MARKER: &[u8] = b"poolminerdetect";
+
+fn file_identity(path: &Path) -> Option<(u64, u64)> {
+    let meta = std::fs::metadata(path).ok()?;
+    let size = meta.len();
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Some((size, mtime))
+}
+
+fn scan_file_for_marker(path: &Path, marker: &[u8]) -> bool {
+    use std::io::Read;
+    if marker.is_empty() {
+        return false;
+    }
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let overlap = marker.len().saturating_sub(1);
+    let mut carry = Vec::new();
+    let mut chunk = [0u8; 256 * 1024];
+    loop {
+        let Ok(read) = file.read(&mut chunk) else {
+            return false;
+        };
+        if read == 0 {
+            return false;
+        }
+        let mut data = carry;
+        data.extend_from_slice(&chunk[..read]);
+        if data.windows(marker.len()).any(|w| w == marker) {
+            return true;
+        }
+        carry = data[data.len().saturating_sub(overlap)..].to_vec();
+    }
+}
+
+static POOL_MINING_MARKER_CACHE: once_cell::sync::Lazy<
+    std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, (u64, u64, bool)>>,
+> = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+/// True when the veriumd binary embeds in-process Stratum pool mining RPCs.
+pub fn binary_supports_native_pool_mining(path: &Path) -> bool {
+    let Some((size, mtime)) = file_identity(path) else {
+        return false;
+    };
+    if let Ok(cache) = POOL_MINING_MARKER_CACHE.lock() {
+        if let Some(&(cached_size, cached_mtime, supported)) = cache.get(path) {
+            if cached_size == size && cached_mtime == mtime {
+                return supported;
+            }
+        }
+    }
+    let supported = scan_file_for_marker(path, POOL_MINER_DETECT_MARKER);
+    if let Ok(mut cache) = POOL_MINING_MARKER_CACHE.lock() {
+        cache.insert(path.to_path_buf(), (size, mtime, supported));
+    }
+    supported
+}
+
 fn staged_sidecar_path(coin: CoinId) -> PathBuf {
     app_config_base()
         .join("run")
@@ -816,20 +895,30 @@ fn rank_sidecar_candidate(path: &Path, coin: CoinId) -> (bool, u64, u64) {
     (!staged, mtime, size)
 }
 
+fn pick_best_sidecar(coin: CoinId, candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates
+        .iter()
+        .max_by_key(|p| rank_sidecar_candidate(p, coin))
+        .cloned()
+}
+
 fn pick_preferred_sidecar(coin: CoinId, mut candidates: Vec<PathBuf>) -> Option<PathBuf> {
     candidates.retain(|p| is_real_sidecar(p));
     if candidates.is_empty() {
         return None;
     }
-    let staged = staged_sidecar_path(coin);
-    if staged.is_file() && is_real_sidecar(&staged) {
-        if coin != CoinId::Verium || !binary_supports_unified_chain_selector(&staged, coin) {
-            return Some(staged);
-        }
-    }
-    // Verium mainnet: legacy flat verium-only binary (no `-verium` selector). Unified
-    // vericoin/veriumd builds use a `verium/` subdir and incompatible bootstrap index.
+    // Verium: prefer a bundled build with native Stratum pool mining over stale
+    // `desktop-app/run/` copies or legacy verium-only sidecars.
     if coin == CoinId::Verium {
+        let pool_native: Vec<PathBuf> = candidates
+            .iter()
+            .filter(|p| binary_supports_native_pool_mining(p))
+            .cloned()
+            .collect();
+        if let Some(best) = pick_best_sidecar(coin, &pool_native) {
+            return Some(best);
+        }
+        // Legacy flat mainnet without native pool: verium-only v1.x (no `-verium`).
         let mut legacy: Vec<PathBuf> = candidates
             .into_iter()
             .filter(|p| !binary_supports_unified_chain_selector(p, coin))
@@ -853,6 +942,12 @@ fn pick_preferred_sidecar(coin: CoinId, mut candidates: Vec<PathBuf>) -> Option<
                 .then_with(|| rank_sidecar_candidate(b, coin).cmp(&rank_sidecar_candidate(a, coin)))
         });
         return legacy.into_iter().next();
+    }
+    let staged = staged_sidecar_path(coin);
+    if staged.is_file() && is_real_sidecar(&staged) {
+        if coin != CoinId::Verium || !binary_supports_unified_chain_selector(&staged, coin) {
+            return Some(staged);
+        }
     }
     if let Some(path) = candidates
         .iter()
@@ -924,47 +1019,77 @@ fn is_daemon_sidecar(path: &Path) -> bool {
         || path.to_string_lossy().contains("binaries")
 }
 
+/// Remove alternate staged names (`veriumd-x86_64-…`, `veriumd-legacy…`) so only one
+/// executable can be launched for this coin.
+fn cleanup_alternate_staged_sidecars(coin: CoinId, run_dir: &Path, keep: &Path) {
+    let prefix = format!("{}-", coin.binary_base());
+    let Ok(entries) = std::fs::read_dir(run_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path == keep {
+            continue;
+        }
+        let Some(fname) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let is_alt = fname.starts_with(&prefix)
+            && (fname.ends_with(".exe") || !fname.contains('.'));
+        if is_alt && path.is_file() {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
 /// Copy bundled sidecars into the app config dir before spawn so Tauri can
 /// rebuild/hash `src-tauri/binaries/*` and `target/debug/{veriumd,vericoind}.exe`
-/// while daemons are running.
-fn stage_sidecar_for_spawn(source: &Path) -> AppResult<PathBuf> {
+/// while daemons are running. Always stages to `run/{veriumd,vericoind}.exe`.
+fn stage_sidecar_for_spawn(coin: CoinId, source: &Path) -> AppResult<PathBuf> {
     if !is_daemon_sidecar(source) {
         return Ok(source.to_path_buf());
     }
-    let Some(name) = source.file_name() else {
-        return Ok(source.to_path_buf());
-    };
     let run_dir = app_config_base().join("run");
-    if source.starts_with(&run_dir) {
-        return Ok(source.to_path_buf());
-    }
     std::fs::create_dir_all(&run_dir)?;
-    let dest = run_dir.join(name);
-    if dest.is_file() {
+    let dest = run_dir.join(binary_name(coin));
+    if source == dest.as_path() {
+        cleanup_alternate_staged_sidecars(coin, &run_dir, &dest);
+        return Ok(dest);
+    }
+    let staged = if dest.is_file() {
         if let (Ok(src_meta), Ok(dst_meta)) = (source.metadata(), dest.metadata()) {
             let same_bytes = src_meta.len() == dst_meta.len();
             let dest_not_older = dst_meta.modified().ok() >= src_meta.modified().ok();
             if same_bytes && dest_not_older {
-                return Ok(dest);
+                dest.clone()
+            } else {
+                copy_staged_sidecar(coin, source, &dest)?
             }
+        } else {
+            copy_staged_sidecar(coin, source, &dest)?
         }
-    }
-    match std::fs::copy(source, &dest) {
-        Ok(_) => Ok(dest),
-        Err(e)
-            if e.raw_os_error() == Some(32) && dest.is_file() =>
-        {
+    } else {
+        copy_staged_sidecar(coin, source, &dest)?
+    };
+    cleanup_alternate_staged_sidecars(coin, &run_dir, &staged);
+    Ok(staged)
+}
+
+fn copy_staged_sidecar(coin: CoinId, source: &Path, dest: &Path) -> AppResult<PathBuf> {
+    match std::fs::copy(source, dest) {
+        Ok(_) => Ok(dest.to_path_buf()),
+        Err(e) if e.raw_os_error() == Some(32) && dest.is_file() => {
             tracing::warn!(
                 "stage: {} locked; reusing existing staged copy at {}",
                 source.display(),
                 dest.display()
             );
-            Ok(dest)
+            Ok(dest.to_path_buf())
         }
         Err(e) => Err(AppError::other(format!(
             "could not stage {} for spawn (stop {} and retry): {e}",
             source.display(),
-            name.to_string_lossy()
+            coin.binary_base()
         ))),
     }
 }

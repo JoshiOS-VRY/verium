@@ -927,15 +927,18 @@ pub fn recover_split_chain_layout(coin: CoinId, cfg: &DaemonConfig) -> AppResult
     Ok(recovered)
 }
 
-/// Recommended `-dbcache` (MiB) for faster initial sync on typical desktop hardware.
+/// Recommended `-dbcache` (MiB). Keep moderate on desktop — large values spike RAM
+/// during block-index load on mainnet (~1M+ headers).
 pub fn recommended_dbcache_mib() -> u64 {
-    2048
+    512
 }
 
 /// veriumd settings that improve block download and validation throughput during IBD.
 pub fn sync_performance_overrides() -> Vec<(&'static str, String)> {
     vec![
         ("dbcache", recommended_dbcache_mib().to_string()),
+        // Limit script-check parallelism during index load (default can be 16+).
+        ("par", "4".to_string()),
         ("maxconnections", "32".to_string()),
         ("maxuploadtarget", "0".to_string()),
         // Wallet polls status + heal loops concurrently; raise RPC throughput headroom.

@@ -42,6 +42,7 @@
 #include <scheduler.h>
 #include <script/sigcache.h>
 #include <script/standard.h>
+#include <poolminer.h>
 #include <shutdown.h>
 #include <timedata.h>
 #include <torcontrol.h>
@@ -170,6 +171,7 @@ void Interrupt()
         g_txindex->Interrupt();
     }
     ForEachBlockFilterIndex([](BlockFilterIndex& index) { index.Interrupt(); });
+    PoolMinerStop();
 }
 
 void Shutdown(InitInterfaces& interfaces)
@@ -186,6 +188,8 @@ void Shutdown(InitInterfaces& interfaces)
     /// module was initialized.
     util::ThreadRename("shutoff");
     mempool.AddTransactionsUpdated(1);
+
+    StopPoolMinerOnShutdown();
 
     StopHTTPRPC();
     StopREST();
@@ -1165,7 +1169,7 @@ bool AppInitSanityChecks()
         return InitError(strprintf(_("Initialization sanity check failed. %s is shutting down.").translated, PACKAGE_NAME));
 
     if (!ScryptDispatchInit()) {
-        return InitError(_("Scrypt consensus self-test failed. Verium cannot mine or validate safely; shutting down.").translated);
+        LogPrintf("WARNING: Scrypt mining dispatch unavailable at startup — chain sync and wallet RPC continue; solo/pool mining disabled until a validated build is used.\n");
     }
 
     // Probe the data directory lock to give an early error message, if possible

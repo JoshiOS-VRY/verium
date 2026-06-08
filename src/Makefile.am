@@ -290,6 +290,9 @@ libbitcoin_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   miner.cpp \
+  poolminer.cpp \
+  stratum/client.cpp \
+  stratum/protocol.cpp \
   net.cpp \
   net_processing.cpp \
   node/coin.cpp \
