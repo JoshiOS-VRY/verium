@@ -352,7 +352,8 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: cargo audit
-        run: cargo audit --manifest-path src-tauri/Cargo.toml
+        # cargo-audit 0.22+ dropped --manifest-path; audit the Tauri lockfile explicitly.
+        run: cargo audit -f src-tauri/Cargo.lock
 
       - name: Download Vericonomy daemon sidecar
         uses: actions/download-artifact@v7
