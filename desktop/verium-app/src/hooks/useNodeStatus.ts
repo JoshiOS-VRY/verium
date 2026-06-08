@@ -22,9 +22,9 @@ export function useNodeStatus(coin: CoinId) {
     refetchInterval: (q) => {
       const d = q.state.data;
       if (isBinaryUnavailableError(d?.error)) return false;
-      if (d?.warming_up || d?.reindex_in_progress || d?.sync_stalled) return 2_000;
-      if (d?.connected) return 10_000;
-      return 5_000;
+      if (d?.warming_up || d?.reindex_in_progress || d?.sync_stalled) return 10_000;
+      if (d?.connected) return 20_000;
+      return 10_000;
     },
     retry: 1,
     retryDelay: 2_000,

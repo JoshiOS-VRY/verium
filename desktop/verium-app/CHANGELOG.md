@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Security modernization**: encrypted storage (AES-256-GCM + OS keychain), BIP39 recovery phrase, TOTP 2FA, app unlock PIN, auto-lock, QR codes (BIP21) with `verium://` / `vericoin://` deep links, hardware wallet xpub + PSBT flow, multisig, spending controls, audit log, scheduled backups, Shamir social recovery, installer verification, and a dedicated **Security** page.
+- **Security modernization**: encrypted storage (AES-256-GCM + OS keychain), BIP39 recovery phrase, TOTP 2FA, auto-lock, QR codes (BIP21) with `verium://` / `vericoin://` deep links, hardware wallet xpub + PSBT flow, multisig, spending controls, audit log, scheduled backups, Shamir social recovery, installer verification, and a dedicated **Security** page.
+
+### Removed
+
+- **App unlock PIN** — launch-time PIN gate and Security page enrollment UI removed.
 
 ## [1.0.0-alpha.1]
 

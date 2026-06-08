@@ -11,7 +11,8 @@ import {
 } from "@/lib/staking-stats";
 import { transactionCategoryLabel } from "@/lib/transaction-category";
 import { AnimatedHashrate } from "@/components/AnimatedHashrate";
-import { formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
+import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
 
 function isEarnActivity(tx: TransactionItem, coin: CoinId): boolean {
   if (coin === "verium") {
@@ -33,7 +34,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
   const profile = getCoinProfile(coin);
   const {
     connected,
-    wallet,
+    effectiveWallet,
     transactions: txs,
     mining: vrmMining,
     minerState: vrmMiner,
@@ -57,6 +58,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
     .filter((tx) => isEarnActivity(tx, coin))
     .sort((a, b) => (b.time ?? 0) - (a.time ?? 0))
     .slice(0, 8);
+  const blurClass = lockedWalletBalanceClass(effectiveWallet);
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -69,24 +71,24 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
         <CardContent className="grid grid-cols-2 gap-3 pb-4 pt-0 text-sm">
           <div>
             <div className="text-xs text-fg-subtle">Balance</div>
-            <div className="font-semibold tabular-nums">
-              {showRpcData && wallet.data
-                ? formatCoinAmount(wallet.data.balance, coin, 4)
+            <div className={cn("font-semibold tabular-nums", blurClass)}>
+              {showRpcData && effectiveWallet
+                ? formatCoinAmount(effectiveWallet.balance, coin, 4)
                 : "—"}
             </div>
           </div>
           <div>
             <div className="text-xs text-fg-subtle">Immature</div>
-            <div className="font-semibold tabular-nums">
-              {showRpcData && wallet.data
-                ? formatCoinAmount(wallet.data.immature_balance, coin, 4)
+            <div className={cn("font-semibold tabular-nums", blurClass)}>
+              {showRpcData && effectiveWallet
+                ? formatCoinAmount(effectiveWallet.immature_balance, coin, 4)
                 : "—"}
             </div>
           </div>
           {coin === "vericoin" && (
             <div className="col-span-2">
               <div className="text-xs text-fg-subtle">Stake weight</div>
-              <div className="font-semibold tabular-nums">
+              <div className={cn("font-semibold tabular-nums", blurClass)}>
                 {vrcMining.data?.stakeweight?.combined != null
                   ? formatNumber(vrcMining.data.stakeweight.combined, 0)
                   : "—"}
@@ -220,7 +222,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
                       {tx.txid.slice(0, 16)}…
                     </div>
                   </div>
-                  <div className="shrink-0 font-semibold tabular-nums">
+                  <div className={cn("shrink-0 font-semibold tabular-nums", blurClass)}>
                     {formatCoinAmount(tx.amount, coin, 4)}
                   </div>
                 </li>

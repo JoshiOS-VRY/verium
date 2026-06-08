@@ -138,7 +138,7 @@ export function Transactions() {
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
 
   const addressGroupings = useQuery({

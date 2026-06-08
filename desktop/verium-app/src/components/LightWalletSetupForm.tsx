@@ -10,9 +10,9 @@ import { RecoveryPhraseWizard } from "@/components/RecoveryPhraseWizard";
 
 import { useActiveCoin } from "@/lib/coin/context";
 
-import { coinQueryKey } from "@/lib/coin/profile";
+import { invalidateLightWalletQueries } from "@/lib/invalidate-wallet-queries";
 
-import { lightWalletCreate, lightWalletUnlock } from "@/lib/light-wallet/client";
+import { lightWalletCreate, lightWalletImport, lightWalletUnlock } from "@/lib/light-wallet/client";
 
 import { scorePassphrase } from "@/lib/passphrase-strength";
 
@@ -102,9 +102,17 @@ export function LightWalletSetupForm({
 
       const mnemonicToUse = (mnemonic ?? phrase).trim();
 
-      setPhase("Encrypting wallet…");
+      setPhase(mode === "import" ? "Importing wallet…" : "Encrypting wallet…");
 
-      await lightWalletCreate(coin, mnemonicToUse, passphrase);
+      if (mode === "import") {
+
+        await lightWalletImport(coin, mnemonicToUse, passphrase);
+
+      } else {
+
+        await lightWalletCreate(coin, mnemonicToUse, passphrase);
+
+      }
 
     },
 
@@ -114,19 +122,7 @@ export function LightWalletSetupForm({
 
       setError(null);
 
-      await queryClient.invalidateQueries({
-
-        queryKey: coinQueryKey(coin, "getwalletinfo"),
-
-      });
-
-      await queryClient.invalidateQueries({
-
-        queryKey: coinQueryKey(coin, "light-server-status"),
-
-      });
-
-      await queryClient.invalidateQueries({ queryKey: ["wallet-mode-status"] });
+      await invalidateLightWalletQueries(queryClient, coin);
 
       onDone();
 

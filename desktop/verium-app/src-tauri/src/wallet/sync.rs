@@ -91,7 +91,7 @@ async fn sync_light_wallet_inner(state: &AppState, coin: CoinId) -> AppResult<()
     let needs_scan = keystore::needs_full_address_scan(coin)?;
 
     if needs_scan {
-        if !keystore::is_unlocked(coin)? {
+        if !keystore::is_unlocked(coin)? || !keystore::signing_session_active(coin) {
             return Ok(());
         }
         let phrase = keystore::unlocked_mnemonic(coin, "")?;

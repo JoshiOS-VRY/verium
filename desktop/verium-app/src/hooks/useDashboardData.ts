@@ -31,6 +31,7 @@ import {
 } from "@/lib/rpc/client";
 import { resolveTipBlockTime } from "@/lib/tip-block-time";
 import { formatBlockAge } from "@/lib/utils";
+import { walletInfoForMode } from "@/lib/wallet-unlock";
 
 /** Shared RPC polling for dashboard hero, middle row, and activity banners. */
 export function useDashboardData(coin: CoinId) {
@@ -41,7 +42,8 @@ export function useDashboardData(coin: CoinId) {
     queryKey: coinQueryKey(coin, "light-wallet-exists"),
     queryFn: () => lightWalletExists(coin),
     enabled: isLight,
-    staleTime: 5_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const lightServer = useLightServerConnected();
   const node = useNodeStatus(coin);
@@ -55,16 +57,7 @@ export function useDashboardData(coin: CoinId) {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: (query) => {
-      if (!visible || isLight) return false;
-      const data = query.state.data;
-      const syncing =
-        data != null &&
-        data.headers != null &&
-        data.blocks != null &&
-        data.headers > data.blocks + 1;
-      return syncing ? 5_000 : 30_000;
-    },
+    refetchInterval: false,
     enabled: !isLight,
   });
 
@@ -74,11 +67,15 @@ export function useDashboardData(coin: CoinId) {
     enabled: !isLight || lightExistsForCoin.data !== false,
     refetchInterval: (q) => {
       if (!isLight || !visible || !lightServer.connected) return false;
-      if (q.state.data?.light_syncing) return 5_000;
+      const effective = walletInfoForMode(true, q.state.data ?? undefined);
+      if (!effective) return false;
+      if (effective.light_syncing) return 5_000;
       return 30_000;
     },
     retry: isLight ? 2 : 3,
   });
+
+  const effectiveWallet = walletInfoForMode(isLight, wallet.data);
 
   const explorer = useQuery({
     queryKey: coinQueryKey(coin, "explorer-stats"),
@@ -92,8 +89,8 @@ export function useDashboardData(coin: CoinId) {
     queryKey: coinQueryKey(coin, "explorer-blocks", 10),
     queryFn: () => fetchExplorerBlocks(coin, 10),
     enabled: explorerEnabled && connected && visible,
-    staleTime: 60_000,
-    refetchInterval: visible ? 60_000 : false,
+    staleTime: isLight ? 5_000 : 60_000,
+    refetchInterval: visible ? (isLight ? 5_000 : 60_000) : false,
     retry: 2,
   });
 
@@ -136,14 +133,14 @@ export function useDashboardData(coin: CoinId) {
   const stakingState = useQuery({
     queryKey: coinQueryKey(coin, "get_staking_state"),
     queryFn: () => rpcGetStakingState(coin),
-    refetchInterval: visible ? 5_000 : false,
+    refetchInterval: false,
     enabled: coin === "vericoin" && !isLight,
   });
 
   const vrcMining = useQuery({
     queryKey: coinQueryKey("vericoin", "getmininginfo"),
     queryFn: () => rpcGetVericoinMiningInfo(),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
     enabled: coin === "vericoin" && !isLight,
   });
 
@@ -221,6 +218,7 @@ export function useDashboardData(coin: CoinId) {
     phase,
     blockchain,
     wallet,
+    effectiveWallet,
     explorer,
     transactions,
     mining,

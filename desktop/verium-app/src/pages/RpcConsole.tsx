@@ -21,7 +21,6 @@ import { useActiveCoin } from "@/lib/coin/context";
 import { cn } from "@/lib/utils";
 import { isWalletLocked } from "@/lib/wallet-unlock";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { isNodeReady, nodeStatusLabel } from "@/lib/node/status";
 
 interface ConsoleEntry {
@@ -102,11 +101,10 @@ export function RpcConsole() {
       void daemonConfig.refetch();
     },
   });
-  const visible = useWindowVisible();
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: visible ? 5_000 : false,
+    refetchInterval: false,
   });
   const walletLocked = isWalletLocked(wallet.data);
   const [draft, setDraft] = useState("");

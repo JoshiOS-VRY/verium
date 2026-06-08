@@ -14,8 +14,10 @@ import { fetchExplorerStats, isExplorerApiEnabled } from "@/lib/explorer-api";
 import { networkHashToKhm } from "@/lib/mining-revenue";
 import { rpcGetMiningInfo, rpcGetWalletInfo } from "@/lib/rpc/client";
 import { formatCoinAmount } from "@/lib/units";
-import { formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
+import { useWalletMode } from "@/hooks/useWalletMode";
+import { lockedWalletBalanceClass, walletInfoForMode } from "@/lib/wallet-unlock";
 
 function formatUsd(value?: number): string {
   if (value === undefined || value === null) return "—";
@@ -32,11 +34,13 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
   const coin = useActiveCoin();
   const profile = getCoinProfile(coin);
   const visible = useWindowVisible();
+  const { isLight } = useWalletMode();
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
+  const effectiveWallet = walletInfoForMode(isLight, wallet.data);
   const explorerEnabled = useQuery({
     queryKey: ["explorer-api-enabled"],
     queryFn: isExplorerApiEnabled,
@@ -80,28 +84,34 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
           <MiniStat
             label="Balance"
             value={
-              wallet.data ? formatCoinAmount(wallet.data.balance, coin, 4) : "—"
+              effectiveWallet
+                ? formatCoinAmount(effectiveWallet.balance, coin, 4)
+                : "—"
             }
+            valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
           <MiniStat
             label="Unconfirmed"
             value={
-              wallet.data
-                ? formatCoinAmount(wallet.data.unconfirmed_balance, coin, 4)
+              effectiveWallet
+                ? formatCoinAmount(effectiveWallet.unconfirmed_balance, coin, 4)
                 : "—"
             }
+            valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
           <MiniStat
             label="Immature"
             value={
-              wallet.data
-                ? formatCoinAmount(wallet.data.immature_balance, coin, 4)
+              effectiveWallet
+                ? formatCoinAmount(effectiveWallet.immature_balance, coin, 4)
                 : "—"
             }
+            valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
           <MiniStat
             label="Transactions"
-            value={wallet.data ? formatNumber(wallet.data.txcount, 0) : "—"}
+            value={effectiveWallet ? formatNumber(effectiveWallet.txcount, 0) : "—"}
+            valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
         </CardContent>
       </Card>
@@ -190,11 +200,19 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
   return (
     <div>
       <div className="text-xs text-fg-subtle">{label}</div>
-      <div className="font-semibold tabular-nums">{value}</div>
+      <div className={cn("font-semibold tabular-nums", valueClassName)}>{value}</div>
     </div>
   );
 }

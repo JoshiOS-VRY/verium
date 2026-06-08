@@ -44,7 +44,7 @@ export function useAutoStake() {
   const blockchain = useQuery({
     queryKey: coinQueryKey(VERICOIN, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(VERICOIN),
-    refetchInterval: 10_000,
+    refetchInterval: false,
     enabled:
       !isLight &&
       loaded &&
@@ -55,7 +55,7 @@ export function useAutoStake() {
   const wallet = useQuery({
     queryKey: coinQueryKey(VERICOIN, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(VERICOIN),
-    refetchInterval: 5_000,
+    refetchInterval: false,
     enabled:
       !isLight &&
       loaded &&
@@ -66,7 +66,7 @@ export function useAutoStake() {
   const stakingState = useQuery({
     queryKey: coinQueryKey(VERICOIN, "get_staking_state"),
     queryFn: () => rpcGetStakingState(VERICOIN),
-    refetchInterval: 5_000,
+    refetchInterval: false,
     enabled:
       !isLight &&
       loaded &&

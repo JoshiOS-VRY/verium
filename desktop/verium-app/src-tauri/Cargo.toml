@@ -55,6 +55,8 @@ urlencoding = "2"
 zeroize = { version = "1", features = ["derive"] }
 sysinfo = "0.33"
 verium-pool-miner = { path = "crates/verium-pool-miner" }
+vericonomy-node-supervisor = { path = "crates/vericonomy-node-supervisor" }
+vericonomy-wallet-core = { path = "crates/vericonomy-wallet-core" }
 async-trait = "0.1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio-rustls = "0.26"

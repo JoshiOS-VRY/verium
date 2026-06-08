@@ -80,7 +80,10 @@ export function WalletUnlockGate({
         </CardHeader>
         {(modeMismatch || (isLight && !hasStoredLightWallet)) && (
           <CardContent>
-            <Link to="/settings" className="text-sm text-accent underline">
+            <Link
+              to={modeMismatch ? "/settings" : "/setup"}
+              className="text-sm text-accent underline"
+            >
               {modeMismatch
                 ? lightWalletCopy.modeMismatchCta
                 : lightWalletCopy.unlockUnavailableCta}

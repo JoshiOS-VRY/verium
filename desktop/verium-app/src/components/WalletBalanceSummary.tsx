@@ -5,6 +5,8 @@ import { coinQueryKey } from "@/lib/coin/profile";
 import { rpcGetWalletInfo } from "@/lib/rpc/client";
 import { formatCoinAmount } from "@/lib/units";
 import { coinMaturityConfirmations } from "@/lib/units";
+import { cn } from "@/lib/utils";
+import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
 
 export function WalletBalanceSummary() {
   const coin = useActiveCoin();
@@ -23,32 +25,33 @@ export function WalletBalanceSummary() {
   const scanning =
     typeof wallet.data.scanning === "object" ? wallet.data.scanning : null;
   const mature = coinMaturityConfirmations(coin);
+  const blurClass = lockedWalletBalanceClass(wallet.data);
 
   return (
     <div className="rounded-md border border-border bg-bg-subtle px-4 py-3 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <span className="text-fg-muted">Wallet total </span>
-          <span className="text-lg font-semibold tabular-nums">
+          <span className={cn("text-lg font-semibold tabular-nums", blurClass)}>
             {formatCoinAmount(total, coin, 4)}
           </span>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
           <span>
             Spendable{" "}
-            <span className="font-medium tabular-nums text-fg">
+            <span className={cn("font-medium tabular-nums text-fg", blurClass)}>
               {formatCoinAmount(spendable, coin, 4)}
             </span>
           </span>
           <span>
             Unconfirmed{" "}
-            <span className="font-medium tabular-nums text-fg">
+            <span className={cn("font-medium tabular-nums text-fg", blurClass)}>
               {formatCoinAmount(unconfirmed, coin, 4)}
             </span>
           </span>
           <span>
             Immature{" "}
-            <span className="font-medium tabular-nums text-fg">
+            <span className={cn("font-medium tabular-nums text-fg", blurClass)}>
               {formatCoinAmount(immature, coin, 4)}
             </span>
           </span>

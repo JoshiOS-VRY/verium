@@ -55,12 +55,12 @@ pub async fn fetch_utxos_with_addresses(
     Ok(utxos)
 }
 
-pub fn wallet_mode_for(prefs: &UserPreferences) -> WalletMode {
-    prefs.wallet_mode
+pub fn wallet_mode_for(prefs: &UserPreferences, coin: CoinId) -> WalletMode {
+    prefs::wallet_mode_for(prefs, coin)
 }
 
-pub fn is_light_mode(prefs: &UserPreferences) -> bool {
-    prefs.wallet_mode.is_light()
+pub fn is_light_mode(prefs: &UserPreferences, coin: CoinId) -> bool {
+    prefs::wallet_mode_for(prefs, coin).is_light()
 }
 
 pub async fn get_wallet_info_json(
@@ -69,15 +69,20 @@ pub async fn get_wallet_info_json(
     _passphrase: Option<&str>,
 ) -> AppResult<Option<Value>> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() || !keystore::wallet_exists(coin)? {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() || !keystore::wallet_exists(coin)? {
         return Ok(None);
     }
 
     let signing_ready = keystore::signing_session_active(coin);
+    let unlock_timer_active = keystore::is_unlocked(coin).unwrap_or(false);
+    let session_unlocked = unlock_timer_active && signing_ready;
     let scan_complete = !keystore::needs_full_address_scan(coin).unwrap_or(true);
-    let light_syncing = signing_ready && !scan_complete;
+    let light_syncing = session_unlocked && !scan_complete;
+    let funded_scripts = keystore::funded_script_hexes(coin).unwrap_or_default();
+    let should_background_sync =
+        light_syncing || (scan_complete && !funded_scripts.is_empty());
 
-    if light_syncing {
+    if should_background_sync {
         let sync_state = state.clone();
         tauri::async_runtime::spawn(async move {
             if let Err(e) = sync_light_wallet(&sync_state, coin).await {
@@ -86,13 +91,11 @@ pub async fn get_wallet_info_json(
         });
     }
 
-    let unlock_timer_active = keystore::is_unlocked(coin).unwrap_or(false);
-
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let unlocked_until = if unlock_timer_active && signing_ready {
+    let unlocked_until = if session_unlocked {
         keystore::load_keystore()?
             .unlocked_until_by_coin
             .get(coin.as_str())
@@ -128,7 +131,7 @@ pub async fn list_transactions(
     passphrase: Option<&str>,
 ) -> AppResult<Vec<Value>> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Ok(vec![]);
     }
     let _ = passphrase;
@@ -162,7 +165,7 @@ pub async fn get_new_address(
     passphrase: Option<&str>,
 ) -> AppResult<String> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
     if !keystore::is_unlocked(coin)? && passphrase.is_none() {
@@ -182,7 +185,7 @@ pub async fn send_to_address(
     passphrase: &str,
 ) -> AppResult<String> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
     let phrase = keystore::decrypt_mnemonic_for_send(coin, passphrase)?;
@@ -226,7 +229,7 @@ pub async fn list_unspent_json(
     passphrase: &str,
 ) -> AppResult<Vec<Value>> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
     let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
@@ -259,7 +262,7 @@ pub async fn send_with_inputs(
     passphrase: &str,
 ) -> AppResult<String> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
     let phrase = keystore::decrypt_mnemonic_for_send(coin, passphrase)?;
@@ -321,7 +324,7 @@ pub async fn send_with_inputs(
 
 pub async fn light_server_status(state: &AppState, coin: CoinId) -> AppResult<Option<LightServerStatus>> {
     let prefs = prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Ok(None);
     }
     let backend = resolve_backend(state, coin).await?;

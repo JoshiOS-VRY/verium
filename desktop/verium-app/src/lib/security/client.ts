@@ -124,36 +124,6 @@ export async function twoFactorIsGated(
   return invoke("two_factor_is_gated", { action, coin, amount: amount ?? null });
 }
 
-// ── Passkey / PIN ───────────────────────────────────────────────────────────
-
-export const PASSKEY_GATE_QUERY_KEY = ["passkey-gate"] as const;
-
-export interface PasskeyConfig {
-  enabled: boolean;
-  use_pin_fallback: boolean;
-  enrolled_at?: number | null;
-}
-
-export async function passkeyStatus(): Promise<PasskeyConfig> {
-  return invoke("passkey_status");
-}
-
-export async function passkeyGateRequired(): Promise<boolean> {
-  return invoke("passkey_gate_required");
-}
-
-export async function passkeyEnrollPin(pin: string): Promise<void> {
-  return invoke("passkey_enroll_pin", { pin });
-}
-
-export async function passkeyVerifyPin(pin: string): Promise<boolean> {
-  return invoke("passkey_verify_pin", { pin });
-}
-
-export async function passkeyDisable(pin: string): Promise<void> {
-  return invoke("passkey_disable", { pin });
-}
-
 // ── Auto-lock ───────────────────────────────────────────────────────────────
 
 export interface AutoLockConfig {

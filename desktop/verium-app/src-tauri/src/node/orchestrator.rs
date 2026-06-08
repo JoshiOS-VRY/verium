@@ -50,25 +50,52 @@ pub async fn startup(app: AppHandle, state: &AppState) {
     }
 
     let prefs = prefs::load().await.unwrap_or_default();
-    let light_mode = prefs.wallet_mode.is_light();
 
-    if light_mode {
-        tracing::info!("startup: light wallet mode — skipping local daemon orchestration");
+    // Per-coin wallet mode: a coin in light mode never gets a managed daemon;
+    // a coin in full-node mode follows the daemon prepare/ensure/wait pipeline.
+    // This lets e.g. Verium run a full node while Vericoin runs light.
+    let light_coins: Vec<CoinId> = CoinId::all()
+        .iter()
+        .copied()
+        .filter(|c| prefs::wallet_mode_for(&prefs, *c).is_light())
+        .collect();
+    let full_node_coins: Vec<CoinId> = CoinId::all()
+        .iter()
+        .copied()
+        .filter(|c| {
+            prefs::coin_enabled(&prefs, *c) && !prefs::wallet_mode_for(&prefs, *c).is_light()
+        })
+        .collect();
+
+    for coin in &light_coins {
+        if crate::wallet::keystore::is_unlocked(*coin).unwrap_or(false)
+            && !crate::wallet::keystore::signing_session_active(*coin)
+        {
+            tracing::info!(
+                "startup: clearing stale light wallet unlock for {} (session not active)",
+                coin.as_str()
+            );
+            let _ = crate::wallet::keystore::lock_wallet(*coin);
+        }
+    }
+    if !light_coins.is_empty() {
         let sync_state = state.clone();
+        let sync_coins = light_coins.clone();
         tauri::async_runtime::spawn(async move {
-            for coin in CoinId::all() {
-                if crate::wallet::keystore::wallet_exists(*coin).unwrap_or(false) {
-                    let _ = crate::wallet::sync::sync_light_wallet(&sync_state, *coin).await;
+            for coin in sync_coins {
+                if crate::wallet::keystore::wallet_exists(coin).unwrap_or(false) {
+                    let _ = crate::wallet::sync::sync_light_wallet(&sync_state, coin).await;
                 }
             }
         });
+    }
+
+    if full_node_coins.is_empty() {
+        tracing::info!("startup: no full-node coins — skipping daemon orchestration");
         return;
     }
 
-    for coin in CoinId::all() {
-        if !prefs::coin_enabled(&prefs, *coin) {
-            continue;
-        }
+    for coin in &full_node_coins {
         if let Err(e) = startup_prepare_chain_data(state, *coin).await {
             tracing::warn!(
                 "startup ({}): chain data prepare failed: {e}",
@@ -77,10 +104,7 @@ pub async fn startup(app: AppHandle, state: &AppState) {
         }
     }
 
-    for coin in CoinId::all() {
-        if !prefs::coin_enabled(&prefs, *coin) {
-            continue;
-        }
+    for coin in &full_node_coins {
         let cfg = match state.config_fresh(*coin).await {
             Ok(c) => c,
             Err(e) => {
@@ -93,11 +117,7 @@ pub async fn startup(app: AppHandle, state: &AppState) {
 
     sleep(Duration::from_secs(2)).await;
     let wait_secs = STARTUP_RPC_WAIT.as_secs() as u32;
-    let enabled: Vec<CoinId> = CoinId::all()
-        .iter()
-        .copied()
-        .filter(|c| prefs::coin_enabled(&prefs, *c))
-        .collect();
+    let enabled: Vec<CoinId> = full_node_coins.clone();
     let mut wait_tasks = Vec::new();
     for coin in &enabled {
         if !crate::daemon::detect_binary(*coin).manageable {
@@ -143,7 +163,7 @@ pub async fn startup(app: AppHandle, state: &AppState) {
 
 /// Proactively clear invalid block flags before status polling can surface a stall banner.
 async fn invalid_block_heal_loop(state: &AppState) {
-    sleep(Duration::from_secs(8)).await;
+    sleep(Duration::from_secs(20)).await;
     loop {
         let prefs = prefs::load().await.unwrap_or_default();
         for coin in CoinId::all() {
@@ -184,6 +204,10 @@ async fn supervise_coin(_app: &AppHandle, state: &AppState, coin: CoinId) {
     if !prefs::coin_enabled(&prefs, coin) {
         return;
     }
+    // Light-mode coins have no managed daemon; never try to start one for them.
+    if prefs::wallet_mode_for(&prefs, coin).is_light() {
+        return;
+    }
     let cfg = match state.config_fresh(coin).await {
         Ok(c) => c,
         Err(e) => {
@@ -199,7 +223,6 @@ async fn supervise_coin(_app: &AppHandle, state: &AppState, coin: CoinId) {
     }
 
     if rpc_reachable(coin, &cfg).await {
-        let _ = heal_invalid_blocks_silently(state, coin, &cfg).await;
         state.clear_auth_restart_attempts(coin);
         state.set_daemon_phase(coin, "connected");
         return;

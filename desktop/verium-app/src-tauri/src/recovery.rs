@@ -1,81 +1,52 @@
-//! BIP39 mnemonic generation and BIP32 master key derivation for sethdseed RPC.
-//! WIF encoding uses each chain's Base58 secret-key prefix (see chainparams.cpp).
+//! Thin desktop shell over [`vericonomy_wallet_core::recovery`].
+//!
+//! The cryptographic logic (BIP39, BIP32, WIF) lives in the portable
+//! `vericonomy-wallet-core` crate so it can be reused by future mobile shells.
+//! This module only maps the app's [`CoinId`] to each chain's Base58 secret-key
+//! prefix and adapts the core error type into [`AppError`].
 
-use bip39::{Language, Mnemonic};
-use bitcoin::bip32::{DerivationPath, Xpriv};
-use bitcoin::secp256k1::Secp256k1;
-use rand::RngCore;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use vericonomy_wallet_core::recovery as core;
 
 use crate::coin_profile::CoinId;
 use crate::error::{AppError, AppResult};
 
-#[derive(Debug, Clone, Serialize, Deserialize, ZeroizeOnDrop)]
-pub struct RecoveryPhraseBundle {
-    pub mnemonic: String,
-    pub word_count: u32,
+pub use vericonomy_wallet_core::recovery::RecoveryPhraseBundle;
+
+fn map_err(e: vericonomy_wallet_core::WalletCoreError) -> AppError {
+    AppError::other(e.to_string())
 }
 
 /// Secret-key version byte for Base58Check WIF (must match veriumd `base58Prefixes[SECRET_KEY]`).
+///
+/// Both mainnet chains use `128 + PUBKEY_ADDRESS(70) = 198` per `chainparams.cpp`
+/// (`vericoin/src/chainparams.cpp` line 126 and Verium's equivalent). A WIF encoded
+/// with the wrong prefix is rejected by `DecodeSecret`, which silently breaks
+/// `sethdseed` and recovery-phrase restore on that chain.
 pub fn secret_key_prefix(coin: CoinId) -> u8 {
     match coin {
         CoinId::Verium => 198,   // 128 + 70
-        CoinId::Vericoin => 239, // 128 + 111
+        CoinId::Vericoin => 198, // 128 + 70
     }
-}
-
-fn base58check_encode(version: u8, payload: &[u8]) -> String {
-    let mut data = Vec::with_capacity(1 + payload.len() + 4);
-    data.push(version);
-    data.extend_from_slice(payload);
-    let hash1 = Sha256::digest(&data);
-    let hash2 = Sha256::digest(hash1);
-    data.extend_from_slice(&hash2[..4]);
-    bs58::encode(data).into_string()
 }
 
 /// Encode a compressed secp256k1 secret as chain-correct WIF for `DecodeSecret` / sethdseed.
 pub fn secret_bytes_to_wif(coin: CoinId, secret: &[u8; 32]) -> String {
-    let mut payload = Vec::with_capacity(33);
-    payload.extend_from_slice(secret);
-    payload.push(1); // compressed
-    base58check_encode(secret_key_prefix(coin), &payload)
+    core::secret_bytes_to_wif(secret_key_prefix(coin), secret)
 }
 
 /// Generate a new 24-word BIP39 mnemonic (256-bit entropy).
 pub fn generate_mnemonic() -> AppResult<RecoveryPhraseBundle> {
-    let mut entropy = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut entropy);
-    let mnemonic = Mnemonic::from_entropy_in(Language::English, &entropy)
-        .map_err(|e| AppError::other(format!("mnemonic generation failed: {e}")))?;
-    Ok(RecoveryPhraseBundle {
-        mnemonic: mnemonic.to_string(),
-        word_count: 24,
-    })
+    core::generate_mnemonic().map_err(map_err)
 }
 
 /// Validate a BIP39 mnemonic (checksum included).
 pub fn validate_mnemonic(phrase: &str) -> AppResult<bool> {
-    match Mnemonic::parse_in(Language::English, phrase.trim()) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    Ok(core::validate_mnemonic(phrase))
 }
 
 /// Derive the BIP32 master extended private key from a mnemonic + optional BIP39 passphrase.
-pub fn derive_master_xpriv(
-    phrase: &str,
-    bip39_passphrase: Option<&str>,
-) -> AppResult<String> {
-    let mnemonic = Mnemonic::parse_in(Language::English, phrase.trim())
-        .map_err(|e| AppError::other(format!("invalid mnemonic: {e}")))?;
-    let seed = mnemonic.to_seed(bip39_passphrase.unwrap_or(""));
-    let secp = Secp256k1::new();
-    let xpriv = Xpriv::new_master(bitcoin::NetworkKind::Main, &seed)
-        .map_err(|e| AppError::other(format!("master key derivation failed: {e}")))?;
-    Ok(xpriv.to_string())
+pub fn derive_master_xpriv(phrase: &str, bip39_passphrase: Option<&str>) -> AppResult<String> {
+    core::derive_master_xpriv(phrase, bip39_passphrase).map_err(map_err)
 }
 
 /// Derive master private key WIF in the chain's native format for sethdseed.
@@ -84,48 +55,20 @@ pub fn master_xpriv_to_wif(
     phrase: &str,
     bip39_passphrase: Option<&str>,
 ) -> AppResult<String> {
-    let mnemonic = Mnemonic::parse_in(Language::English, phrase.trim())
-        .map_err(|e| AppError::other(format!("invalid mnemonic: {e}")))?;
-    let seed = mnemonic.to_seed(bip39_passphrase.unwrap_or(""));
-    let secp = Secp256k1::new();
-    let xpriv = Xpriv::new_master(bitcoin::NetworkKind::Main, &seed)
-        .map_err(|e| AppError::other(format!("master key derivation failed: {e}")))?;
-    Ok(secret_bytes_to_wif(coin, &xpriv.private_key.secret_bytes()))
+    core::master_xpriv_to_wif(secret_key_prefix(coin), phrase, bip39_passphrase).map_err(map_err)
 }
 
 /// Pick random word indices (0-based) for verification challenge.
 pub fn verification_indices(word_count: u32, count: usize) -> Vec<usize> {
-    use rand::seq::SliceRandom;
-    let mut indices: Vec<usize> = (0..word_count as usize).collect();
-    let mut rng = rand::thread_rng();
-    indices.shuffle(&mut rng);
-    indices.truncate(count.min(word_count as usize));
-    indices.sort_unstable();
-    indices
+    core::verification_indices(word_count, count)
 }
 
 /// Verify user-supplied words at given indices.
-pub fn verify_words_at_indices(
-    phrase: &str,
-    indices: &[usize],
-    answers: &[String],
-) -> bool {
-    let words: Vec<&str> = phrase.split_whitespace().collect();
-    if indices.len() != answers.len() {
-        return false;
-    }
-    for (idx, answer) in indices.iter().zip(answers.iter()) {
-        if *idx >= words.len() {
-            return false;
-        }
-        if !words[*idx].eq_ignore_ascii_case(answer.trim()) {
-            return false;
-        }
-    }
-    true
+pub fn verify_words_at_indices(phrase: &str, indices: &[usize], answers: &[String]) -> bool {
+    core::verify_words_at_indices(phrase, indices, answers)
 }
 
-/// Derive a child private key WIF at m/44'/coin_type'/0'/0/0 for address preview.
+/// Derive a child private key WIF at m/44'/coin_type'/0'/0/index for address preview.
 pub fn derive_account_wif(
     coin: CoinId,
     phrase: &str,
@@ -133,28 +76,19 @@ pub fn derive_account_wif(
     coin_type: u32,
     index: u32,
 ) -> AppResult<String> {
-    let mnemonic = Mnemonic::parse_in(Language::English, phrase.trim())
-        .map_err(|e| AppError::other(format!("invalid mnemonic: {e}")))?;
-    let seed = mnemonic.to_seed(bip39_passphrase.unwrap_or(""));
-    let secp = Secp256k1::new();
-    let xpriv = Xpriv::new_master(bitcoin::NetworkKind::Main, &seed)
-        .map_err(|e| AppError::other(format!("master key derivation failed: {e}")))?;
-    let path: DerivationPath = format!("m/44'/{coin_type}'/0'/0/{index}")
-        .parse()
-        .map_err(|e| AppError::other(format!("invalid derivation path: {e}")))?;
-    let child = xpriv
-        .derive_priv(&secp, &path)
-        .map_err(|e| AppError::other(format!("derive failed: {e}")))?;
-    Ok(secret_bytes_to_wif(coin, &child.private_key.secret_bytes()))
+    core::derive_account_wif(
+        secret_key_prefix(coin),
+        phrase,
+        bip39_passphrase,
+        coin_type,
+        index,
+    )
+    .map_err(map_err)
 }
 
 /// Zeroize a string in place (best-effort).
 pub fn zeroize_string(s: &mut String) {
-    unsafe {
-        let bytes = s.as_mut_vec();
-        bytes.zeroize();
-    }
-    s.clear();
+    core::zeroize_string(s);
 }
 
 #[cfg(test)]
@@ -162,19 +96,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn verium_wif_uses_198_prefix() {
-        let wif = secret_bytes_to_wif(CoinId::Verium, &[1u8; 32]);
-        let decoded = bs58::decode(&wif).with_check(None).into_vec().unwrap();
-        assert_eq!(decoded[0], 198);
-        assert_eq!(decoded.len(), 1 + 32 + 1); // version + secret + compressed flag
-        assert_eq!(decoded[33], 1);
+    fn both_chains_share_mainnet_secret_prefix() {
+        assert_eq!(secret_key_prefix(CoinId::Verium), 198);
+        assert_eq!(secret_key_prefix(CoinId::Vericoin), 198);
     }
 
     #[test]
-    fn vericoin_wif_uses_239_prefix() {
-        let wif = secret_bytes_to_wif(CoinId::Vericoin, &[2u8; 32]);
-        let decoded = bs58::decode(&wif).with_check(None).into_vec().unwrap();
-        assert_eq!(decoded[0], 239);
-        assert_eq!(decoded.len(), 34);
+    fn master_wif_uses_198_prefix_for_both_chains() {
+        let phrase = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+        for coin in [CoinId::Verium, CoinId::Vericoin] {
+            let wif = master_xpriv_to_wif(coin, phrase, None).unwrap();
+            let decoded = bs58::decode(&wif).with_check(None).into_vec().unwrap();
+            assert_eq!(decoded[0], 198, "{coin:?} master WIF prefix");
+            assert_eq!(decoded.len(), 34, "{coin:?} master WIF length");
+            assert_eq!(decoded[33], 1, "{coin:?} compressed flag");
+        }
     }
 }

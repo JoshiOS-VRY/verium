@@ -26,6 +26,14 @@ export function isBinaryUnavailableError(error?: string | null): boolean {
   );
 }
 
+const STARTING_PHASES = new Set(["starting", "reindexing", "warming_up"]);
+const STARTING_STATES = new Set([
+  "starting",
+  "warming_up",
+  "reindexing",
+  "initializing",
+]);
+
 export function isDaemonConnectingState(
   status: NodeStatus | undefined,
   opts: {
@@ -46,6 +54,22 @@ export function isDaemonConnectingState(
     status?.error?.includes("invalid RPC credentials");
   if (unauthorized) return false;
 
+  if (
+    status?.daemon_phase &&
+    STARTING_PHASES.has(status.daemon_phase)
+  ) {
+    return true;
+  }
+
+  if (status?.state && STARTING_STATES.has(status.state)) {
+    return true;
+  }
+
+  // Backend maps connection refused → "Starting node…" — keep UI in connecting mode.
+  if (status?.error?.includes("Starting node")) {
+    return true;
+  }
+
   // Backend-reported startup / index load messages should stay in connecting state.
   if (status?.error?.toLowerCase().includes("reindexing block headers")) {
     return true;
@@ -59,9 +83,9 @@ export function isDaemonConnectingState(
   }
 
   if (opts.isFetching && !status) return true;
-  if (opts.startupGraceActive && isTransientDaemonError(status?.error)) {
+  if (isTransientDaemonError(status?.error)) {
     return true;
   }
 
-  return false;
+  return opts.startupGraceActive;
 }

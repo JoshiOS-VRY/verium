@@ -5,7 +5,7 @@ use verium_pool_miner::parse_stratum_url;
 use verium_pool_miner::stratum::StratumClient;
 
 #[test]
-#[ignore = "requires network access to official pool"]
+#[ignore = "requires network access to public pool"]
 fn connect_subscribe_authorize_official_pool() {
     let (host, port) = parse_stratum_url("stratum+tcp://mine.vericonomy.com:3333").unwrap();
     let mut client = StratumClient::connect(&host, port).expect("connect");

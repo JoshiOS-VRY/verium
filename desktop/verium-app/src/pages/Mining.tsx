@@ -1,7 +1,11 @@
+import { PoolDisclaimer } from "@/components/pool/PoolDisclaimer";
 import { PoolStatsStrip } from "@/components/pool/PoolStatsStrip";
 import { PoolMiningPanel } from "@/components/pool/PoolMiningPanel";
 import { usePoolMinerRunning } from "@/components/pool/PoolMiningControls";
-import { fetchPoolMinerMemoryLimits, stopPoolMiner } from "@/lib/pool-miner-api";
+import {
+  fetchPoolMinerMemoryLimits,
+  stopPoolMiner,
+} from "@/lib/pool-miner-api";
 import { useActiveCoin } from "@/lib/coin/context";
 import { useExplorerQueriesEnabled } from "@/lib/network-mode";
 import { coinQueryKey } from "@/lib/coin/profile";
@@ -61,10 +65,7 @@ import {
   markMiningStoppedByUser,
 } from "@/lib/mining-session";
 import { isChainSynced } from "@/lib/bootstrap-policy";
-import {
-  isMinerBooting,
-  MINING_HASHRATE_POLL_MS,
-} from "@/lib/mining-boot";
+import { isMinerBooting, MINING_HASHRATE_POLL_MS } from "@/lib/mining-boot";
 
 type MiningMode = "solo" | "pool";
 
@@ -124,7 +125,7 @@ export function Mining() {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
@@ -321,8 +322,8 @@ export function Mining() {
       title="Unlock to mine"
       description={
         isLight
-          ? "Enter your wallet passphrase to mine on the official Verium pool."
-          : "Enter your wallet passphrase to access solo CPU mining or mine on the official Verium pool."
+          ? "Enter your wallet passphrase to mine on the public Verium pool."
+          : "Enter your wallet passphrase to access solo CPU mining or mine on the public Verium pool."
       }
     >
       <div className="flex flex-col gap-4">
@@ -350,7 +351,7 @@ export function Mining() {
               className="h-8 px-4 text-sm"
               onClick={() => setMiningModePersist("solo")}
             >
-              Solo (built-in)
+              Solo Mining
             </Button>
             <Button
               type="button"
@@ -358,177 +359,184 @@ export function Mining() {
               className="h-8 px-4 text-sm"
               onClick={() => setMiningModePersist("pool")}
             >
-              Pool (official)
+              Pool Mining
             </Button>
           </div>
         )}
 
         {miningMode === "pool" || isLight ? (
           <>
-          <PoolStatsStrip enabled={explorerEnabled} />
-          <PoolMiningPanel
-            prefs={prefs}
-            enabled={explorerEnabled}
-            payoutAddress={prefs.pool_payout_address ?? ""}
-            onPayoutAddressChange={(addr) =>
-              void updatePrefs({ pool_payout_address: addr })
-            }
-            workerName={prefs.pool_worker_name ?? "wallet"}
-            onWorkerNameChange={(name) =>
-              void updatePrefs({ pool_worker_name: name })
-            }
-            miningThreads={poolMiningThreads}
-            autoAdjustThreads={autoAdjustThreads}
-            manualThreads={prefs.auto_mine_threads ?? 2}
-            suggestedThreads={suggestedThreads}
-            maxThreads={maxThreads}
-            scratchpadMib={
-              poolMemory.data?.usesSidecar
-                ? undefined
-                : poolMemory.data?.scratchpadMib
-            }
-            usesSidecar={poolMemory.data?.usesSidecar}
-            topology={topology.data}
-            logicalCpus={logicalCpus}
-            onAutoAdjustChange={handleAutoAdjustChange}
-            onManualThreadsChange={(threads) =>
-              void updatePrefs({ auto_mine_threads: threads })
-            }
-            chainSynced={chainSynced}
-            syncStalled={syncStalled}
-            onStartPool={() => {
-              if (active) void stop.mutate();
-            }}
-            onStopSolo={() => {
-              if (active) void stop.mutate();
-            }}
-          />
+            <PoolStatsStrip enabled={explorerEnabled} />
+            <PoolMiningPanel
+              prefs={prefs}
+              enabled={explorerEnabled}
+              payoutAddress={prefs.pool_payout_address ?? ""}
+              onPayoutAddressChange={(addr) =>
+                void updatePrefs({ pool_payout_address: addr })
+              }
+              workerName={prefs.pool_worker_name ?? "wallet"}
+              onWorkerNameChange={(name) =>
+                void updatePrefs({ pool_worker_name: name })
+              }
+              miningThreads={poolMiningThreads}
+              autoAdjustThreads={autoAdjustThreads}
+              manualThreads={prefs.auto_mine_threads ?? 2}
+              suggestedThreads={suggestedThreads}
+              maxThreads={maxThreads}
+              scratchpadMib={
+                poolMemory.data?.usesSidecar
+                  ? undefined
+                  : poolMemory.data?.scratchpadMib
+              }
+              usesSidecar={poolMemory.data?.usesSidecar}
+              topology={topology.data}
+              logicalCpus={logicalCpus}
+              onAutoAdjustChange={handleAutoAdjustChange}
+              onManualThreadsChange={(threads) =>
+                void updatePrefs({ auto_mine_threads: threads })
+              }
+              chainSynced={chainSynced}
+              syncStalled={syncStalled}
+              onStartPool={() => {
+                if (active) void stop.mutate();
+              }}
+              onStopSolo={() => {
+                if (active) void stop.mutate();
+              }}
+            />
+            <PoolDisclaimer />
           </>
         ) : null}
 
         {!isLight && miningMode === "solo" ? (
           <>
-        <MiningHero
-          active={active}
-          minerBooting={minerBooting}
-          localHashrate={localHashrate}
-          hashrateReady={mining.data != null}
-          displayThreads={displayThreads}
-          sessionStartedAt={minerState.data?.started_at}
-          sessionAvg={sessionAvg}
-          chainSynced={chainSynced}
-          syncStalled={syncStalled}
-          staticAddressMissing={staticAddressMissing}
-          blocksBehind={blocksBehind}
-          startPending={start.isPending}
-          stopPending={stop.isPending}
-          startError={start.error}
-          stopError={stop.error}
-          onStart={() => start.mutate()}
-          onStop={() => stop.mutate()}
-        />
+            <MiningHero
+              active={active}
+              minerBooting={minerBooting}
+              localHashrate={localHashrate}
+              hashrateReady={mining.data != null}
+              displayThreads={displayThreads}
+              sessionStartedAt={minerState.data?.started_at}
+              sessionAvg={sessionAvg}
+              chainSynced={chainSynced}
+              syncStalled={syncStalled}
+              staticAddressMissing={staticAddressMissing}
+              blocksBehind={blocksBehind}
+              startPending={start.isPending}
+              stopPending={stop.isPending}
+              startError={start.error}
+              stopError={stop.error}
+              onStart={() => start.mutate()}
+              onStop={() => stop.mutate()}
+            />
 
-        {live && <MiningHashrateChart {...chartProps} />}
+            {live && <MiningHashrateChart {...chartProps} />}
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MiningStatTile
-            label="Hashrate"
-            icon={Cpu}
-            highlight={live}
-            value={
-              <MinerHashrateDisplay
-                booting={minerBooting}
-                value={mining.data?.hashrate}
-                fractionDigits={2}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <MiningStatTile
+                label="Hashrate"
+                icon={Cpu}
+                highlight={live}
+                value={
+                  <MinerHashrateDisplay
+                    booting={minerBooting}
+                    value={mining.data?.hashrate}
+                    fractionDigits={2}
+                  />
+                }
               />
-            }
-          />
-          <MiningStatTile
-            label="Network hashrate"
-            icon={Globe}
-            value={networkKhm != null ? formatNumber(networkKhm, 2) : "—"}
-            unit="kH/m"
-          />
-          <MiningStatTile label="Difficulty" icon={Target} value={difficulty} />
-          <MiningStatTile
-            label="Est. next block"
-            icon={Clock}
-            value={
-              estBlockRate != null ? `${formatNumber(estBlockRate, 1)}` : "—"
-            }
-            unit={estBlockRate != null ? "h" : undefined}
-            hint={
-              networkStats?.blockReward != null
-                ? `reward ${formatNumber(networkStats.blockReward, 4)} VRM`
-                : undefined
-            }
-          />
-        </div>
-
-        {share != null && localHashrate > 0 && (
-          <div className="rounded-lg border border-border bg-bg-subtle/50 px-4 py-3">
-            <div className="mb-1 flex justify-between text-sm">
-              <span className="text-fg-muted">Your network share</span>
-              <span className="font-semibold tabular-nums">
-                {formatNumber(share, 2)}%
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-bg-panel">
-              <div
-                className="h-full rounded-full bg-accent transition-[width]"
-                style={{ width: `${Math.min(100, share)}%` }}
+              <MiningStatTile
+                label="Network hashrate"
+                icon={Globe}
+                value={networkKhm != null ? formatNumber(networkKhm, 2) : "—"}
+                unit="kH/m"
+              />
+              <MiningStatTile
+                label="Difficulty"
+                icon={Target}
+                value={difficulty}
+              />
+              <MiningStatTile
+                label="Est. next block"
+                icon={Clock}
+                value={
+                  estBlockRate != null
+                    ? `${formatNumber(estBlockRate, 1)}`
+                    : "—"
+                }
+                unit={estBlockRate != null ? "h" : undefined}
+                hint={
+                  networkStats?.blockReward != null
+                    ? `reward ${formatNumber(networkStats.blockReward, 4)} VRM`
+                    : undefined
+                }
               />
             </div>
-          </div>
-        )}
 
-        <MiningControlsCard
-          autoAdjustThreads={autoAdjustThreads}
-          manualThreads={prefs.auto_mine_threads ?? 2}
-          suggestedThreads={suggestedThreads}
-          maxThreads={maxThreads}
-          topology={topology.data}
-          logicalCpus={logicalCpus}
-          displayThreads={displayThreads}
-          isMining={active}
-          controlsDisabled={controlsDisabled}
-          rewardMode={
-            (prefs.mining_reward_address_mode ??
-              "dynamic") as MiningRewardAddressMode
-          }
-          rewardAddress={prefs.mining_reward_address ?? ""}
-          autoMineOnOpen={prefs.auto_mine_on_open === true}
-          playSoundOnBlock={prefs.play_sound_on_block_mined === true}
-          onAutoAdjustChange={handleAutoAdjustChange}
-          onManualThreadsChange={(threads) =>
-            void updatePrefs({ auto_mine_threads: threads })
-          }
-          onRewardModeChange={(mode) =>
-            void updatePrefs({ mining_reward_address_mode: mode })
-          }
-          onRewardAddressChange={(address) =>
-            void updatePrefs({ mining_reward_address: address })
-          }
-          onAutoMineOnOpenChange={(checked) =>
-            void updatePrefs({ auto_mine_on_open: checked })
-          }
-          onPlaySoundChange={(checked) =>
-            void updatePrefs({ play_sound_on_block_mined: checked })
-          }
-        />
+            {share != null && localHashrate > 0 && (
+              <div className="rounded-lg border border-border bg-bg-subtle/50 px-4 py-3">
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="text-fg-muted">Your network share</span>
+                  <span className="font-semibold tabular-nums">
+                    {formatNumber(share, 2)}%
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-bg-panel">
+                  <div
+                    className="h-full rounded-full bg-accent transition-[width]"
+                    style={{ width: `${Math.min(100, share)}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
-        {dailyEstimate && localHashrate > 0 && (
-          <MiningEconomicsCard
-            dailyEstimate={dailyEstimate}
-            period={revenuePeriod}
-            onPeriodChange={setRevenuePeriod}
-            marketPriceUsd={marketPriceUsd}
-            usingCustomVrmPrice={usingCustomVrmPrice}
-            statsSource={networkStats?.source}
-          />
-        )}
+            <MiningControlsCard
+              autoAdjustThreads={autoAdjustThreads}
+              manualThreads={prefs.auto_mine_threads ?? 2}
+              suggestedThreads={suggestedThreads}
+              maxThreads={maxThreads}
+              topology={topology.data}
+              logicalCpus={logicalCpus}
+              displayThreads={displayThreads}
+              isMining={active}
+              controlsDisabled={controlsDisabled}
+              rewardMode={
+                (prefs.mining_reward_address_mode ??
+                  "dynamic") as MiningRewardAddressMode
+              }
+              rewardAddress={prefs.mining_reward_address ?? ""}
+              autoMineOnOpen={prefs.auto_mine_on_open === true}
+              playSoundOnBlock={prefs.play_sound_on_block_mined === true}
+              onAutoAdjustChange={handleAutoAdjustChange}
+              onManualThreadsChange={(threads) =>
+                void updatePrefs({ auto_mine_threads: threads })
+              }
+              onRewardModeChange={(mode) =>
+                void updatePrefs({ mining_reward_address_mode: mode })
+              }
+              onRewardAddressChange={(address) =>
+                void updatePrefs({ mining_reward_address: address })
+              }
+              onAutoMineOnOpenChange={(checked) =>
+                void updatePrefs({ auto_mine_on_open: checked })
+              }
+              onPlaySoundChange={(checked) =>
+                void updatePrefs({ play_sound_on_block_mined: checked })
+              }
+            />
 
-        {!live && <MiningHashrateChart {...chartProps} emptyWhenIdle />}
+            {dailyEstimate && localHashrate > 0 && (
+              <MiningEconomicsCard
+                dailyEstimate={dailyEstimate}
+                period={revenuePeriod}
+                onPeriodChange={setRevenuePeriod}
+                marketPriceUsd={marketPriceUsd}
+                usingCustomVrmPrice={usingCustomVrmPrice}
+                statsSource={networkStats?.source}
+              />
+            )}
+
+            {!live && <MiningHashrateChart {...chartProps} emptyWhenIdle />}
           </>
         ) : null}
       </div>

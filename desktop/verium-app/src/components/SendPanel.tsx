@@ -34,7 +34,6 @@ import {
 import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
 import { coinQueryKey, getCoinProfile, type CoinId } from "@/lib/coin/profile";
 import { useUserPreferences } from "@/lib/user-preferences";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { coinSymbol, formatCoinAmount } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import { listAddressBookEntries, upsertAddressBookEntry } from "@/lib/address-book";
@@ -51,6 +50,8 @@ const EXAMPLE_ADDRESSES: Partial<Record<CoinId, string>> = {
   verium: "VRq98Nm2P6anLHPgnHdb6NnibJ6GoG3Jm9",
 };
 const DEFAULT_FEE_RATE = 0.001;
+/** ~2 recipient cards visible; additional rows scroll inside the panel. */
+const RECIPIENTS_SCROLL_MAX_CLASS = "max-h-[min(22rem,42vh)]";
 
 interface SendRecipient {
   id: string;
@@ -197,11 +198,10 @@ export function SendPanel({
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const updatePrefs = useUserPreferences((s) => s.update);
-  const visible = useWindowVisible();
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
 
   const [recipients, setRecipients] = useState<SendRecipient[]>([
@@ -228,6 +228,8 @@ export function SendPanel({
   const [lastSend, setLastSend] = useState<SendSuccessResult | null>(null);
   const [preparingConfirm, setPreparingConfirm] = useState(false);
   const clipboardSnapshot = useRef<Map<string, string>>(new Map());
+  const recipientsScrollRef = useRef<HTMLDivElement>(null);
+  const prevRecipientCountRef = useRef(recipients.length);
 
   const spendingCfg = useQuery({
     queryKey: ["spending-controls"],
@@ -245,6 +247,19 @@ export function SendPanel({
       },
     ]);
   }, [initialAddress, initialAmount, initialLabel]);
+
+  useEffect(() => {
+    if (recipients.length <= prevRecipientCountRef.current) {
+      prevRecipientCountRef.current = recipients.length;
+      return;
+    }
+
+    const scrollEl = recipientsScrollRef.current;
+    if (scrollEl) {
+      scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
+    }
+    prevRecipientCountRef.current = recipients.length;
+  }, [recipients.length]);
 
   // Keep daemon's settxfee aligned with the persisted preference.
   useEffect(() => {
@@ -589,7 +604,31 @@ export function SendPanel({
         }}
       />
 
-      <div className="flex flex-col gap-3">
+      <div className="flex min-h-0 flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-fg-muted">
+            {recipients.length === 1
+              ? "1 recipient"
+              : `${recipients.length} recipients`}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={addRecipient}
+          >
+            <Plus className="h-4 w-4" />
+            Add Recipient
+          </Button>
+        </div>
+
+        <div
+          ref={recipientsScrollRef}
+          className={cn(
+            "flex flex-col gap-3 overflow-y-auto overscroll-y-contain rounded-lg border border-border bg-bg-subtle/40 p-2 pr-1",
+            RECIPIENTS_SCROLL_MAX_CLASS,
+          )}
+        >
         {recipients.map((row, index) => {
           const addressError = row.address.trim()
             ? validateSendAddress(row.address.trim())
@@ -599,6 +638,11 @@ export function SendPanel({
             key={row.id}
             className="rounded-lg border border-border bg-bg-subtle/80 p-4"
           >
+            {recipients.length > 1 && (
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
+                Recipient {index + 1}
+              </p>
+            )}
             <div className="grid gap-3">
               <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-start">
                 <label
@@ -743,6 +787,7 @@ export function SendPanel({
           </div>
         );
         })}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
@@ -846,16 +891,6 @@ export function SendPanel({
           >
             <X className="h-4 w-4" />
             Clear All
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            className="border-0 bg-white/15 text-accent-fg hover:bg-white/25"
-            onClick={addRecipient}
-          >
-            <Plus className="h-4 w-4" />
-            Add Recipient
           </Button>
         </div>
         <div className="text-sm font-semibold tabular-nums">

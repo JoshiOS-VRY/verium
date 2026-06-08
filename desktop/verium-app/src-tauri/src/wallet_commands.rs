@@ -15,12 +15,14 @@ use crate::wallet::keystore;
 use crate::wallet::mode::WalletMode;
 use crate::wallet::service;
 
-async fn ensure_light_wallet_mode_active() -> AppResult<()> {
+/// Mark one coin as light mode after a light wallet is created/imported/unlocked.
+/// Per-coin so the other chain can keep running a full node.
+async fn ensure_light_wallet_mode_active(coin: CoinId) -> AppResult<()> {
     let mut prefs = prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Ok(());
     }
-    prefs.wallet_mode = WalletMode::Light;
+    prefs::set_wallet_mode_for(&mut prefs, coin, WalletMode::Light);
     prefs::save(&prefs).await?;
     Ok(())
 }
@@ -33,13 +35,10 @@ pub struct WalletModeStatus {
     pub electrum_servers: Vec<String>,
 }
 
-#[tauri::command]
-pub async fn wallet_mode_get() -> AppResult<WalletModeStatus> {
-    let prefs = prefs::load().await?;
-    let coin = prefs.active_coin.parse().unwrap_or(CoinId::Verium);
+fn wallet_mode_status_for(prefs: &UserPreferences, coin: CoinId) -> WalletModeStatus {
     let network = crate::features::effective_network_mode(prefs.network_mode);
-    Ok(WalletModeStatus {
-        mode: prefs.wallet_mode.as_str().to_string(),
+    WalletModeStatus {
+        mode: prefs::wallet_mode_for(prefs, coin).as_str().to_string(),
         light_wallet_enabled: crate::features::light_wallet_enabled(),
         light_wallet_exists: keystore::wallet_exists(coin).unwrap_or(false),
         electrum_servers: prefs
@@ -47,13 +46,41 @@ pub async fn wallet_mode_get() -> AppResult<WalletModeStatus> {
             .as_ref()
             .and_then(|m| m.get(coin.as_str()).cloned())
             .unwrap_or_else(|| coin.default_electrum_servers(network)),
-    })
+    }
+}
+
+#[tauri::command]
+pub async fn wallet_mode_get() -> AppResult<WalletModeStatus> {
+    let prefs = prefs::load().await?;
+    let coin = prefs.active_coin.parse().unwrap_or(CoinId::Verium);
+    Ok(wallet_mode_status_for(&prefs, coin))
+}
+
+/// Per-coin variant of `wallet_mode_get`.
+#[tauri::command]
+pub async fn wallet_mode_get_for_coin(coin: String) -> AppResult<WalletModeStatus> {
+    let coin = parse_coin_id(&coin)?;
+    let prefs = prefs::load().await?;
+    Ok(wallet_mode_status_for(&prefs, coin))
 }
 
 #[tauri::command]
 pub async fn wallet_mode_set(mode: String) -> AppResult<()> {
     let mut prefs = prefs::load().await?;
+    // App-wide default still set for backward compatibility; per-coin overrides
+    // win when present (see prefs::wallet_mode_for).
     prefs.wallet_mode = WalletMode::from_str_lossy(&mode);
+    let _ = prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
+    prefs::save(&prefs).await
+}
+
+/// Set the wallet mode for a single coin without touching the other chain.
+#[tauri::command]
+pub async fn wallet_mode_set_for_coin(coin: String, mode: String) -> AppResult<()> {
+    let coin = parse_coin_id(&coin)?;
+    let mut prefs = prefs::load().await?;
+    prefs::set_wallet_mode_for(&mut prefs, coin, WalletMode::from_str_lossy(&mode));
+    let _ = prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
     prefs::save(&prefs).await
 }
 
@@ -123,7 +150,7 @@ pub async fn light_wallet_create(
         ));
     }
     keystore::create_wallet(coin, &trimmed, &passphrase, label.as_deref())?;
-    ensure_light_wallet_mode_active().await
+    ensure_light_wallet_mode_active(coin).await
 }
 
 #[tauri::command]
@@ -146,12 +173,7 @@ pub async fn light_wallet_import(
         ));
     }
     keystore::import_wallet(coin, &trimmed, &passphrase, label.as_deref())?;
-    if !keystore::wallet_exists(coin)? {
-        return Err(crate::error::AppError::other(
-            "import did not persist — could not write the light wallet file. Check disk space and retry.",
-        ));
-    }
-    ensure_light_wallet_mode_active().await?;
+    ensure_light_wallet_mode_active(coin).await?;
     keystore::mark_address_scan_incomplete(coin)?;
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
@@ -171,7 +193,7 @@ pub async fn light_wallet_unlock(
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
     keystore::unlock_wallet(coin, &passphrase, seconds.unwrap_or(4 * 60 * 60))?;
-    ensure_light_wallet_mode_active().await?;
+    ensure_light_wallet_mode_active(coin).await?;
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {

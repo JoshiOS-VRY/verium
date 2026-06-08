@@ -41,9 +41,10 @@ use crate::daemon::{
 };
 use crate::error::{AppError, AppResult, is_rpc_warmup};
 use crate::explorer_api::{
-    fetch_blocks, fetch_chain_tips, fetch_extraction, fetch_explorer_peers, fetch_network_stats,
-    fetch_transactions, ExplorerBlock, ExplorerChainTip, ExplorerExtractionEntry, ExplorerPeerEntry,
-    ExplorerStats, ExplorerTransaction, EXPLORER_API_ENABLED, explorer_logo_url,
+    fetch_blocks, fetch_chain_tips, fetch_extraction, fetch_explorer_blocks_for_feed,
+    fetch_explorer_peers, fetch_network_stats, fetch_transactions, ExplorerBlock,
+    ExplorerChainTip, ExplorerExtractionEntry, ExplorerPeerEntry, ExplorerStats,
+    ExplorerTransaction, EXPLORER_API_ENABLED, explorer_logo_url,
 };
 use crate::pool_api::{
     fetch_miner_hashrate_history, fetch_miner_overview, fetch_miner_payouts, fetch_pool_payout_summary,
@@ -69,7 +70,7 @@ use crate::node::constants::{
 };
 use crate::prefs::{self, PartialUserPreferences, UserPreferences};
 use crate::rpc::RpcClient;
-use crate::state::{AppState, EarnLocalState, MinerLocalState};
+use crate::state::{AppState, EarnLocalState, MinerLocalState, SPAWN_COOLDOWN};
 use crate::updates::{check_for_updates as run_update_check, UpdateInfo};
 use crate::wallet_secrets::{
     self, is_forever_unlock_duration, WALLET_UNLOCK_FOREVER_SECONDS,
@@ -168,6 +169,7 @@ async fn stop_inner_with_policy(
         wait_for_rpc_down(coin, &cfg, force_rpc_wait).await;
     }
     state.daemon(coin)?.clear_tracking().await;
+    state.forget_managed_daemon(coin);
     Ok(())
 }
 
@@ -557,6 +559,7 @@ async fn stop_daemon_fully_for_repair(state: &AppState, coin: CoinId, cfg: &Daem
         daemon.force_kill_child().await;
         daemon.clear_tracking().await;
     }
+    state.forget_managed_daemon(coin);
     free_rpc_port(coin, cfg);
     wait_for_rpc_port_free(cfg.rpc_port, Duration::from_secs(30)).await;
     wait_for_native_daemon_exit(coin, Duration::from_secs(15)).await;
@@ -585,7 +588,8 @@ pub(crate) async fn start_inner_impl(state: &AppState, coin: CoinId, force: bool
         state.daemon(coin)?.mark_managed().await;
         return Ok(());
     }
-    if !pids_listening_on_port(cfg.rpc_port).is_empty() {
+    let listener_pids = pids_listening_on_port(cfg.rpc_port);
+    if !listener_pids.is_empty() {
         if rpc_auth_failed(coin, &cfg).await {
             let datadir = chain_datadir(coin, &cfg);
             let lines = tail_debug_log(&datadir, 80).await.unwrap_or_default();
@@ -600,6 +604,21 @@ pub(crate) async fn start_inner_impl(state: &AppState, coin: CoinId, force: bool
                 state.daemon(coin)?.mark_managed().await;
                 state.mark_spawn(coin);
                 state.set_daemon_phase(coin, "reindexing");
+                return Ok(());
+            }
+            // Only free the port when the listener is our own daemon (tracked in
+            // the registry, or a process whose image is this coin's daemon). A
+            // truly foreign listener is surfaced to the user instead of silently
+            // killed.
+            let ours = state.port_owner(coin, &listener_pids).is_ours()
+                || native_daemon_image_running(coin);
+            if !ours {
+                tracing::warn!(
+                    "start: port {} held by a foreign process {:?} — not killing; surfacing conflict",
+                    cfg.rpc_port,
+                    listener_pids
+                );
+                state.set_daemon_phase(coin, "port_conflict");
                 return Ok(());
             }
             tracing::warn!(
@@ -665,8 +684,10 @@ pub(crate) async fn start_inner_impl(state: &AppState, coin: CoinId, force: bool
         state.mark_pending_reindex(coin);
         return start_with_chain_repair(state, coin, &cfg).await;
     }
-    let _pid = state.daemon(coin)?.start(&cfg, &[]).await?;
+    // Cooldown starts at launch attempt so a crash-looping node is not respawned every poll.
     state.mark_spawn(coin);
+    let pid = state.daemon(coin)?.start(&cfg, &[]).await?;
+    state.record_managed_daemon(coin, pid, cfg.rpc_port);
     Ok(())
 }
 
@@ -707,8 +728,8 @@ pub(crate) async fn start_with_chain_repair(state: &AppState, coin: CoinId, cfg:
 
     prepare_chain_for_reindex(coin, cfg)?;
     state.mark_pending_reindex(coin);
-    state.daemon(coin)?.start(cfg, &["-reindex"]).await?;
     state.mark_spawn(coin);
+    state.daemon(coin)?.start(cfg, &["-reindex"]).await?;
     state.mark_repair_attempt(coin);
     state.set_daemon_phase(coin, "reindexing");
     tracing::info!("start: {binary} launched with -reindex after chain DB repair prep");
@@ -740,15 +761,16 @@ pub async fn get_node_status(
             Ok(d) => d.child_running().await,
             Err(_) => false,
         };
-        if !child_up {
-            let rpc_up = rpc_reachable(coin, &cfg).await;
-            if !rpc_up {
-                let booting = daemon_boot_in_progress(state.inner(), coin, &cfg).await;
-                let reindexing = reindex_running_live(state.inner(), coin, &cfg).await;
-                if !booting && !reindexing {
-                    ensure_daemon_running(state.inner(), coin, &cfg).await;
-                    cfg = state.config_fresh(coin).await?;
-                }
+        if !child_up && !rpc_reachable(coin, &cfg).await {
+            // Status polling is observe-only — the supervisor loop owns spawn/restart.
+            // Calling ensure_daemon_running here caused tight restart loops (every 5s poll)
+            // while the UI flickered between "disconnected" and "starting".
+            let booting = daemon_boot_in_progress(state.inner(), coin, &cfg).await;
+            let reindexing = reindex_running_live(state.inner(), coin, &cfg).await;
+            if reindexing {
+                state.inner().set_daemon_phase(coin, "reindexing");
+            } else if booting || state.inner().spawn_recent(coin) {
+                state.inner().set_daemon_phase(coin, "starting");
             }
         }
     }
@@ -977,7 +999,7 @@ async fn enrich_vericoin_connected_status(
     if status.network_active.is_none() {
         status.network_active = rpc_network_active(state, coin).await;
     }
-    let _ = heal_invalid_blocks_silently(state, coin, cfg).await;
+    // Healing runs in `invalid_block_heal_loop` only — not on every status poll.
     status.txindex_network_paused = state.txindex_network_paused(coin);
     if status.network_active == Some(false) {
         status.txindex_network_paused = true;
@@ -1011,6 +1033,7 @@ pub(crate) async fn heal_invalid_blocks_silently(
     coin: CoinId,
     cfg: &DaemonConfig,
 ) -> AppResult<()> {
+    let _heal_serial = state.rpc_heal_lock().await;
     let paused = state.txindex_network_paused(coin);
     if state.invalid_clear_backoff_active(coin) && !paused {
         return Ok(());
@@ -1470,7 +1493,7 @@ pub async fn get_wallet_info(
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
     let light_keystore_wallet = crate::wallet::keystore::wallet_exists(coin).unwrap_or(false);
-    if prefs.wallet_mode.is_light() || light_keystore_wallet {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() || light_keystore_wallet {
         return crate::wallet::service::get_wallet_info_json(&state, coin, None).await;
     }
     let client = state.rpc_client(coin).await?;
@@ -1489,7 +1512,7 @@ pub async fn get_new_address(
 ) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let _ = label;
         return crate::wallet::service::get_new_address(&state, coin, None).await;
     }
@@ -1572,7 +1595,7 @@ pub async fn list_transactions(
 ) -> AppResult<Value> {
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let txs = crate::wallet::service::list_transactions(
             &state,
             coin,
@@ -1807,7 +1830,7 @@ pub async fn wallet_unlock(
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let seconds = timeout_seconds.max(1).min(i64::from(u32::MAX)) as u32;
         return crate::wallet::keystore::unlock_wallet(coin, &passphrase, seconds);
     }
@@ -1835,7 +1858,7 @@ pub async fn wallet_lock(
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         return crate::wallet::keystore::lock_wallet(coin);
     }
     let cfg = state.config_fresh(coin).await?;
@@ -2304,7 +2327,7 @@ pub async fn wallet_list_unspent(
 ) -> AppResult<Value> {
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let rows = crate::wallet::service::list_unspent_json(
             &state,
             coin,
@@ -2367,7 +2390,7 @@ pub async fn wallet_send_with_inputs(
     }
     let prefs = crate::prefs::load().await?;
     let pass = wallet_passphrase.unwrap_or_default();
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let txid = crate::wallet::service::send_with_inputs(
             &state,
             coin,
@@ -2479,7 +2502,7 @@ pub async fn send_to_address(
     )?;
     let prefs = crate::prefs::load().await?;
     let pass = wallet_passphrase.unwrap_or_default();
-    let txid = if prefs.wallet_mode.is_light() {
+    let txid = if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let _ = comment;
         crate::wallet::service::send_to_address(
             &state,
@@ -3202,6 +3225,29 @@ pub async fn fetch_explorer_blocks(
     fetch_blocks(coin, limit.unwrap_or(10)).await
 }
 
+/// Recent-blocks table enrichment from the local node (coinbase out, miner, etc.).
+#[tauri::command]
+pub async fn fetch_local_blocks_for_feed(
+    state: State<'_, AppState>,
+    coin: String,
+    heights: Vec<u32>,
+) -> AppResult<Vec<ExplorerBlock>> {
+    let coin = parse_coin_id(&coin)?;
+    let heights: Vec<u64> = heights.into_iter().map(u64::from).collect();
+    crate::local_block_feed::fetch_local_blocks_enriched(state.inner(), coin, heights).await
+}
+
+/// Recent-blocks enrichment from explorer `/block/:height` (light wallet).
+#[tauri::command]
+pub async fn fetch_explorer_blocks_for_feed_cmd(
+    coin: String,
+    heights: Vec<u32>,
+) -> AppResult<Vec<ExplorerBlock>> {
+    let coin = parse_coin_id(&coin)?;
+    let heights: Vec<u64> = heights.into_iter().map(u64::from).collect();
+    fetch_explorer_blocks_for_feed(coin, heights).await
+}
+
 #[tauri::command]
 pub async fn fetch_explorer_transactions(
     coin: String,
@@ -3339,7 +3385,6 @@ async fn ensure_daemon_running_locked(state: &AppState, coin: CoinId, cfg: &Daem
             return;
         }
         state.clear_wrong_chain_restart_attempts(coin);
-        let _ = heal_invalid_blocks_silently(state, coin, cfg).await;
         state.set_daemon_phase(coin, "connected");
         return;
     }
@@ -3458,6 +3503,14 @@ async fn ensure_daemon_running_locked(state: &AppState, coin: CoinId, cfg: &Daem
     }
 
     if detect_binary(coin).manageable {
+        if state.spawn_recent(coin) {
+            state.set_daemon_phase(coin, "starting");
+            tracing::debug!(
+                "ensure ({}): spawn cooldown active ({SPAWN_COOLDOWN:?}) — waiting before retry",
+                coin.as_str()
+            );
+            return;
+        }
         if !native_daemon_image_running(coin) && !pids_listening_on_port(cfg.rpc_port).is_empty() {
             kill_port_listeners(cfg.rpc_port);
             tokio::time::sleep(Duration::from_millis(500)).await;
@@ -3777,7 +3830,8 @@ pub async fn repair_chain(
     stop_daemon_fully_for_repair(state.inner(), coin, &cfg).await;
     prepare_chain_for_reindex(coin, &cfg)?;
     let flag = start_mode.flag();
-    state.daemon(coin)?.start(&cfg, &[flag]).await?;
+    let pid = state.daemon(coin)?.start(&cfg, &[flag]).await?;
+    state.record_managed_daemon(coin, pid, cfg.rpc_port);
     state.inner().mark_spawn(coin);
 
     let label = start_mode.label();

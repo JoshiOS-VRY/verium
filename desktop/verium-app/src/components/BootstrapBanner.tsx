@@ -28,13 +28,13 @@ export function BootstrapBanner() {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: 15_000,
+    refetchInterval: false,
     enabled: !isLight && !isTestNetwork,
   });
   const peers = useQuery({
     queryKey: coinQueryKey(coin, "getpeerinfo"),
     queryFn: () => rpcGetPeerInfo(coin),
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     enabled: !isLight && !isTestNetwork,
   });
   const explorer = useQuery({

@@ -48,14 +48,20 @@ import { useChainSynced } from "@/hooks/useChainSynced";
 
 import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
 import { useChainSwitchTransition } from "@/hooks/useChainSwitchTransition";
-import { useChainTip } from "@/lib/chain-tip-store";
+import { useEffectiveLocalChainTip } from "@/hooks/useEffectiveLocalChainTip";
 
 import { fetchExplorerBlocks, isExplorerApiEnabled } from "@/lib/explorer-api";
 import type { ExplorerBlock } from "@/lib/explorer-api";
 import {
+  blockNeedsRpcEnrichment,
   blockRowFromRewardEvent,
+  buildPendingBlocksAbove,
+  enrichBlocksFromExplorer,
+  enrichBlocksFromRpc,
+  isIndexingBlockRow,
   mergeRecentBlocks,
 } from "@/lib/local-recent-block";
+import { useWalletMode } from "@/hooks/useWalletMode";
 
 import { explorerBlocksHash } from "@/lib/explorer-links";
 import {
@@ -78,11 +84,15 @@ interface ExplorerRecentBlocksProps {
 }
 
 /**
- * Live updates now arrive instantly from the chain tip watcher; the explorer
- * query is only a safety-net poll plus the source of enrichment (miner address,
- * reward) that the local node row lacks.
+ * Live rows come from the local node tip watcher (+ RPC gap backfill when the
+ * wallet is ahead of the explorer index). The explorer query enriches rows with
+ * miner address and reward once the indexer catches up (see explorer-v2
+ * `useLatestBlocksPoll` + `liveBlocksMerge`).
  */
 const BLOCKS_FALLBACK_REFETCH_MS = 60_000;
+const BLOCKS_LIGHT_REFETCH_MS = 5_000;
+const BLOCKS_INDEXING_REFETCH_MS = 2_000;
+const BLOCKS_ENRICH_RETRY_MS = 3_000;
 
 const CELEBRATION_DISMISS_MS = 60_000;
 
@@ -137,11 +147,11 @@ export function ExplorerRecentBlocks({
   const { synced } = useChainSynced(coin);
 
   const visible = useWindowVisible();
+  const { isLight } = useWalletMode();
 
-  const chainTip = useChainTip(coin);
-  const { enteringHash, nudgeOthers } = useBlockRowEnterAnimation(
-    chainTip.tip?.hash,
-  );
+  const { height: localTipHeight, hash: localTipHash, time: localTipTime, chainTip } =
+    useEffectiveLocalChainTip(coin);
+  const { enteringHash, nudgeOthers } = useBlockRowEnterAnimation(localTipHash);
 
   const ageTick = useBlockAgeTick(isDashboard && visible);
 
@@ -164,6 +174,10 @@ export function ExplorerRecentBlocks({
     staleTime: Infinity,
   });
 
+  const blocksPollMs = isLight
+    ? BLOCKS_LIGHT_REFETCH_MS
+    : BLOCKS_FALLBACK_REFETCH_MS;
+
   const blocks = useQuery({
     queryKey: coinQueryKey(coin, "explorer-blocks", 10),
 
@@ -171,14 +185,101 @@ export function ExplorerRecentBlocks({
 
     enabled: (isDashboard || enabled.data === true) && visible,
 
-    staleTime: BLOCKS_FALLBACK_REFETCH_MS,
+    staleTime: blocksPollMs,
 
-    refetchInterval: visible ? BLOCKS_FALLBACK_REFETCH_MS : false,
+    refetchInterval: visible ? blocksPollMs : false,
 
     refetchOnWindowFocus: !isDashboard,
 
     retry: isDashboard ? 2 : 0,
   });
+
+  const explorerTopHeight = blocks.data?.[0]?.height;
+  const indexingLag =
+    localTipHeight != null &&
+    explorerTopHeight != null &&
+    localTipHeight > explorerTopHeight;
+
+  useEffect(() => {
+    if (!visible || !indexingLag) return;
+
+    void blocks.refetch();
+
+    const fastPoll = window.setInterval(() => {
+      void blocks.refetch();
+    }, BLOCKS_INDEXING_REFETCH_MS);
+
+    return () => window.clearInterval(fastPoll);
+  }, [blocks.refetch, indexingLag, visible]);
+
+  const explorerBlocksSignature =
+    blocks.data?.map((block) => block.height).join(",") ?? "";
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const explorerTop = blocks.data?.[0]?.height ?? 0;
+    const heights = new Set<number>();
+
+    if (localTipHeight != null && localTipHeight > explorerTop) {
+      for (let height = localTipHeight; height > explorerTop; height -= 1) {
+        heights.add(height);
+      }
+    }
+
+    for (const block of blocks.data ?? []) {
+      if (blockNeedsRpcEnrichment(block, coin)) {
+        heights.add(block.height);
+      }
+    }
+
+    if (heights.size === 0) return;
+
+    let cancelled = false;
+
+    const targetForHeight = (height: number): ExplorerBlock => {
+      const fromExplorer = blocks.data?.find((block) => block.height === height);
+      if (fromExplorer) return fromExplorer;
+      return {
+        id: height,
+        hash:
+          height === localTipHeight && localTipHash
+            ? localTipHash
+            : isLight
+              ? `light-pending-${height}`
+              : `local-pending-${height}`,
+        height,
+        time: height === localTipHeight ? localTipTime : 0,
+      };
+    };
+
+    const targets = [...heights].map(targetForHeight);
+
+    const enrich = isLight ? enrichBlocksFromExplorer : enrichBlocksFromRpc;
+    const runEnrich = () => {
+      void enrich(coin, targets).then((rows) => {
+        if (cancelled || rows.length === 0) return;
+        setLocalBlocks((prev) => mergeRecentBlocks(rows, prev, 24));
+      });
+    };
+
+    runEnrich();
+    const retry = window.setInterval(runEnrich, BLOCKS_ENRICH_RETRY_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(retry);
+    };
+  }, [
+    blocks.data,
+    coin,
+    explorerBlocksSignature,
+    isLight,
+    localTipHash,
+    localTipHeight,
+    localTipTime,
+    visible,
+  ]);
 
   useEffect(() => {
     if (coin === "verium") {
@@ -252,19 +353,51 @@ export function ExplorerRecentBlocks({
     isReady: !blocks.isLoading && !blocks.isFetching,
   });
 
-  if (!isDashboard && enabled.data !== true) return null;
-
-  const feedLimit = isDashboard ? 10 : 10;
+  const feedLimit = 10;
+  const explorerBlocks = blocks.data ?? [];
   const liveAndLocal = useMemo(() => {
     return mergeRecentBlocks(chainTip.recentBlocks, localBlocks, 24);
   }, [chainTip.recentBlocks, localBlocks]);
-  const blockRows = mergeRecentBlocks(
-    blocks.data ?? [],
+
+  const pendingLocal = useMemo(() => {
+    const explorerTop = explorerBlocks[0]?.height ?? 0;
+    if (localTipHeight == null || localTipHeight <= explorerTop) {
+      return [];
+    }
+
+    const knownHeights = new Set<number>();
+    for (const block of explorerBlocks) knownHeights.add(block.height);
+    for (const block of liveAndLocal) knownHeights.add(block.height);
+
+    return buildPendingBlocksAbove(
+      explorerTop,
+      localTipHeight,
+      localTipHash,
+      localTipTime,
+      knownHeights,
+    );
+  }, [
+    explorerBlocks,
     liveAndLocal,
-    feedLimit,
+    localTipHash,
+    localTipHeight,
+    localTipTime,
+  ]);
+
+  const blockRows = useMemo(
+    () =>
+      mergeRecentBlocks(
+        mergeRecentBlocks(explorerBlocks, pendingLocal, feedLimit + 4),
+        liveAndLocal,
+        feedLimit,
+      ),
+    [explorerBlocks, feedLimit, liveAndLocal, pendingLocal],
   );
-  /** Instant tip from node watcher; fallback to newest row while watcher warms up. */
-  const tipHeight = chainTip.tip?.height ?? blockRows[0]?.height;
+
+  /** Same tip source as the dashboard hero. */
+  const tipHeight = localTipHeight ?? blockRows[0]?.height;
+
+  if (!isDashboard && enabled.data !== true) return null;
 
   const yoursInFeed = blockRows.filter((block) =>
     isVerium
@@ -408,6 +541,7 @@ export function ExplorerRecentBlocks({
                 {!loading &&
                   blockRows.map((block) => {
                     const isTip = tipHeight === block.height;
+                    const indexing = isIndexingBlockRow(block);
 
                     const isYours = isVerium
                       ? isBlockMinedByWallet(block, miningCtx)
@@ -485,7 +619,19 @@ export function ExplorerRecentBlocks({
                             isYours ? "font-medium text-fg" : "text-fg-muted",
                           )}
                         >
-                          {formatBlockAge(block.time, ageTick)}
+                          {indexing ? (
+                            <span className="inline-flex items-center justify-end gap-1 text-fg-subtle">
+                              <Loader2
+                                className="h-3 w-3 animate-spin"
+                                aria-hidden
+                              />
+                              Indexing…
+                            </span>
+                          ) : block.time > 0 ? (
+                            formatBlockAge(block.time, ageTick)
+                          ) : (
+                            "—"
+                          )}
                         </td>
 
                         <td
@@ -494,7 +640,7 @@ export function ExplorerRecentBlocks({
                             isYours ? "text-fg" : "text-fg-muted",
                           )}
                         >
-                          {block.n_tx ?? "—"}
+                          {indexing ? "—" : (block.n_tx ?? "—")}
                         </td>
 
                         <td
@@ -506,25 +652,27 @@ export function ExplorerRecentBlocks({
                                 : "font-semibold text-accent"),
                           )}
                         >
-                          {reward}
+                          {indexing ? "—" : reward}
                         </td>
 
                         {isDashboard && (
                           <>
                             <td className="hidden px-4 py-2.5 text-right text-xs tabular-nums text-fg-muted sm:table-cell">
-                              {block.size != null
+                              {!indexing && block.size != null
                                 ? `${formatNumber(block.size, 0)} B`
                                 : "—"}
                             </td>
 
                             <td className="hidden px-4 py-2.5 text-right text-xs tabular-nums text-fg-muted md:table-cell">
-                              {formatDifficulty(block.difficulty)}
+                              {indexing ? "—" : formatDifficulty(block.difficulty)}
                             </td>
                           </>
                         )}
 
                         <td className="max-w-[180px] px-4 py-2.5 text-xs">
-                          {isYours ? (
+                          {indexing ? (
+                            "—"
+                          ) : isYours ? (
                             block.miner_address ? (
                               <ExplorerLink
                                 coin={coin}

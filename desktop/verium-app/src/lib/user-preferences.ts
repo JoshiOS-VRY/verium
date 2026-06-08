@@ -5,6 +5,8 @@ import { migrateExplorerPrefs } from "@/lib/explorer-links";
 import { DEFAULT_TX_EXPLORER_TEMPLATE } from "@/lib/verium-links";
 import type { ThemeMode } from "@/lib/theme";
 import { DEFAULT_WALLET_UNLOCK_SECONDS } from "@/lib/wallet-unlock";
+import type { WalletMode } from "@/lib/light-wallet/client";
+import type { OnboardingCheckpoint } from "@/lib/wallet-profile";
 
 export interface UserPreferences {
   /** @deprecated use setup_completed_by_coin; kept for legacy prefs migration */
@@ -35,9 +37,9 @@ export interface UserPreferences {
   mining_cost_per_kwh?: number;
   /** Optional VRM/USD price for solo revenue estimates; blank uses live explorer price. */
   mining_vrm_price_usd?: number;
-  /** VRM address for official pool payouts (Stratum username prefix). */
+  /** VRM address for public pool payouts (Stratum username prefix). */
   pool_payout_address?: string;
-  /** Worker suffix for official pool mining (ADDRESS.worker). */
+  /** Worker suffix for public pool mining (ADDRESS.worker). */
   pool_worker_name?: string;
   /** Last selected mining tab on the Mining page. */
   mining_mode?: "solo" | "pool";
@@ -47,6 +49,12 @@ export interface UserPreferences {
   wallet_unlock_duration_by_coin?: Partial<Record<CoinId, number>>;
   tx_fee_rate_vrm_per_kb?: number;
   bootstrap_imported_at_by_coin?: Partial<Record<CoinId, number>>;
+  /** App-wide default wallet mode; per-coin overrides win when present. */
+  wallet_mode?: WalletMode;
+  /** Per-coin wallet mode overrides (`verium`, `vericoin`). */
+  wallet_mode_by_coin?: Partial<Record<CoinId, WalletMode>>;
+  /** Resumable onboarding checkpoint per chain. */
+  onboarding_by_coin?: Partial<Record<CoinId, OnboardingCheckpoint>>;
 }
 
 interface PrefsState {
@@ -138,6 +146,18 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
             ...partial.setup_completed_by_coin,
           }
         : current.setup_completed_by_coin,
+      wallet_mode_by_coin: partial.wallet_mode_by_coin
+        ? {
+            ...current.wallet_mode_by_coin,
+            ...partial.wallet_mode_by_coin,
+          }
+        : current.wallet_mode_by_coin,
+      onboarding_by_coin: partial.onboarding_by_coin
+        ? {
+            ...current.onboarding_by_coin,
+            ...partial.onboarding_by_coin,
+          }
+        : current.onboarding_by_coin,
     };
     set({ prefs: next });
     await invoke<UserPreferences>("set_user_preferences", { partial });

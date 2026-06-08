@@ -15,6 +15,7 @@ import {
   minersPeriodLabel,
   type MinersPeriodId,
 } from "@/lib/miners-periods";
+import { cn } from "@/lib/utils";
 
 interface NetworkTopMinersCardProps {
   coin: CoinId;
@@ -23,6 +24,7 @@ interface NetworkTopMinersCardProps {
   entries?: ExplorerExtractionEntry[];
   isError?: boolean;
   isLoading?: boolean;
+  isFetching?: boolean;
 }
 
 export function NetworkTopMinersCard({
@@ -32,7 +34,9 @@ export function NetworkTopMinersCard({
   entries = [],
   isError,
   isLoading,
+  isFetching,
 }: NetworkTopMinersCardProps) {
+  const showTableLoading = Boolean(isLoading || isFetching);
   if (coin !== "verium") return null;
 
   return (
@@ -51,7 +55,7 @@ export function NetworkTopMinersCard({
           </div>
           <MinersPeriodPicker
             period={period}
-            disabled={isLoading}
+            disabled={showTableLoading}
             onSelect={onPeriodChange}
           />
         </div>
@@ -78,7 +82,12 @@ export function NetworkTopMinersCard({
             No mining rewards recorded for this period.
           </div>
         ) : (
-          <div className="max-h-[360px] overflow-auto">
+          <div
+            className={cn(
+              "max-h-[360px] overflow-auto",
+              showTableLoading && "pointer-events-none opacity-60",
+            )}
+          >
             <table className="w-full border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-bg-panel text-xs uppercase text-fg-subtle shadow-[0_1px_0_var(--border)]">
                 <tr>

@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   CheckCircle2,
-  Circle,
   Cog,
   HardDriveDownload,
   HardDriveUpload,
@@ -31,8 +30,8 @@ import {
   anyEnabledCoinSetupIncomplete,
   coinSetupCompletePatch,
   fullNodeWalletExists,
-  isCoinSetupComplete,
   isCoinWalletReady,
+  resolveEffectiveWalletMode,
 } from "@/lib/setup";
 import {
   rpcGetConfig,
@@ -70,6 +69,13 @@ import { LightWalletSetupForm } from "@/components/LightWalletSetupForm";
 import { SetupWalletHub } from "@/components/SetupWalletHub";
 import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
+import {
+  onboardingCheckpointSet,
+  onboardingMarkComplete,
+} from "@/lib/wallet-profile";
+import { FeatureTile } from "@/components/onboarding/FeatureTile";
+import { SetupStepIndicator } from "@/components/onboarding/SetupStepIndicator";
+import { LegacyUpgradeWizard } from "@/components/onboarding/LegacyUpgradeWizard";
 
 type Step =
   | "hub"
@@ -114,13 +120,21 @@ export function Setup() {
   const setActiveCoin = useSetActiveCoin();
   const enabledCoins = useEnabledCoins();
   const isTestNetwork = useIsTestNetwork();
-  const { isLight, lightWalletExists: activeLightWalletExists } = useWalletMode();
+  const {
+    isLight,
+    mode: persistedWalletMode,
+    isLoading: walletModeLoading,
+  } = useWalletMode();
   const invalidateWalletMode = useInvalidateWalletMode();
   const [setupWalletMode, setSetupWalletMode] = useState<"light" | "full_node">(
     "full_node",
   );
   const [showAdvancedLightMode, setShowAdvancedLightMode] = useState(false);
-  const lightSetupActive = isLight || setupWalletMode === "light";
+  const effectiveSetupWalletMode = resolveEffectiveWalletMode(
+    persistedWalletMode === "light" ? "light" : "full_node",
+    setupWalletMode,
+  );
+  const lightSetupActive = effectiveSetupWalletMode === "light";
   const activeSteps = lightSetupActive ? LIGHT_STEPS : FULL_STEPS;
   const [step, setStep] = useState<Step>("hub");
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
@@ -130,8 +144,10 @@ export function Setup() {
     null,
   );
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [legacyFreshStart, setLegacyFreshStart] = useState(false);
   const [hubOpeningCoin, setHubOpeningCoin] = useState<CoinId | null>(null);
   const defaultedFullNodeForExistingWallet = useRef(false);
+  const handledSetupNav = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
   const updatePrefs = useUserPreferences((s) => s.update);
@@ -142,6 +158,7 @@ export function Setup() {
     setBootstrapOpen(false);
     setPendingPassphrase(null);
     setRecoveryError(null);
+    setLegacyFreshStart(false);
   }, []);
 
   const goToHub = useCallback(() => {
@@ -155,9 +172,10 @@ export function Setup() {
         ...coinSetupCompletePatch(targetCoin, prefs),
         active_coin: targetCoin,
       });
+      await onboardingMarkComplete(targetCoin).catch(() => undefined);
       if (LIGHT_WALLET_ENABLED) {
         try {
-          await walletModeSet(setupWalletMode);
+          await walletModeSet(effectiveSetupWalletMode);
           invalidateWalletMode();
         } catch {
           /* prefs may reconcile on next load */
@@ -165,7 +183,13 @@ export function Setup() {
       }
       navigate("/dashboard", { replace: true });
     },
-    [prefs, updatePrefs, invalidateWalletMode, navigate, setupWalletMode],
+    [
+      prefs,
+      updatePrefs,
+      invalidateWalletMode,
+      navigate,
+      effectiveSetupWalletMode,
+    ],
   );
 
   const startCoinSetup = useCallback(
@@ -173,14 +197,11 @@ export function Setup() {
       const hasLightWallet = await lightWalletExists(targetCoin).catch(
         () => false,
       );
-      let hasFullNodeWallet = false;
-      if (setupWalletMode === "full_node") {
-        const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
-        hasFullNodeWallet = fullNodeWalletExists(status);
-      }
+      const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
+      const hasFullNodeWallet = fullNodeWalletExists(status);
       if (
         isCoinWalletReady(targetCoin, prefs, {
-          walletMode: setupWalletMode,
+          walletMode: effectiveSetupWalletMode,
           hasLightWallet,
           hasFullNodeWallet,
         })
@@ -188,11 +209,29 @@ export function Setup() {
         await openReadyCoinDashboard(targetCoin);
         return;
       }
+      // Don't restart onboarding when a light wallet already exists and the hub
+      // is only showing "Not set up" because full-node mode is selected.
+      if (
+        hasLightWallet &&
+        !hasFullNodeWallet &&
+        effectiveSetupWalletMode === "full_node"
+      ) {
+        if (LIGHT_WALLET_ENABLED) {
+          try {
+            await walletModeSet("light");
+            invalidateWalletMode();
+          } catch {
+            /* open with existing light keys */
+          }
+        }
+        await openReadyCoinDashboard(targetCoin);
+        return;
+      }
       setActiveCoin(targetCoin);
       resetCoinOnboarding();
       if (LIGHT_WALLET_ENABLED) {
         try {
-          await walletModeSet(setupWalletMode);
+          await walletModeSet(effectiveSetupWalletMode);
           invalidateWalletMode();
         } catch {
           /* continue with local mode choice */
@@ -204,7 +243,7 @@ export function Setup() {
       prefs,
       setActiveCoin,
       resetCoinOnboarding,
-      setupWalletMode,
+      effectiveSetupWalletMode,
       invalidateWalletMode,
       openReadyCoinDashboard,
     ],
@@ -241,12 +280,30 @@ export function Setup() {
     refetchInterval: 4_000,
     enabled: step === "wallet" || step === "daemon" || step === "welcome",
   });
+  const setupCoinLightWallet = useQuery({
+    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryFn: () => lightWalletExists(coin),
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+  const setupCoinHasLightWallet = setupCoinLightWallet.data === true;
 
   const hasFullNodeWallet =
     walletFile.data?.exists === true ||
     walletFile.data?.legacy_wallet_detected === true;
   const showFullNodeMigrationHint =
-    lightSetupActive && hasFullNodeWallet && !activeLightWalletExists;
+    lightSetupActive && hasFullNodeWallet && !setupCoinHasLightWallet;
+
+  // Full-node legacy upgrade: a legacy wallet.dat exists outside the configured
+  // datadir. Route through the dedicated wizard unless the user opts to start
+  // fresh. The wizard owns its own sub-steps until it calls onComplete.
+  const legacyWizardActive =
+    step === "wallet" &&
+    !isLight &&
+    setupWalletMode !== "light" &&
+    walletFile.data?.legacy_wallet_detected === true &&
+    walletFile.data?.exists !== true &&
+    !legacyFreshStart;
 
   const switchToFullNodeSetup = async () => {
     setSetupWalletMode("full_node");
@@ -272,11 +329,18 @@ export function Setup() {
 
   useEffect(() => {
     if (defaultedFullNodeForExistingWallet.current || !walletFile.data) return;
-    if (hasFullNodeWallet && !activeLightWalletExists && LIGHT_WALLET_ENABLED) {
+    if (setupWalletMode === "light" || isLight) return;
+    if (hasFullNodeWallet && !setupCoinHasLightWallet && LIGHT_WALLET_ENABLED) {
       defaultedFullNodeForExistingWallet.current = true;
       setSetupWalletMode("full_node");
     }
-  }, [walletFile.data, hasFullNodeWallet, activeLightWalletExists]);
+  }, [
+    walletFile.data,
+    hasFullNodeWallet,
+    setupCoinHasLightWallet,
+    setupWalletMode,
+    isLight,
+  ]);
 
   useEffect(() => {
     if (!lightSetupActive || step !== "wallet" || isLight) return;
@@ -298,12 +362,50 @@ export function Setup() {
     walletFile.data?.exists === true;
 
   useEffect(() => {
-    const state = location.state as { setupHub?: boolean } | null;
+    if (walletModeLoading) return;
+    if (persistedWalletMode === "light") {
+      setSetupWalletMode("light");
+      setShowAdvancedLightMode(true);
+    }
+  }, [persistedWalletMode, walletModeLoading]);
+
+  const handleSetupWalletModeChange = useCallback(
+    async (mode: "light" | "full_node") => {
+      setSetupWalletMode(mode);
+      if (mode === "light") {
+        setShowAdvancedLightMode(true);
+      }
+      if (!LIGHT_WALLET_ENABLED) return;
+      try {
+        await walletModeSet(mode);
+        invalidateWalletMode();
+      } catch {
+        /* hub still reflects local choice */
+      }
+    },
+    [invalidateWalletMode],
+  );
+
+  useEffect(() => {
+    const state = location.state as {
+      setupHub?: boolean;
+      lightWalletSetup?: CoinId;
+    } | null;
     if (state?.setupHub) {
       goToHub();
       navigate(location.pathname, { replace: true, state: null });
+      return;
     }
-  }, [location.pathname, location.state, goToHub, navigate]);
+    if (!state?.lightWalletSetup) return;
+    const navKey = `light:${state.lightWalletSetup}`;
+    if (handledSetupNav.current === navKey) return;
+    handledSetupNav.current = navKey;
+    setSetupWalletMode("light");
+    setShowAdvancedLightMode(true);
+    void startCoinSetup(state.lightWalletSetup).finally(() => {
+      navigate(location.pathname, { replace: true, state: null });
+    });
+  }, [location.pathname, location.state, goToHub, navigate, startCoinSetup]);
 
   useEffect(() => {
     if (config.data && !datadirDraft) {
@@ -337,13 +439,8 @@ export function Setup() {
   };
 
   const applyRecovery = useMutation({
-    mutationFn: ({
-      phrase,
-      unlock,
-    }: {
-      phrase: string;
-      unlock?: string;
-    }) => recoveryApplyHdSeed(coin, phrase, undefined, unlock),
+    mutationFn: ({ phrase, unlock }: { phrase: string; unlock?: string }) =>
+      recoveryApplyHdSeed(coin, phrase, undefined, unlock),
     onSuccess: async () => {
       setRecoveryError(null);
       setPendingPassphrase(null);
@@ -406,10 +503,21 @@ export function Setup() {
     }
   }, [step, connected]);
 
+  // Persist a resumable onboarding checkpoint per coin so a refresh, crash, or
+  // restart returns the user to the same step instead of the hub. Best-effort:
+  // failures never block the wizard.
+  useEffect(() => {
+    if (step === "hub" || step === "advanced") return;
+    void onboardingCheckpointSet(coin, {
+      phase: step === "done" ? "complete" : "in_progress",
+      intent: lightSetupActive ? "light_continue" : null,
+      step,
+      legacy_path: walletFile.data?.legacy_wallet_path ?? null,
+    }).catch(() => undefined);
+  }, [step, coin, lightSetupActive, walletFile.data?.legacy_wallet_path]);
+
   const onboardingBusy =
-    applyRecovery.isPending ||
-    ensureFirstRun.isPending ||
-    saveConfig.isPending;
+    applyRecovery.isPending || ensureFirstRun.isPending || saveConfig.isPending;
 
   const finish = async () => {
     const nextPrefs = {
@@ -417,6 +525,7 @@ export function Setup() {
       ...coinSetupCompletePatch(coin, prefs),
     };
     await updatePrefs(coinSetupCompletePatch(coin, prefs));
+    await onboardingMarkComplete(coin).catch(() => undefined);
     if (anyEnabledCoinSetupIncomplete(enabledCoins, nextPrefs)) {
       goToHub();
       return;
@@ -430,14 +539,11 @@ export function Setup() {
       const hasLightWallet = await lightWalletExists(targetCoin).catch(
         () => false,
       );
-      let hasFullNodeWallet = false;
-      if (setupWalletMode === "full_node") {
-        const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
-        hasFullNodeWallet = fullNodeWalletExists(status);
-      }
+      const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
+      const hasFullNodeWallet = fullNodeWalletExists(status);
       if (
         isCoinWalletReady(targetCoin, patch, {
-          walletMode: setupWalletMode,
+          walletMode: effectiveSetupWalletMode,
           hasLightWallet,
           hasFullNodeWallet,
         })
@@ -452,7 +558,7 @@ export function Setup() {
     });
     if (LIGHT_WALLET_ENABLED) {
       try {
-        await walletModeSet(setupWalletMode);
+        await walletModeSet(effectiveSetupWalletMode);
         invalidateWalletMode();
       } catch {
         /* continue */
@@ -466,7 +572,9 @@ export function Setup() {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="!normal-case !tracking-normal !text-base">
-            {step === "hub" ? "Vericonomy wallets" : `Set up ${profile.displayName}`}
+            {step === "hub"
+              ? "Vericonomy wallets"
+              : `Set up ${profile.displayName}`}
           </CardTitle>
           <CardDescription>
             {step === "hub"
@@ -480,7 +588,9 @@ export function Setup() {
           {step === "hub" && (
             <SetupWalletHub
               walletMode={setupWalletMode}
-              onWalletModeChange={setSetupWalletMode}
+              onWalletModeChange={(mode) =>
+                void handleSetupWalletModeChange(mode)
+              }
               showAdvancedLightMode={showAdvancedLightMode}
               onShowAdvancedLightMode={() => setShowAdvancedLightMode(true)}
               onSelectCoin={handleHubSelectCoin}
@@ -490,25 +600,7 @@ export function Setup() {
           )}
 
           {step !== "hub" && step !== "advanced" && (
-            <ol className="flex flex-wrap items-center gap-3 text-xs text-fg-subtle">
-              {activeSteps.map((s, idx) => {
-                const currentIdx = activeSteps.findIndex((x) => x.id === step);
-                const reached = idx <= currentIdx;
-                return (
-                  <li key={s.id} className="flex items-center gap-2">
-                    {reached ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                    ) : (
-                      <Circle className="h-3.5 w-3.5" />
-                    )}
-                    <span className={reached ? "text-fg" : ""}>{s.label}</span>
-                    {idx < activeSteps.length - 1 && (
-                      <span className="text-fg-subtle">/</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
+            <SetupStepIndicator steps={activeSteps} currentId={step} />
           )}
 
           {step === "welcome" && (
@@ -579,7 +671,9 @@ export function Setup() {
                   <p className="font-medium text-fg">
                     {lightWalletCopy.setupFullNodeWalletFoundTitle}
                   </p>
-                  <p className="mt-1">{lightWalletCopy.setupFullNodeWalletFoundBody}</p>
+                  <p className="mt-1">
+                    {lightWalletCopy.setupFullNodeWalletFoundBody}
+                  </p>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -700,7 +794,9 @@ export function Setup() {
                   <p className="font-medium text-fg">
                     {lightWalletCopy.setupFullNodeWalletFoundTitle}
                   </p>
-                  <p className="mt-1">{lightWalletCopy.setupFullNodeWalletFoundBody}</p>
+                  <p className="mt-1">
+                    {lightWalletCopy.setupFullNodeWalletFoundBody}
+                  </p>
                   {walletFile.data?.path && (
                     <p className="mt-2 break-all font-mono text-[11px] text-fg-subtle">
                       {walletFile.data.path}
@@ -727,7 +823,7 @@ export function Setup() {
                     >
                       Import recovery phrase
                     </Button>
-                    {!activeLightWalletExists && (
+                    {!setupCoinHasLightWallet && (
                       <Button
                         variant="ghost"
                         className="sm:col-span-2"
@@ -760,7 +856,7 @@ export function Setup() {
               )}
               {walletAction === "unlock" && (
                 <div className="flex flex-col gap-3">
-                  {!activeLightWalletExists && (
+                  {!setupCoinHasLightWallet && (
                     <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-fg-muted">
                       No light wallet was found for {profile.symbol} on this
                       device. Choose <strong>Create new wallet</strong> or{" "}
@@ -788,7 +884,24 @@ export function Setup() {
             </div>
           )}
 
-          {step === "wallet" && !isLight && setupWalletMode !== "light" && (
+          {legacyWizardActive && (
+            <LegacyUpgradeWizard
+              coin={coin}
+              legacyPath={walletFile.data?.legacy_wallet_path}
+              connected={connected}
+              onComplete={() => advanceAfterChainWalletReady()}
+              onStartFresh={() => {
+                setLegacyFreshStart(true);
+                setWalletAction("choose");
+              }}
+              onBack={goToHub}
+            />
+          )}
+
+          {step === "wallet" &&
+            !isLight &&
+            setupWalletMode !== "light" &&
+            !legacyWizardActive && (
             <div className="flex flex-col gap-4">
               <div className="rounded-md border border-border bg-bg-subtle p-3 text-xs text-fg-muted">
                 {walletFile.data?.path && (
@@ -801,7 +914,8 @@ export function Setup() {
                 </p>
                 {walletInfo.data && walletSetupMode === "needs_unlock" && (
                   <p className="mt-1 text-fg">
-                    Balance: {walletInfo.data.balance.toFixed(8)} {profile.symbol}
+                    Balance: {walletInfo.data.balance.toFixed(8)}{" "}
+                    {profile.symbol}
                     {walletInfo.data.txcount > 0
                       ? ` · ${walletInfo.data.txcount} transactions`
                       : ""}
@@ -821,8 +935,8 @@ export function Setup() {
                   )}
                 {walletFile.data?.is_new_install && (
                   <p className="mt-2 text-xs text-fg-muted">
-                    No existing {profile.displayName} wallet was detected on this
-                    Mac — you are setting up a new {profile.symbol} wallet.
+                    No existing {profile.displayName} wallet was detected on
+                    this Mac — you are setting up a new {profile.symbol} wallet.
                   </p>
                 )}
               </div>
@@ -841,7 +955,8 @@ export function Setup() {
                 </div>
               )}
 
-              {(walletSetupMode === "needs_unlock" || walletUnlockAwaitingNode) &&
+              {(walletSetupMode === "needs_unlock" ||
+                walletUnlockAwaitingNode) &&
                 walletAction === "unlock" && (
                   <>
                     <WalletUnlockForm
@@ -982,9 +1097,9 @@ export function Setup() {
               <p className="text-sm text-fg-muted">
                 This phrase is separate from your wallet passphrase: it is the
                 HD master key for your addresses. Save it on paper so you can
-                restore on a new device if you lose your passphrase, computer, or{" "}
-                <span className="font-mono text-xs">wallet.dat</span>. Vericonomy
-                cannot look it up for you.
+                restore on a new device if you lose your passphrase, computer,
+                or <span className="font-mono text-xs">wallet.dat</span>.
+                Vericonomy cannot look it up for you.
               </p>
               <RecoveryPhraseWizard
                 onComplete={async (phrase) => {
@@ -1018,26 +1133,34 @@ export function Setup() {
               <p className="text-sm text-fg-muted">
                 Protect sends, passphrase changes, and sensitive actions with a
                 code from an authenticator app. This applies to{" "}
-                <strong className="font-medium text-fg">both Verium and Vericoin</strong>
+                <strong className="font-medium text-fg">
+                  both Verium and Vericoin
+                </strong>
                 — your {profile.symbol} passphrase and recovery phrase remain
                 separate per chain.
               </p>
               <TwoFactorEnrollmentPanel
                 autoStartEnrollment
-                onEnabled={() => setStep(lightSetupActive ? "done" : "bootstrap")}
+                onEnabled={() =>
+                  setStep(lightSetupActive ? "done" : "bootstrap")
+                }
               />
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setStep(lightSetupActive ? "done" : "bootstrap")}
+                  onClick={() =>
+                    setStep(lightSetupActive ? "done" : "bootstrap")
+                  }
                 >
                   Skip for now
                 </Button>
                 {twoFa.data?.enabled && (
                   <Button
                     size="sm"
-                    onClick={() => setStep(lightSetupActive ? "done" : "bootstrap")}
+                    onClick={() =>
+                      setStep(lightSetupActive ? "done" : "bootstrap")
+                    }
                   >
                     Continue
                   </Button>
@@ -1125,11 +1248,7 @@ export function Setup() {
                     ? "Finish and return to wallet menu"
                     : "Open dashboard"}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={goToHub}
-                >
+                <Button size="sm" variant="ghost" onClick={goToHub}>
                   Wallet menu
                 </Button>
               </div>
@@ -1168,7 +1287,11 @@ export function Setup() {
                 </div>
               </div>
 
-              <DaemonConnectionPanel coin={coin} config={config.data} mode="settings" />
+              <DaemonConnectionPanel
+                coin={coin}
+                config={config.data}
+                mode="settings"
+              />
 
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1201,26 +1324,6 @@ export function Setup() {
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function FeatureTile({
-  icon,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-md border border-border bg-bg-subtle p-3 text-xs">
-      <div className="flex items-center gap-1.5 text-fg">
-        {icon}
-        <span className="font-medium">{title}</span>
-      </div>
-      <p className="text-fg-muted">{body}</p>
     </div>
   );
 }

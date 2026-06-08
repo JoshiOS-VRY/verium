@@ -133,7 +133,7 @@ export function PoolMiningPanel({
           <CardTitle className="normal-case">Pool dashboard</CardTitle>
           <CardDescription>
             Workers, hashrate charts, pending rewards, and payout history are on
-            the official pool site — not in the wallet.
+            the public pool site — not in the wallet.
           </CardDescription>
         </CardHeader>
         <CardContent>

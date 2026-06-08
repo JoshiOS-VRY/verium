@@ -7,7 +7,6 @@
 | BIP39 mnemonic (light) | `secure/light-wallet-keystore.enc` | Argon2id + AES-GCM; RAM while unlocked |
 | `wallet.dat` keys | `<datadir>/wallet.dat` | AES-256 via node passphrase |
 | TOTP secret | `secure/two-factor-config.enc` | AES-GCM via OS keychain master |
-| PIN hash | `secure/passkey-config.enc` | Argon2id hash |
 | WIF / xprv (transient) | Process memory | `zeroize` where applicable |
 
 ## Sensitive (credentials & config)
@@ -41,5 +40,4 @@
 | File | Action |
 | --- | --- |
 | `two_factor.json` | Migrated → deleted |
-| `passkey.json` | Migrated → deleted |
 | `light-keystore.json` | Migrated → deleted |

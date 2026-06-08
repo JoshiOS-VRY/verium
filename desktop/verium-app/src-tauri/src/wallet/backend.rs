@@ -15,7 +15,7 @@ pub async fn resolve_backend(state: &AppState, coin: CoinId) -> AppResult<Arc<dy
     let prefs = prefs::load().await?;
     let network = effective_network_mode(prefs.network_mode);
 
-    if prefs.wallet_mode.is_light() {
+    if prefs::wallet_mode_for(&prefs, coin).is_light() {
         let servers = prefs
             .electrum_servers_by_coin
             .as_ref()

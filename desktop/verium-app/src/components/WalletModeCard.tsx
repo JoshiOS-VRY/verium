@@ -15,14 +15,16 @@ import { useActiveCoin } from "@/lib/coin/context";
 import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
 import { electrumUriFriendlyLabel } from "@/lib/light-wallet/labels";
-import { coinQueryKey } from "@/lib/coin/profile";
+import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
+import { invalidateLightWalletQueries } from "@/lib/invalidate-wallet-queries";
+import { useUserPreferences } from "@/lib/user-preferences";
 import {
   electrumServersGet,
   electrumServersSet,
   electrumTestConnection,
   type WalletMode,
-  walletModeGet,
-  walletModeSet,
+  walletModeGetForCoin,
+  walletModeSetForCoin,
 } from "@/lib/light-wallet/client";
 
 export function WalletModeCard() {
@@ -38,13 +40,14 @@ export function WalletModeCard() {
 function WalletModeCardInner() {
   const activeCoin = useActiveCoin();
   const queryClient = useQueryClient();
+  const reloadPrefs = useUserPreferences((s) => s.load);
   const invalidateWalletMode = useInvalidateWalletMode();
   const [customServers, setCustomServers] = useState("");
   const [confirmSwitch, setConfirmSwitch] = useState<WalletMode | null>(null);
 
   const modeStatus = useQuery({
-    queryKey: ["wallet-mode-status"],
-    queryFn: walletModeGet,
+    queryKey: ["wallet-mode-status", activeCoin],
+    queryFn: () => walletModeGetForCoin(activeCoin),
   });
 
   const servers = useQuery({
@@ -54,16 +57,25 @@ function WalletModeCardInner() {
   });
 
   const setMode = useMutation({
-    mutationFn: walletModeSet,
-    onSuccess: () => {
+    mutationFn: (mode: WalletMode) => walletModeSetForCoin(activeCoin, mode),
+    onSuccess: async (_data, mode) => {
       invalidateWalletMode();
-      void queryClient.invalidateQueries({
+      queryClient.removeQueries({
         queryKey: coinQueryKey(activeCoin, "getwalletinfo"),
       });
+      for (const targetCoin of ["verium", "vericoin"] as CoinId[]) {
+        await invalidateLightWalletQueries(queryClient, targetCoin);
+      }
       void queryClient.invalidateQueries({
         queryKey: coinQueryKey(activeCoin, "light-server-status"),
       });
+      await reloadPrefs();
       setConfirmSwitch(null);
+      if (mode === "light") {
+        void queryClient.invalidateQueries({
+          queryKey: coinQueryKey(activeCoin, "getwalletinfo"),
+        });
+      }
     },
   });
 

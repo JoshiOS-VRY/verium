@@ -37,11 +37,6 @@ Default `<data-dir>`:
 - 10 single-use recovery codes are generated at enrollment (hashed at rest).
 - Disabling 2FA triggers a 24-hour cooling-off period.
 
-## App unlock PIN
-
-- Optional 6+ digit PIN gates the UI before the wallet shell renders.
-- PIN hash stored encrypted; verified via Argon2id.
-
 ## Auto-lock
 
 - Configurable idle timeout, lock-on-blur, and lock-on-sleep.
@@ -116,7 +111,6 @@ Email **security@vericonomy.com** — do not open public GitHub issues for secur
 ## Known limitations
 
 - Installers may not be code-signed on all platforms until production promotion; verify hashes and cosign attestations from official releases (`RELEASE_SECURITY.md`).
-- PIN gate is UI-layer only; an attacker with disk access who runs their own `veriumd` bypasses the app shell — the wallet passphrase is the root of trust on disk.
 - Light wallet mode trusts Electrum servers for index data (not recommended for high-value custody).
 - Ledger support uses manual xpub import; Verium BIP44 coin type is unregistered.
 - Auto-update is integrated but disabled until a production signing key is configured.

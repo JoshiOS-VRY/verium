@@ -66,7 +66,9 @@ export function useChainTipWatcher(): void {
 
       if (enrichTimer != null) window.clearTimeout(enrichTimer);
       enrichTimer = window.setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: ["explorer-blocks"] });
+        void queryClient.invalidateQueries({
+          queryKey: coinQueryKey(payload.coin, "explorer-blocks"),
+        });
       }, ENRICH_DELAY_MS);
     });
 

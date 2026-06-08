@@ -129,10 +129,29 @@ pub fn load_keystore() -> AppResult<LightKeystore> {
 }
 
 pub fn save_keystore(store: &LightKeystore) -> AppResult<()> {
+    if let Some(parent) = encrypted_keystore_path().parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     crate::secret_store::save_json(KEYSTORE_LABEL, store)?;
     let path = keystore_path();
     if path.exists() {
         let _ = std::fs::remove_file(path);
+    }
+    verify_keystore_persisted(store)?;
+    Ok(())
+}
+
+fn verify_keystore_persisted(expected: &LightKeystore) -> AppResult<()> {
+    if expected.wallets.is_empty() {
+        return Ok(());
+    }
+    let loaded = crate::secret_store::load_json_strict::<LightKeystore>(KEYSTORE_LABEL)?;
+    for coin in expected.wallets.keys() {
+        if !loaded.wallets.contains_key(coin) {
+            return Err(AppError::other(format!(
+                "light wallet file did not persist for {coin} — check disk space and Windows Credential Manager (service: com.vericonomy.wallet.desktop), then retry"
+            )));
+        }
     }
     Ok(())
 }
@@ -344,8 +363,12 @@ fn seal_wallet_record(
     })
 }
 
-fn persist_unlocked_seed(coin: CoinId, seed_secret: &str, seconds: u32) -> AppResult<()> {
-    let mut store = load_keystore()?;
+fn persist_unlock_in_store(
+    store: &mut LightKeystore,
+    coin: CoinId,
+    seed_secret: &str,
+    seconds: u32,
+) -> AppResult<()> {
     let until = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -354,7 +377,6 @@ fn persist_unlocked_seed(coin: CoinId, seed_secret: &str, seconds: u32) -> AppRe
     store
         .unlocked_until_by_coin
         .insert(coin.as_str().to_string(), until);
-    save_keystore(&store)?;
     if let Ok(mut session) = SESSION_MNEMONICS.lock() {
         session.insert(
             coin.as_str().to_string(),
@@ -362,6 +384,12 @@ fn persist_unlocked_seed(coin: CoinId, seed_secret: &str, seconds: u32) -> AppRe
         );
     }
     Ok(())
+}
+
+fn clear_unlock_session(coin: CoinId) {
+    if let Ok(mut session) = SESSION_MNEMONICS.lock() {
+        session.remove(coin.as_str());
+    }
 }
 
 pub fn create_wallet(
@@ -379,8 +407,8 @@ pub fn create_wallet(
     }
     let record = seal_wallet_record(coin, mnemonic, passphrase, label, None)?;
     store.wallets.insert(coin.as_str().to_string(), record);
+    persist_unlock_in_store(&mut store, coin, mnemonic, 24 * 60 * 60)?;
     save_keystore(&store)?;
-    persist_unlocked_seed(coin, mnemonic, 24 * 60 * 60)?;
     let _ = crate::wallet::hd::precache_light_wallet_scripts(coin, mnemonic);
     Ok(())
 }
@@ -392,17 +420,18 @@ pub fn import_wallet(
     passphrase: &str,
     label: Option<&str>,
 ) -> AppResult<()> {
-    let _ = lock_wallet(coin);
+    clear_unlock_session(coin);
     let mut store = load_keystore()?;
+    store.unlocked_until_by_coin.remove(coin.as_str());
     let created_at = store
         .wallets
         .get(coin.as_str())
         .map(|r| r.created_at);
     let record = seal_wallet_record(coin, seed_secret, passphrase, label, created_at)?;
     store.wallets.insert(coin.as_str().to_string(), record);
+    persist_unlock_in_store(&mut store, coin, seed_secret, 24 * 60 * 60)?;
     save_keystore(&store)?;
     let _ = crate::wallet::cache::clear_coin_cache(coin);
-    persist_unlocked_seed(coin, seed_secret, 24 * 60 * 60)?;
     let _ = crate::wallet::hd::precache_light_wallet_scripts(coin, seed_secret);
     Ok(())
 }
@@ -414,31 +443,16 @@ pub fn unlock_wallet(coin: CoinId, passphrase: &str, seconds: u32) -> AppResult<
         .get(coin.as_str())
         .ok_or_else(|| AppError::other("light wallet not found"))?;
     let phrase = decrypt_mnemonic(record, passphrase)?;
-    let until = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-        + seconds as u64;
-    store
-        .unlocked_until_by_coin
-        .insert(coin.as_str().to_string(), until);
+    persist_unlock_in_store(&mut store, coin, &phrase, seconds)?;
     save_keystore(&store)?;
-    let mut session = SESSION_MNEMONICS
-        .lock()
-        .map_err(|e| AppError::other(format!("wallet session lock failed: {e}")))?;
-    session.insert(
-        coin.as_str().to_string(),
-        Zeroizing::new(phrase.clone()),
-    );
     Ok(())
 }
 
 pub fn lock_wallet(coin: CoinId) -> AppResult<()> {
+    clear_unlock_session(coin);
     let mut store = load_keystore()?;
-    store.unlocked_until_by_coin.remove(coin.as_str());
-    save_keystore(&store)?;
-    if let Ok(mut session) = SESSION_MNEMONICS.lock() {
-        session.remove(coin.as_str());
+    if store.unlocked_until_by_coin.remove(coin.as_str()).is_some() {
+        save_keystore(&store)?;
     }
     Ok(())
 }

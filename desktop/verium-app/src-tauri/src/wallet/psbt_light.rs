@@ -21,7 +21,7 @@ pub async fn build_hw_psbt(
     passphrase: &str,
 ) -> AppResult<PsbtSendResult> {
     let prefs = crate::prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
     let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
@@ -71,7 +71,7 @@ pub async fn finalize_and_broadcast_light(
     psbt_base64: &str,
 ) -> AppResult<String> {
     let prefs = crate::prefs::load().await?;
-    if !prefs.wallet_mode.is_light() {
+    if !crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
     let raw = psbt_base64.trim().to_string();

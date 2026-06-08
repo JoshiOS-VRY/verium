@@ -7,12 +7,13 @@ import { useActiveCoin } from "@/lib/coin/context";
 import { BINARYTEST_ENABLED } from "@/lib/features";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { useWebAudioGestureUnlock } from "@/lib/web-audio";
-import { PasskeyGate } from "@/components/PasskeyGate";
 import { useAutoLock } from "@/hooks/useAutoLock";
 import { useScheduledBackup } from "@/hooks/useScheduledBackup";
 import { useMiningPollCoordinator } from "@/hooks/useMiningPollCoordinator";
 import { useAdaptiveMiningThreads } from "@/hooks/useAdaptiveMiningThreads";
 import { useWalletInfoPollCoordinator } from "@/hooks/useWalletInfoPollCoordinator";
+import { useBlockchainInfoPollCoordinator } from "@/hooks/useBlockchainInfoPollCoordinator";
+import { useVericoinEarnPollCoordinator } from "@/hooks/useVericoinEarnPollCoordinator";
 import { useAutoMine } from "@/hooks/useAutoMine";
 import { useAutoStake } from "@/hooks/useAutoStake";
 import { useBlockMinedSound } from "@/hooks/useBlockMinedSound";
@@ -114,12 +115,16 @@ function SetupRedirect() {
   useEffect(() => {
     if (!loaded || storedLightWallet.isLoading) return;
     if (!isLight && walletFile.isLoading) return;
+    const hasLightWallet = storedLightWallet.data === true;
+    const hasFullNodeWallet = fullNodeWalletExists(walletFile.data);
     const ready = isCoinWalletReady(coin, prefs, {
       walletMode: isLight ? "light" : "full_node",
-      hasLightWallet: storedLightWallet.data,
-      hasFullNodeWallet: fullNodeWalletExists(walletFile.data),
+      hasLightWallet,
+      hasFullNodeWallet,
     });
     if (ready) return;
+    // Full-node mode with only a light wallet: don't trap the user in setup.
+    if (!isLight && hasLightWallet && !hasFullNodeWallet) return;
     if (location.pathname === "/setup") return;
     if (!isLight && daemonLoading) return;
     navigate("/setup", { replace: true, state: { setupHub: true } });
@@ -145,6 +150,8 @@ function AppHooks() {
   useAutoMine();
   useMiningPollCoordinator();
   useWalletInfoPollCoordinator();
+  useBlockchainInfoPollCoordinator();
+  useVericoinEarnPollCoordinator();
   useAdaptiveMiningThreads();
   useAutoStake();
   useAutoLock();
@@ -218,11 +225,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppErrorBoundary>
-      <PasskeyGate>
-        <CoinProvider>
-          <AppRoutes />
-        </CoinProvider>
-      </PasskeyGate>
+      <CoinProvider>
+        <AppRoutes />
+      </CoinProvider>
     </AppErrorBoundary>
   );
 }

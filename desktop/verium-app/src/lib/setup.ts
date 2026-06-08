@@ -10,6 +10,27 @@ export interface CoinWalletReadyOptions {
   hasFullNodeWallet?: boolean;
 }
 
+export interface CoinWalletPresence {
+  hasLightWallet?: boolean;
+  hasFullNodeWallet?: boolean;
+}
+
+/** App-wide or hub-local mode: persisted light mode wins; else hub selection. */
+export function resolveEffectiveWalletMode(
+  persistedMode: WalletModeChoice | undefined,
+  localChoice: WalletModeChoice,
+): WalletModeChoice {
+  if (persistedMode === "light") return "light";
+  if (localChoice === "light") return "light";
+  return "full_node";
+}
+
+export function coinHasStoredWallet(presence: CoinWalletPresence): boolean {
+  return (
+    presence.hasLightWallet === true || presence.hasFullNodeWallet === true
+  );
+}
+
 /** True if wallet.dat (or a legacy Qt wallet) exists for this chain. */
 export function fullNodeWalletExists(
   status?: Pick<WalletFileStatus, "exists" | "legacy_wallet_detected"> | null,
@@ -26,15 +47,17 @@ export function anyEnabledCoinSetupIncomplete(
 }
 
 /**
- * Chain is ready to open from the hub: wizard marked complete, or the selected
- * wallet mode already has persisted keys (light keystore vs local wallet.dat).
+ * True when the selected wallet mode has persisted keys on this device.
+ * Does not use setup_completed — that flag can be set from full-node onboarding
+ * while the app is later switched to light mode without a light keystore.
  */
 export function isCoinWalletReady(
   coin: CoinId,
   prefs: Pick<UserPreferences, "setup_completed" | "setup_completed_by_coin">,
   options?: CoinWalletReadyOptions | boolean,
 ): boolean {
-  if (isCoinSetupComplete(coin, prefs)) return true;
+  void coin;
+  void prefs;
 
   const opts: CoinWalletReadyOptions =
     typeof options === "boolean" ? { hasLightWallet: options } : (options ?? {});
@@ -50,7 +73,9 @@ export function isCoinWalletReady(
 export function isCoinSetupComplete(
   coin: CoinId,
   prefs: Pick<UserPreferences, "setup_completed" | "setup_completed_by_coin">,
+  presence?: CoinWalletPresence,
 ): boolean {
+  if (coinHasStoredWallet(presence ?? {})) return true;
   const perCoin = prefs.setup_completed_by_coin?.[coin];
   if (perCoin === true) return true;
   if (perCoin === false) return false;

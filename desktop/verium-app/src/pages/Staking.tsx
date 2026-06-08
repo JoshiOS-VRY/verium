@@ -88,22 +88,22 @@ export function Staking() {
   const stakingState = useQuery({
     queryKey: coinQueryKey(VERICOIN, "get_staking_state"),
     queryFn: () => rpcGetStakingState(VERICOIN),
-    refetchInterval: visible ? 4_000 : false,
+    refetchInterval: false,
   });
   const miningInfo = useQuery({
     queryKey: coinQueryKey(VERICOIN, "getmininginfo"),
     queryFn: () => rpcGetVericoinMiningInfo(),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
   const blockchain = useQuery({
     queryKey: coinQueryKey(VERICOIN, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(VERICOIN),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
   const wallet = useQuery({
     queryKey: coinQueryKey(VERICOIN, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(VERICOIN),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
   const walletTxs = useWalletTransactions(VERICOIN);
   const daemonStatus = useDaemonStatus(VERICOIN);

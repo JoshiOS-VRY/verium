@@ -20,7 +20,7 @@ export function useDashboardActivity(coin: CoinId) {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: visible ? 30_000 : false,
+    refetchInterval: false,
     enabled: node.data?.connected === true,
   });
 

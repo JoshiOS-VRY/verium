@@ -1164,7 +1164,8 @@ async fn finish_restart(
         let start_args: &[&str] = &[];
         state.mark_bootstrap_loading(coin, BOOTSTRAP_LOADING_GRACE);
         match state.daemon(coin)?.start(&restart_cfg, start_args).await {
-            Ok(_) => {
+            Ok(pid) => {
+                state.record_managed_daemon(coin, pid, restart_cfg.rpc_port);
                 let blocks = poll_chain_height_after_restart(
                     state,
                     coin,

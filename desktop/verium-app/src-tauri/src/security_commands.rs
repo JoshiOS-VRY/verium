@@ -1,4 +1,4 @@
-//! Tauri commands for security, recovery, 2FA, passkeys, hardware wallets, etc.
+//! Tauri commands for security, recovery, 2FA, hardware wallets, etc.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -13,7 +13,6 @@ use crate::error::{AppError, AppResult};
 use crate::hardware_wallet::{self, HardwareWalletConfig, HardwareVendor, PsbtSendResult};
 use crate::installer_verify::{self, VerificationStatus};
 use crate::multisig::{self, MultisigWalletConfig};
-use crate::passkey::{self, PasskeyConfig};
 use crate::receive_requests::{self, ReceiveRequest};
 use crate::recovery::{self, RecoveryPhraseBundle};
 use crate::slip39_recovery::{self, ShamirSplitResult};
@@ -163,7 +162,7 @@ pub async fn recovery_export_seed(
     }
 
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         if !crate::wallet::keystore::wallet_exists(coin)? {
             return Err(AppError::other("No light wallet found for this chain."));
         }
@@ -292,33 +291,6 @@ pub struct PartialTwoFactorConfig {
     pub send_threshold_vrm: Option<f64>,
     pub send_threshold_vrc: Option<f64>,
     pub gated_actions: Option<Vec<String>>,
-}
-
-// ── Passkey / PIN ────────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub fn passkey_status() -> AppResult<PasskeyConfig> {
-    passkey::status()
-}
-
-#[tauri::command]
-pub fn passkey_gate_required() -> AppResult<bool> {
-    passkey::gate_required()
-}
-
-#[tauri::command]
-pub fn passkey_enroll_pin(pin: String) -> AppResult<()> {
-    passkey::enroll_pin(&pin)
-}
-
-#[tauri::command]
-pub fn passkey_verify_pin(pin: String) -> AppResult<bool> {
-    passkey::verify_pin(&pin)
-}
-
-#[tauri::command]
-pub fn passkey_disable(pin: String) -> AppResult<()> {
-    passkey::disable(&pin)
 }
 
 // ── Auto-lock ────────────────────────────────────────────────────────────────
@@ -452,7 +424,7 @@ pub async fn hardware_wallet_send_psbt(
     )?;
     let prefs = crate::prefs::load().await?;
     let pass = wallet_passphrase.unwrap_or_default();
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         return crate::wallet::psbt_light::build_hw_psbt(&state, coin, outputs, fee_rate, &pass).await;
     }
     let client = state.rpc_client(coin).await?;
@@ -476,7 +448,7 @@ pub async fn hardware_wallet_finalize_psbt(
     )
     .await?;
     let prefs = crate::prefs::load().await?;
-    let txid = if prefs.wallet_mode.is_light() {
+    let txid = if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         crate::wallet::psbt_light::finalize_and_broadcast_light(&state, coin, &psbt_base64).await?
     } else {
         let client = state.rpc_client(coin).await?;

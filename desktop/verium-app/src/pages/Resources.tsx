@@ -39,7 +39,13 @@ interface ResourceCardProps {
   cta: string;
 }
 
-function ResourceCard({ icon: Icon, title, description, href, cta }: ResourceCardProps) {
+function ResourceCard({
+  icon: Icon,
+  title,
+  description,
+  href,
+  cta,
+}: ResourceCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -91,7 +97,7 @@ export function Resources() {
         />
         <ResourceCard
           icon={Cpu}
-          title="Official Verium pool"
+          title="Public Verium pool"
           description="PPLNS CPU mining pool with per-address dashboards, worker stats, and automatic payouts."
           href={POOL_WEB_URL}
           cta="Open pool"

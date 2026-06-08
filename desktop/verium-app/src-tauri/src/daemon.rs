@@ -26,6 +26,32 @@ use crate::error::{AppError, AppResult};
 /// running this alpha build (e.g. `/Vericonomy:1.0.0.0(alpha1)/`).
 const DAEMON_UACOMMENT: &str = "alpha1";
 
+/// Coins whose next daemon spawn should include `-upgradewallet`. This upgrades
+/// a pre-HD `wallet.dat` to the latest wallet format so `sethdseed` (recovery
+/// phrase) can be applied to legacy passphrase-only wallets. One-shot: the flag
+/// is consumed on the next spawn so we never repeatedly upgrade.
+static PENDING_WALLET_UPGRADE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<CoinId>>> =
+    std::sync::OnceLock::new();
+
+fn pending_wallet_upgrade_set() -> &'static std::sync::Mutex<std::collections::HashSet<CoinId>> {
+    PENDING_WALLET_UPGRADE.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()))
+}
+
+/// Request that the next spawn of `coin`'s daemon include `-upgradewallet`.
+pub fn request_wallet_upgrade_once(coin: CoinId) {
+    if let Ok(mut set) = pending_wallet_upgrade_set().lock() {
+        set.insert(coin);
+    }
+}
+
+/// Consume the pending upgrade flag for `coin` (true if it was set).
+fn take_pending_wallet_upgrade(coin: CoinId) -> bool {
+    pending_wallet_upgrade_set()
+        .lock()
+        .map(|mut set| set.remove(&coin))
+        .unwrap_or(false)
+}
+
 /// User agent string shown for wallet-managed nodes and advertised on P2P once
 /// bundled daemons are built from Vericonomy-tagged sources. Legacy CDN sidecars
 /// may still report `/Verium:1.3.5(alpha1)/` on the wire until replaced.
@@ -251,6 +277,13 @@ impl DaemonManager {
                 std_cmd.arg(*arg);
             }
         }
+        if take_pending_wallet_upgrade(self.coin) {
+            tracing::info!(
+                "{}: starting with -upgradewallet (one-shot legacy HD upgrade)",
+                self.coin.binary_base()
+            );
+            std_cmd.arg("-upgradewallet");
+        }
         std_cmd.current_dir(&spawn_cfg.datadir);
 
         #[cfg(windows)]
@@ -381,9 +414,67 @@ pub fn pids_listening_on_port(port: u16) -> Vec<u32> {
     pids
 }
 
+/// Linux + macOS parity for the Windows `netstat` probe. Uses `lsof` (present
+/// by default on macOS and common on Linux) and falls back to `ss` on Linux.
 #[cfg(not(windows))]
-pub fn pids_listening_on_port(_port: u16) -> Vec<u32> {
+pub fn pids_listening_on_port(port: u16) -> Vec<u32> {
+    if let Some(pids) = lsof_listening_pids(port) {
+        return pids;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(pids) = ss_listening_pids(port) {
+            return pids;
+        }
+    }
     Vec::new()
+}
+
+#[cfg(not(windows))]
+fn lsof_listening_pids(port: u16) -> Option<Vec<u32>> {
+    // `-t` prints only PIDs, one per line. lsof exits 1 with empty output when
+    // nothing matches — that is "no listeners", not a probe failure.
+    let output = std::process::Command::new("lsof")
+        .args(["-nP", &format!("-iTCP:{port}"), "-sTCP:LISTEN", "-t"])
+        .output()
+        .ok()?;
+    let mut pids: Vec<u32> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|l| l.trim().parse().ok())
+        .filter(|p| *p > 0)
+        .collect();
+    pids.sort_unstable();
+    pids.dedup();
+    Some(pids)
+}
+
+#[cfg(target_os = "linux")]
+fn ss_listening_pids(port: u16) -> Option<Vec<u32>> {
+    let output = std::process::Command::new("ss")
+        .args(["-H", "-ltnp", &format!("sport = :{port}")])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut pids = Vec::new();
+    for line in text.lines() {
+        // users:(("veriumd",pid=1234,fd=10))
+        for token in line.split("pid=") {
+            if let Some(num) = token
+                .split(|c: char| !c.is_ascii_digit())
+                .next()
+                .filter(|s| !s.is_empty())
+            {
+                if let Ok(pid) = num.parse::<u32>() {
+                    if pid > 0 {
+                        pids.push(pid);
+                    }
+                }
+            }
+        }
+    }
+    pids.sort_unstable();
+    pids.dedup();
+    Some(pids)
 }
 
 /// Stop only processes listening on the RPC port (does not kill by image name).
@@ -397,6 +488,17 @@ pub fn kill_port_listeners(port: u16) {
             let _ = std::process::Command::new("taskkill")
                 .args(["/F", "/PID", &pid.to_string()])
                 .creation_flags(CREATE_NO_WINDOW)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            tracing::info!("freed RPC port {} by stopping pid {}", port, pid);
+        }
+        #[cfg(not(windows))]
+        {
+            use std::process::Stdio;
+            let _ = std::process::Command::new("kill")
+                .args(["-9", &pid.to_string()])
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
@@ -556,7 +658,53 @@ pub fn force_stop_native_daemon(coin: CoinId) {
 }
 
 #[cfg(not(windows))]
-pub fn force_stop_native_daemon(_coin: CoinId) {}
+pub fn force_stop_native_daemon(coin: CoinId) {
+    let pids = unix_pids_with_image_prefix(coin.binary_base());
+    for pid in pids {
+        use std::process::Stdio;
+        let _ = std::process::Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+/// Linux + macOS parity for the Windows `tasklist` image probe. Matches by the
+/// process command name (`veriumd`, `vericoind`, …) via `ps`.
+#[cfg(not(windows))]
+fn unix_pids_with_image_prefix(prefix: &str) -> Vec<u32> {
+    let output = match std::process::Command::new("ps")
+        .args(["-A", "-o", "pid=,comm="])
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
+    let mut pids = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let line = line.trim();
+        let Some((pid_str, comm)) = line.split_once(char::is_whitespace) else {
+            continue;
+        };
+        // comm is a path on some platforms; match on the basename.
+        let name = comm
+            .trim()
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(comm.trim());
+        if !name.starts_with(prefix) {
+            continue;
+        }
+        if let Ok(pid) = pid_str.trim().parse::<u32>() {
+            if pid > 0 {
+                pids.push(pid);
+            }
+        }
+    }
+    pids
+}
 
 /// True when a native daemon process for this coin is running (any datadir).
 /// Matches `veriumd.exe`, `veriumd-legacy.exe`, `veriumd-x86_64-pc-windows-msvc.exe`, etc.
@@ -567,8 +715,7 @@ pub fn native_daemon_image_running(coin: CoinId) -> bool {
     }
     #[cfg(not(windows))]
     {
-        let _ = coin;
-        false
+        !unix_pids_with_image_prefix(coin.binary_base()).is_empty()
     }
 }
 

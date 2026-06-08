@@ -8,7 +8,6 @@ import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
 import { lightWalletExists, lightWalletUnlock } from "@/lib/light-wallet/client";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
 import { rpcGetWalletInfo, rpcWalletUnlock } from "@/lib/rpc/client";
-import { passkeyStatus } from "@/lib/security/client";
 import {
   optimisticLightWalletUnlockPatch,
   rpcUnlockTimeoutSeconds,
@@ -47,7 +46,6 @@ export function WalletUnlockForm({
   const { isLight } = useWalletMode();
   const invalidateWalletMode = useInvalidateWalletMode();
   const queryClient = useQueryClient();
-  const passkey = useQuery({ queryKey: ["passkey"], queryFn: passkeyStatus });
   const storedLightWallet = useQuery({
     queryKey: coinQueryKey(coin, "light-wallet-exists"),
     queryFn: () => lightWalletExists(coin),
@@ -152,13 +150,6 @@ export function WalletUnlockForm({
           if (passphrase) unlock.mutate();
         }}
       >
-        {passkey.data?.enabled && (
-          <p className="text-xs text-fg-subtle">
-            App PIN is enrolled — use the PIN gate at launch. Enter your wallet
-            passphrase here to unlock signing and sending.
-          </p>
-        )}
-
         <div className="flex flex-col gap-1 text-sm">
           <label className="text-fg-muted">Passphrase</label>
           <input

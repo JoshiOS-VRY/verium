@@ -3,16 +3,12 @@ import { useActiveCoin } from "@/lib/coin/context";
 import { coinQueryKey, getCoinProfile } from "@/lib/coin/profile";
 import { useQuery } from "@tanstack/react-query";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { ExplorerPeersPanel } from "@/components/ExplorerPeersPanel";
-import { NetworkChainStats } from "@/components/NetworkChainStats";
-import { NetworkExplorerOverview } from "@/components/NetworkExplorerOverview";
 import { NetworkHero } from "@/components/NetworkHero";
-import { NetworkLocalPeersCard } from "@/components/NetworkLocalPeersCard";
+import { NetworkPeersSection } from "@/components/NetworkPeersSection";
 import { NetworkTopMinersCard } from "@/components/NetworkTopMinersCard";
 import {
   fetchExplorerExtraction,
   fetchExplorerStats,
-  isExplorerApiEnabled,
 } from "@/lib/explorer-api";
 import type { MinersPeriodId } from "@/lib/miners-periods";
 import { useExplorerQueriesEnabled } from "@/lib/network-mode";
@@ -43,27 +39,22 @@ export function Network() {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
   const vrmMining = useQuery({
     queryKey: coinQueryKey("verium", "getmininginfo"),
     queryFn: () => rpcGetMiningInfo("verium"),
     enabled: visible && coin === "verium",
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
   const vrcMining = useQuery({
     queryKey: coinQueryKey("vericoin", "getmininginfo"),
     queryFn: () => rpcGetVericoinMiningInfo(),
     enabled: visible && coin === "vericoin",
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
   });
 
   const explorerEnabled = useExplorerQueriesEnabled();
-  const explorerApi = useQuery({
-    queryKey: ["explorer-api-enabled"],
-    queryFn: isExplorerApiEnabled,
-    staleTime: Infinity,
-  });
 
   const [minersPeriod, setMinersPeriod] = useState<MinersPeriodId>("month");
 
@@ -99,39 +90,25 @@ export function Network() {
     networkTip: explorerStats.data?.height,
   });
 
-  const localHashrate = vrmMining.data?.hashrate;
-
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5 sm:gap-4">
       <NetworkHero
         profile={profile}
+        coin={coin}
         localBlocks={localHeight}
         headerHeight={headerHeight}
         networkTip={networkTip}
         peerCount={peerCount}
+        network={network.data}
+        blockchain={blockchain.data}
+        explorer={explorerStats.data}
+        explorerError={explorerStats.isError}
+        localHashrate={vrmMining.data?.hashrate}
+        vrcMining={vrcMining.data}
         networkActive={network.data?.networkactive}
         chainSynced={chainSynced}
         ibd={blockchain.data?.initialblockdownload}
       />
-
-      <NetworkChainStats
-        coin={coin}
-        network={network.data}
-        blockchain={blockchain.data}
-        explorer={explorerStats.data}
-        localHashrate={localHashrate}
-        vrcMining={vrcMining.data}
-        peerCount={peerCount}
-      />
-
-      {explorerApi.data === true && (
-        <NetworkExplorerOverview
-          coin={coin}
-          localHeight={localHeight}
-          stats={explorerStats.data}
-          isError={explorerStats.isError}
-        />
-      )}
 
       {explorerEnabled && coin === "verium" && (
         <NetworkTopMinersCard
@@ -141,12 +118,15 @@ export function Network() {
           entries={extraction.data}
           isError={extraction.isError}
           isLoading={extraction.isLoading}
+          isFetching={extraction.isFetching}
         />
       )}
 
-      {explorerApi.data === true && <ExplorerPeersPanel />}
-
-      <NetworkLocalPeersCard coin={coin} peers={peers.data} />
+      <NetworkPeersSection
+        coin={coin}
+        peers={peers.data}
+        explorerEnabled={explorerEnabled}
+      />
     </div>
   );
 }

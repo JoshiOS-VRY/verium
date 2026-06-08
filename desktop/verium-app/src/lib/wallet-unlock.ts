@@ -33,6 +33,16 @@ export function rpcUnlockTimeoutSeconds(): number {
   return DEFAULT_WALLET_UNLOCK_SECONDS;
 }
 
+/** Drop cached full-node wallet info in light mode (and vice versa). */
+export function walletInfoForMode(
+  isLight: boolean,
+  wallet: WalletInfo | null | undefined,
+): WalletInfo | null | undefined {
+  if (!wallet) return wallet;
+  if (isLight) return wallet.light_wallet === true ? wallet : null;
+  return wallet.light_wallet === true ? null : wallet;
+}
+
 /** Blur balance figures while the wallet is locked (privacy). */
 export function lockedWalletBalanceClass(
   wallet: WalletInfo | null | undefined,

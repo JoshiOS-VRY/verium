@@ -938,6 +938,9 @@ pub fn sync_performance_overrides() -> Vec<(&'static str, String)> {
         ("dbcache", recommended_dbcache_mib().to_string()),
         ("maxconnections", "32".to_string()),
         ("maxuploadtarget", "0".to_string()),
+        // Wallet polls status + heal loops concurrently; raise RPC throughput headroom.
+        ("rpcworkqueue", "256".to_string()),
+        ("rpcthreads", "16".to_string()),
     ]
 }
 
@@ -1118,6 +1121,20 @@ pub fn resolve_legacy_wallet_outside_cfg(coin: CoinId, cfg: &DaemonConfig) -> Op
         }
     }
     None
+}
+
+/// The legacy install root to adopt as `-datadir` when a legacy `wallet.dat`
+/// was detected outside the configured datadir. Returns the matching root from
+/// `legacy_install_datadir_roots` (the folder the daemon should use), not the
+/// `wallet.dat` path itself, so chain-data promotion can run on a real datadir.
+pub fn resolve_legacy_datadir_outside_cfg(coin: CoinId, cfg: &DaemonConfig) -> Option<PathBuf> {
+    let wallet = resolve_legacy_wallet_outside_cfg(coin, cfg)?;
+    for root in legacy_install_datadir_roots(coin) {
+        if wallet.starts_with(&root) {
+            return Some(root);
+        }
+    }
+    wallet.parent().map(|p| p.to_path_buf())
 }
 
 /// Locate the active wallet file on disk (legacy root or `wallets/` layout).

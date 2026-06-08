@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Mutex;
@@ -12,6 +13,8 @@ use crate::http_shared::shared_http_client;
 pub const EXPLORER_API_ENABLED: bool = true;
 
 const CACHE_TTL: Duration = Duration::from_secs(30);
+const BLOCKS_CACHE_TTL: Duration = Duration::from_secs(8);
+const MAX_OUTPUT_DETAIL_ENRICH: usize = 24;
 const PEERS_CACHE_TTL: Duration = Duration::from_secs(300);
 const MAX_EXTRACTION_CACHE_KEYS: usize = 32;
 const HTTP_TIMEOUT: Duration = Duration::from_secs(12);
@@ -19,6 +22,12 @@ const HTTP_USER_AGENT: &str = "vericonomy-desktop-app/0.1";
 
 fn explorer_api_url(coin: CoinId, path: &str) -> String {
     let base = coin.explorer_api_base();
+    let path = path.trim_start_matches('/');
+    format!("{base}/{path}")
+}
+
+fn explorer_chain_api_url(coin: CoinId, path: &str) -> String {
+    let base = coin.explorer_chain_api_base();
     let path = path.trim_start_matches('/');
     format!("{base}/{path}")
 }
@@ -212,57 +221,167 @@ pub async fn fetch_explorer_peers(coin: CoinId) -> AppResult<Vec<ExplorerPeerEnt
     Ok(peers)
 }
 
+fn parse_latest_api_block(item: &Value) -> Option<ExplorerBlock> {
+    let height = parse_u64(item.get("height")?)?;
+    let hash = item.get("hash")?.as_str()?.to_string();
+    let output_total = item
+        .get("outputValue")
+        .and_then(|v| v.as_str().map(str::to_string))
+        .or_else(|| item.get("mint").and_then(|v| v.as_str().map(str::to_string)))
+        .or_else(|| {
+            item.get("outputTotal")
+                .and_then(|v| v.as_str().map(str::to_string))
+        });
+    let miner_address = item
+        .get("extractedByAddress")
+        .and_then(|v| v.as_str().map(str::to_string))
+        .or_else(|| {
+            item.get("miner")
+                .and_then(|m| m.get("address"))
+                .and_then(|v| v.as_str().map(str::to_string))
+        });
+    Some(ExplorerBlock {
+        id: height,
+        hash,
+        height,
+        time: parse_u64(item.get("time")?).unwrap_or(0),
+        mint: output_total.clone(),
+        difficulty: item
+            .get("difficulty")
+            .and_then(|v| v.as_str().map(str::to_string)),
+        n_tx: item
+            .get("txCount")
+            .and_then(parse_u64)
+            .or_else(|| item.get("nTx").and_then(parse_u64)),
+        miner_address,
+        size: item.get("size").and_then(parse_u64),
+        output_total,
+        output_count: item
+            .get("outputCount")
+            .and_then(parse_u64)
+            .or_else(|| item.get("outputC").and_then(parse_u64)),
+    })
+}
+
+fn parse_block_detail_payload(value: &Value) -> Option<ExplorerBlock> {
+    let block = value.get("block")?;
+    let mut row = parse_latest_api_block(block)?;
+    if row.output_total.is_none() {
+        if let Some(amount) = value
+            .get("coinbase")
+            .and_then(|c| c.get("reward"))
+            .and_then(|r| r.get("amount"))
+            .and_then(|v| v.as_str())
+        {
+            row.output_total = Some(amount.to_string());
+            row.mint = Some(amount.to_string());
+        }
+    }
+    Some(row)
+}
+
+fn block_needs_output_enrichment(block: &ExplorerBlock) -> bool {
+    block.output_total.is_none() && block.mint.is_none()
+}
+
+async fn enrich_blocks_output_from_detail(
+    coin: CoinId,
+    blocks: Vec<ExplorerBlock>,
+) -> AppResult<Vec<ExplorerBlock>> {
+    let heights: Vec<u64> = blocks
+        .iter()
+        .filter(|block| block_needs_output_enrichment(block))
+        .map(|block| block.height)
+        .take(MAX_OUTPUT_DETAIL_ENRICH)
+        .collect();
+    if heights.is_empty() {
+        return Ok(blocks);
+    }
+
+    let enriched = fetch_explorer_blocks_for_feed(coin, heights).await?;
+    let by_height: HashMap<u64, ExplorerBlock> =
+        enriched.into_iter().map(|b| (b.height, b)).collect();
+
+    Ok(blocks
+        .into_iter()
+        .map(|block| {
+            if let Some(detail) = by_height.get(&block.height) {
+                return ExplorerBlock {
+                    output_total: detail.output_total.clone().or(block.output_total),
+                    mint: detail.mint.clone().or(block.mint),
+                    output_count: detail.output_count.or(block.output_count),
+                    miner_address: detail.miner_address.clone().or(block.miner_address),
+                    size: detail.size.or(block.size),
+                    difficulty: detail.difficulty.clone().or(block.difficulty),
+                    n_tx: detail.n_tx.or(block.n_tx),
+                    time: if block.time > 0 { block.time } else { detail.time },
+                    hash: if block.hash.starts_with("light-tip-")
+                        || block.hash.starts_with("local-pending-")
+                    {
+                        detail.hash.clone()
+                    } else {
+                        block.hash
+                    },
+                    ..block
+                };
+            }
+            block
+        })
+        .collect())
+}
+
+async fn fetch_block_detail_row(
+    client: &reqwest::Client,
+    coin: CoinId,
+    height: u64,
+) -> Option<ExplorerBlock> {
+    let url = explorer_chain_api_url(coin, &format!("block/{height}"));
+    let value = get_json(client, &url).await.ok()?;
+    if value.get("found").and_then(|v| v.as_bool()) == Some(false) {
+        return None;
+    }
+    parse_block_detail_payload(&value)
+}
+
+/// Block rows for the recent-blocks table from explorer `/block/:height` (light wallet).
+pub async fn fetch_explorer_blocks_for_feed(
+    coin: CoinId,
+    heights: Vec<u64>,
+) -> AppResult<Vec<ExplorerBlock>> {
+    if !EXPLORER_API_ENABLED {
+        return Err(AppError::other("explorer api disabled"));
+    }
+    if heights.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let client = http_client()?;
+    let fetches = heights.into_iter().map(|height| {
+        let client = client.clone();
+        async move { fetch_block_detail_row(&client, coin, height).await }
+    });
+    let mut rows: Vec<ExplorerBlock> = join_all(fetches).await.into_iter().flatten().collect();
+    rows.sort_by(|a, b| b.height.cmp(&a.height));
+    Ok(rows)
+}
+
 pub async fn fetch_blocks(coin: CoinId, limit: u32) -> AppResult<Vec<ExplorerBlock>> {
     let limit = limit.clamp(1, 10);
     let blocks = if let Some(cached) = read_blocks_cache(coin).await {
         cached
     } else {
         let client = http_client()?;
-        let url = explorer_api_url(coin, "blocks?limit=100");
+        let url = explorer_chain_api_url(coin, "blocks/latest?limit=100");
         let value = get_json(&client, &url).await?;
         let arr = value
             .as_array()
-            .ok_or_else(|| AppError::other("blocks response is not an array"))?;
+            .ok_or_else(|| AppError::other("blocks/latest response is not an array"))?;
 
-        let fetched: Vec<ExplorerBlock> = arr
-            .iter()
-            .filter_map(|item| {
-                Some(ExplorerBlock {
-                    id: parse_u64(item.get("id")?)?,
-                    hash: item.get("hash")?.as_str()?.to_string(),
-                    height: parse_u64(item.get("height")?)?,
-                    time: parse_u64(item.get("time")?)?,
-                    mint: item
-                        .get("mint")
-                        .and_then(|v| v.as_str().map(str::to_string)),
-                    difficulty: item
-                        .get("difficulty")
-                        .and_then(|v| v.as_str().map(str::to_string)),
-                    n_tx: item.get("nTx").and_then(parse_u64),
-                    miner_address: item
-                        .get("miner")
-                        .and_then(|m| m.get("address"))
-                        .and_then(|v| v.as_str().map(str::to_string)),
-                    size: item
-                        .get("strippedsize")
-                        .and_then(parse_u64)
-                        .or_else(|| item.get("size").and_then(parse_u64)),
-                    output_total: item
-                        .get("outputT")
-                        .and_then(|v| v.as_str().map(str::to_string))
-                        .or_else(|| {
-                            item.get("mint")
-                                .and_then(|v| v.as_str().map(str::to_string))
-                        }),
-                    output_count: item.get("outputC").and_then(parse_u64),
-                })
-            })
-            .collect();
-
-        write_blocks_cache(coin, fetched.clone()).await;
-        fetched
+        arr.iter().filter_map(parse_latest_api_block).collect()
     };
 
+    let blocks = enrich_blocks_output_from_detail(coin, blocks).await?;
+    write_blocks_cache(coin, blocks.clone()).await;
     Ok(blocks.into_iter().take(limit as usize).collect())
 }
 
@@ -423,7 +542,7 @@ async fn read_blocks_cache(coin: CoinId) -> Option<Vec<ExplorerBlock>> {
         .get(&coin)?
         .blocks
         .as_ref()
-        .filter(|e| e.at.elapsed() < CACHE_TTL)
+        .filter(|e| e.at.elapsed() < BLOCKS_CACHE_TTL)
         .map(|e| e.value.clone())
 }
 

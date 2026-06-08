@@ -144,6 +144,15 @@ function HeroSection({
   return <div className={cn("h-full min-w-0", className)}>{body}</div>;
 }
 
+/** Block height: large when stacked full-width; scales down in the narrow xl column. */
+const HERO_BLOCK_NUMBER_CLASS = cn(
+  "font-bold tabular-nums leading-none tracking-tight",
+  "text-[clamp(1.75rem,4.5vw+0.35rem,2.875rem)]",
+  "sm:text-[clamp(2rem,3.5vw+0.5rem,3rem)]",
+  "xl:text-[clamp(1.375rem,0.5rem+0.9vw,2.125rem)]",
+  "2xl:text-[clamp(1.5rem,0.55rem+0.75vw,2.375rem)]",
+);
+
 function HeroBlockHeight({
   coin,
   localBlocks,
@@ -163,13 +172,14 @@ function HeroBlockHeight({
   return (
     <div
       className={cn(
-        "text-[clamp(2rem,3.5vw+0.75rem,3rem)] font-bold tabular-nums leading-none tracking-tight",
+        "min-w-0 max-w-full",
+        HERO_BLOCK_NUMBER_CLASS,
         showPlaceholder ? "text-fg-muted" : "text-fg",
       )}
     >
       {showPlaceholder ? (
         <Loader2
-          className="h-9 w-9 animate-spin text-accent/80"
+          className="h-[1em] w-[1em] animate-spin text-accent/80"
           aria-hidden
         />
       ) : canLink ? (
@@ -179,17 +189,20 @@ function HeroBlockHeight({
           label={
             <AnimatedBlockNumber
               value={localBlocks}
-              className="text-[clamp(2rem,3.5vw+0.75rem,3rem)] font-bold leading-none tracking-tight"
+              className={HERO_BLOCK_NUMBER_CLASS}
             />
           }
           showIcon={false}
           title="View block on explorer"
-          className="rounded-sm font-bold tabular-nums leading-none tracking-tight text-fg no-underline transition-colors hover:text-accent hover:underline"
+          className={cn(
+            HERO_BLOCK_NUMBER_CLASS,
+            "inline-flex max-w-full rounded-sm text-fg no-underline transition-colors hover:text-accent hover:underline",
+          )}
         />
       ) : connected && localBlocks != null ? (
         <AnimatedBlockNumber
           value={localBlocks}
-          className="text-[clamp(2rem,3.5vw+0.75rem,3rem)] font-bold leading-none tracking-tight"
+          className={HERO_BLOCK_NUMBER_CLASS}
         />
       ) : (
         "—"
@@ -431,7 +444,7 @@ function buildHeroStatusRow(
 }
 
 function buildWalletSection(coin: CoinId, data: DashboardData): ReactNode {
-  const wallet = data.wallet.data;
+  const wallet = data.effectiveWallet;
 
   return (
     <HeroSection title="Wallet" icon={<Wallet />}>
@@ -439,7 +452,7 @@ function buildWalletSection(coin: CoinId, data: DashboardData): ReactNode {
         label="Balance"
         value={
           wallet ? (
-            <span className={lockedWalletBalanceClass(data.wallet.data)}>
+            <span className={lockedWalletBalanceClass(wallet)}>
               {formatCoinAmount(wallet.balance, coin, 4)}
             </span>
           ) : (
@@ -451,7 +464,7 @@ function buildWalletSection(coin: CoinId, data: DashboardData): ReactNode {
         label="Immature"
         value={
           wallet ? (
-            <span className={lockedWalletBalanceClass(data.wallet.data)}>
+            <span className={lockedWalletBalanceClass(wallet)}>
               {formatCoinAmount(wallet.immature_balance, coin, 4)}
             </span>
           ) : (
@@ -463,22 +476,40 @@ function buildWalletSection(coin: CoinId, data: DashboardData): ReactNode {
         <MiniStat
           label="Stake weight"
           value={
-            data.vrcMining.data?.stakeweight?.combined != null
-              ? formatNumber(data.vrcMining.data.stakeweight.combined, 0)
-              : "—"
+            wallet && data.vrcMining.data?.stakeweight?.combined != null ? (
+              <span className={lockedWalletBalanceClass(wallet)}>
+                {formatNumber(data.vrcMining.data.stakeweight.combined, 0)}
+              </span>
+            ) : (
+              "—"
+            )
           }
         />
       ) : (
         <MiniStat
           label="Unconfirmed"
           value={
-            wallet ? formatCoinAmount(wallet.unconfirmed_balance, coin, 4) : "—"
+            wallet ? (
+              <span className={lockedWalletBalanceClass(wallet)}>
+                {formatCoinAmount(wallet.unconfirmed_balance, coin, 4)}
+              </span>
+            ) : (
+              "—"
+            )
           }
         />
       )}
       <MiniStat
         label="Transactions"
-        value={wallet ? formatNumber(wallet.txcount, 0) : "—"}
+        value={
+          wallet ? (
+            <span className={lockedWalletBalanceClass(wallet)}>
+              {formatNumber(wallet.txcount, 0)}
+            </span>
+          ) : (
+            "—"
+          )
+        }
       />
     </HeroSection>
   );

@@ -20,7 +20,7 @@ export function useChainSynced(coin: CoinId): {
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: visible ? 10_000 : false,
+    refetchInterval: false,
     enabled: connected,
   });
 

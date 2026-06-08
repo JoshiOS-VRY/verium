@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 
 import type { CoinId } from "@/lib/coin/profile";
 import type { ExplorerBlock } from "@/lib/explorer-api";
+import { isPlaceholderTipHash } from "@/lib/tip-block-time";
 
 /** Latest chain tip pushed from the local node watcher (`chain-tip-changed`). */
 export interface ChainTip {
@@ -40,15 +41,26 @@ export function pushChainTip(tip: ChainTip): void {
   const prev = snapshots.get(tip.coin) ?? EMPTY;
   if (prev.tip?.hash === tip.hash) return;
 
-  let recentBlocks = prev.recentBlocks;
-  if (tip.block) {
-    const block = tip.block;
-    recentBlocks = [block, ...prev.recentBlocks.filter((b) => b.height !== block.height)]
-      .sort((a, b) => b.height - a.height)
-      .slice(0, MAX_RECENT);
-  }
+  const blockTime =
+    tip.time > 0
+      ? tip.time
+      : isPlaceholderTipHash(tip.hash)
+        ? 0
+        : Math.floor(Date.now() / 1000);
 
-  snapshots.set(tip.coin, { tip, recentBlocks });
+  const block: ExplorerBlock =
+    tip.block ?? {
+      id: tip.height,
+      hash: tip.hash,
+      height: tip.height,
+      time: blockTime,
+    };
+
+  const recentBlocks = [block, ...prev.recentBlocks.filter((b) => b.height !== block.height)]
+    .sort((a, b) => b.height - a.height)
+    .slice(0, MAX_RECENT);
+
+  snapshots.set(tip.coin, { tip: { ...tip, block }, recentBlocks });
   notify(tip.coin);
 }
 

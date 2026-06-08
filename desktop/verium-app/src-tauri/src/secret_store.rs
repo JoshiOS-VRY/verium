@@ -1,6 +1,7 @@
 //! Encrypted blob storage backed by OS keychain + Argon2id + AES-256-GCM.
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -40,13 +41,22 @@ fn keyring_entry() -> keyring::Entry {
     keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).expect("keyring entry")
 }
 
+/// Process-wide master key cache. Windows Credential Manager can be slow or
+/// briefly inconsistent when multiple blobs are written in parallel; caching
+/// also prevents a create-key race when two threads both see `NoEntry`.
+#[cfg(not(test))]
+static MASTER_KEY: Mutex<Option<[u8; 32]>> = Mutex::new(None);
+
+#[cfg(not(test))]
+static MASTER_KEY_INIT: Mutex<()> = Mutex::new(());
+
 #[cfg(test)]
 fn ensure_master_key() -> AppResult<[u8; 32]> {
     Ok([0xA5; 32])
 }
 
 #[cfg(not(test))]
-fn ensure_master_key() -> AppResult<[u8; 32]> {
+fn load_master_key_from_keyring() -> AppResult<[u8; 32]> {
     match keyring_entry().get_password() {
         Ok(hex_key) => {
             let bytes = hex::decode(hex_key.trim()).map_err(|e| {
@@ -70,6 +80,31 @@ fn ensure_master_key() -> AppResult<[u8; 32]> {
         }
         Err(e) => Err(AppError::other(format!("keychain read failed: {e}"))),
     }
+}
+
+#[cfg(not(test))]
+fn ensure_master_key() -> AppResult<[u8; 32]> {
+    if let Ok(guard) = MASTER_KEY.lock() {
+        if let Some(key) = *guard {
+            return Ok(key);
+        }
+    }
+
+    let init_guard = MASTER_KEY_INIT
+        .lock()
+        .map_err(|e| AppError::other(format!("master key init lock failed: {e}")))?;
+    if let Ok(guard) = MASTER_KEY.lock() {
+        if let Some(key) = *guard {
+            return Ok(key);
+        }
+    }
+
+    let key = load_master_key_from_keyring()?;
+    if let Ok(mut guard) = MASTER_KEY.lock() {
+        *guard = Some(key);
+    }
+    drop(init_guard);
+    Ok(key)
 }
 
 fn blob_decrypts(label: &str) -> bool {
@@ -134,12 +169,80 @@ fn decrypt(blob: &[u8]) -> AppResult<Vec<u8>> {
         .map_err(|e| AppError::other(format!("decrypt failed: {e}")))
 }
 
+fn blob_backup_path(label: &str) -> PathBuf {
+    blob_path(label).with_extension("enc.bak")
+}
+
+/// Decrypt a blob file without recovery side effects (no quarantine).
+pub fn read_decrypted_blob(label: &str) -> AppResult<Zeroizing<Vec<u8>>> {
+    let path = blob_path(label);
+    if !path.exists() {
+        return Err(AppError::other(format!("encrypted blob missing: {label}")));
+    }
+    let blob = std::fs::read(&path).map_err(|e| {
+        AppError::other(format!("could not read encrypted blob {label}: {e}"))
+    })?;
+    decrypt(&blob).map_err(|e| {
+        AppError::other(format!(
+            "could not decrypt {label}: {e}. Check Windows Credential Manager (service: {KEYCHAIN_SERVICE})."
+        ))
+    })
+    .map(Zeroizing::new)
+}
+
+/// Load JSON from an encrypted blob; returns the real decrypt/parse error instead
+/// of silently falling back to defaults.
+pub fn load_json_strict<T: serde::de::DeserializeOwned>(label: &str) -> AppResult<T> {
+    let bytes = read_decrypted_blob(label)?;
+    let s = String::from_utf8(bytes.to_vec())
+        .map_err(|e| AppError::other(format!("invalid utf8 in {label}: {e}")))?;
+    serde_json::from_str(&s).map_err(|e| AppError::other(format!("invalid json in {label}: {e}")))
+}
+
 /// Seal bytes to an encrypted file. Overwrites any existing blob.
 pub fn seal(label: &str, plaintext: &[u8]) -> AppResult<()> {
     let dir = store_dir();
     std::fs::create_dir_all(&dir)?;
+
     let encrypted = encrypt(plaintext)?;
-    std::fs::write(blob_path(label), encrypted)?;
+    let decrypted = decrypt(&encrypted).map_err(|e| {
+        AppError::other(format!("encrypt roundtrip failed for {label}: {e}"))
+    })?;
+    if decrypted.as_slice() != plaintext {
+        return Err(AppError::other(format!(
+            "encrypt roundtrip mismatch for {label}"
+        )));
+    }
+
+    let path = blob_path(label);
+    let tmp = path.with_extension("enc.new");
+    std::fs::write(&tmp, &encrypted).map_err(|e| {
+        AppError::other(format!("could not write encrypted blob {label}: {e}"))
+    })?;
+
+    let read_back = std::fs::read(&tmp).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        AppError::other(format!("could not read back encrypted blob {label}: {e}"))
+    })?;
+    let disk_plain = decrypt(&read_back).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        AppError::other(format!("post-write decrypt failed for {label}: {e}"))
+    })?;
+    if disk_plain.as_slice() != plaintext {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(AppError::other(format!(
+            "post-write encrypt roundtrip mismatch for {label}"
+        )));
+    }
+
+    if path.exists() {
+        let bak = blob_backup_path(label);
+        let _ = std::fs::copy(&path, &bak);
+    }
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        AppError::other(format!("could not finalize encrypted blob {label}: {e}"))
+    })?;
     Ok(())
 }
 
@@ -167,16 +270,17 @@ fn open_with_recovery(
             tracing::warn!(
                 "secret_store: decrypt failed for {label} ({e}); attempting recovery"
             );
-            quarantine_corrupt_blob(label)?;
             if let Some(fallback) = plaintext_fallback {
                 if migrate_plaintext_json(label, fallback)? {
                     return open_with_recovery(label, Some(fallback));
                 }
                 if let Some(plain) = read_plaintext_fallback(Some(fallback))? {
+                    quarantine_corrupt_blob(label)?;
                     seal(label, plain.as_ref())?;
                     return Ok(Some(plain));
                 }
             }
+            // Do not quarantine here — callers may retry, and seal() verifies writes.
             Ok(None)
         }
     }
@@ -200,8 +304,7 @@ fn quarantine_corrupt_blob(label: &str) -> AppResult<()> {
     if !path.exists() {
         return Ok(());
     }
-    let mut bak = path.clone();
-    bak.set_extension("enc.bak");
+    let bak = blob_backup_path(label);
     if bak.exists() {
         let _ = std::fs::remove_file(&bak);
     }

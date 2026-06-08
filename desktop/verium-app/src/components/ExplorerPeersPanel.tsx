@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -43,7 +42,7 @@ function peerEligibleToAdd(
   return !connectedAddrs.has(key) && !addedSet.has(key);
 }
 
-export function ExplorerPeersPanel() {
+export function ExplorerPeersPanel({ embedded = false }: { embedded?: boolean }) {
   const coin = useActiveCoin();
   const profile = getCoinProfile(coin);
   const queryClient = useQueryClient();
@@ -169,21 +168,22 @@ export function ExplorerPeersPanel() {
 
   if (explorerEnabled.data !== true) return null;
 
-  return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <CardTitle>Known network peers</CardTitle>
-          <CardDescription>
-            <ExplorerLink
-              coin={coin}
-              target={{ kind: "raw", url: explorerPeersHash(coin) }}
-              label="Peers on explorer"
-            />
-            .
-          </CardDescription>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+  const body = (
+    <>
+      {!embedded && (
+        <CardHeader className="flex-row items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <CardTitle>Known network peers</CardTitle>
+            <CardDescription>
+              <ExplorerLink
+                coin={coin}
+                target={{ kind: "raw", url: explorerPeersHash(coin) }}
+                label="Peers on explorer"
+              />
+              .
+            </CardDescription>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -220,8 +220,48 @@ export function ExplorerPeersPanel() {
             Refresh
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-0">
+        </CardHeader>
+      )}
+      {embedded && (
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border px-4 py-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={
+              !daemonConnected ||
+              addAllTargets.length === 0 ||
+              addAllNodes.isPending
+            }
+            title={
+              !daemonConnected
+                ? `Connect ${profile.displayName} first`
+                : `Add ${addAllTargets.length} peer(s) via addnode RPC`
+            }
+            onClick={() =>
+              addAllNodes.mutate(addAllTargets.map((p) => p.address))
+            }
+          >
+            {addAllNodes.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : null}
+            Add all ({addAllTargets.length})
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => explorerPeers.refetch()}
+            disabled={explorerPeers.isFetching}
+          >
+            {explorerPeers.isFetching ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Refresh
+          </Button>
+        </div>
+      )}
+      <div className={embedded ? "flex flex-col gap-3" : "flex flex-col gap-3 p-0"}>
         <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
           <input
             type="search"
@@ -390,7 +430,11 @@ export function ExplorerPeersPanel() {
             {String(addNode.error ?? addAllNodes.error)}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
+
+  if (embedded) return body;
+
+  return <Card>{body}</Card>;
 }

@@ -87,6 +87,30 @@ export function fetchExplorerBlocks(
   return invoke<ExplorerBlock[]>("fetch_explorer_blocks", { coin, limit });
 }
 
+/** Coinbase output, miner, and header fields from the local node (production-safe). */
+export function fetchLocalBlocksForFeed(
+  coin: CoinId,
+  heights: number[],
+): Promise<ExplorerBlock[]> {
+  if (heights.length === 0) return Promise.resolve([]);
+  return invoke<ExplorerBlock[]>("fetch_local_blocks_for_feed", {
+    coin,
+    heights,
+  });
+}
+
+/** Block detail from explorer `/block/:height` (light wallet recent-blocks feed). */
+export function fetchExplorerBlocksForFeed(
+  coin: CoinId,
+  heights: number[],
+): Promise<ExplorerBlock[]> {
+  if (heights.length === 0) return Promise.resolve([]);
+  return invoke<ExplorerBlock[]>("fetch_explorer_blocks_for_feed_cmd", {
+    coin,
+    heights,
+  });
+}
+
 export function fetchExplorerTransactions(
   coin: CoinId,
   limit = 25,

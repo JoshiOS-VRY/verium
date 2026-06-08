@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, KeyRound, Lock, Shield, Smartphone } from "lucide-react";
+import { AlertTriangle, KeyRound, Shield, Smartphone } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -19,10 +19,6 @@ import { useWalletMode } from "@/hooks/useWalletMode";
 import {
   autoLockGetConfig,
   autoLockSetConfig,
-  passkeyDisable,
-  passkeyEnrollPin,
-  passkeyStatus,
-  PASSKEY_GATE_QUERY_KEY,
   recoveryApplyHdSeed,
   recoveryWalletIsHd,
   spendingControlsGet,
@@ -54,15 +50,12 @@ export function Security() {
   const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const [totpCode, setTotpCode] = useState("");
-  const [pin, setPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
   const [showRecovery, setShowRecovery] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showPhraseRestore, setShowPhraseRestore] = useState(false);
   const [walletUnlockPass, setWalletUnlockPass] = useState("");
 
   const twoFa = useQuery({ queryKey: ["two-factor"], queryFn: twoFactorStatus });
-  const passkey = useQuery({ queryKey: ["passkey"], queryFn: passkeyStatus });
   const autoLock = useQuery({ queryKey: ["auto-lock"], queryFn: autoLockGetConfig });
   const spending = useQuery({ queryKey: ["spending-controls"], queryFn: spendingControlsGet });
   const isHd = useQuery({
@@ -75,23 +68,6 @@ export function Security() {
     onSuccess: () => {
       setTotpCode("");
       queryClient.invalidateQueries({ queryKey: ["two-factor"] });
-    },
-  });
-  const enrollPin = useMutation({
-    mutationFn: () => passkeyEnrollPin(pin),
-    onSuccess: async () => {
-      setPin("");
-      setConfirmPin("");
-      await queryClient.invalidateQueries({ queryKey: ["passkey"] });
-      await queryClient.invalidateQueries({ queryKey: PASSKEY_GATE_QUERY_KEY });
-    },
-  });
-  const disablePin = useMutation({
-    mutationFn: () => passkeyDisable(pin),
-    onSuccess: async () => {
-      setPin("");
-      await queryClient.invalidateQueries({ queryKey: ["passkey"] });
-      await queryClient.invalidateQueries({ queryKey: PASSKEY_GATE_QUERY_KEY });
     },
   });
   const applyHd = useMutation({
@@ -112,7 +88,6 @@ export function Security() {
   });
 
   const walletIsHd = isHd.data === true || applyHd.isSuccess;
-  const pinEnrolled = passkey.data?.enabled === true;
 
   const saveAutoLock = async (patch: Partial<AutoLockConfig>) => {
     const current = { ...DEFAULT_AUTO_LOCK, ...autoLock.data };
@@ -134,7 +109,7 @@ export function Security() {
       <div>
         <h1 className="text-2xl font-semibold">Security center</h1>
         <p className="mt-1 text-sm text-fg-muted">
-          Recovery phrase, app PIN, 2FA, spending controls, and auto-lock.
+          Recovery phrase, 2FA, spending controls, and auto-lock.
           {isLight
             ? " Light wallets use an encrypted keystore — export your recovery phrase regularly."
             : " wallet.dat backups are in Settings."}
@@ -269,96 +244,6 @@ export function Security() {
               >
                 Disable 2FA
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-4 w-4 text-accent" /> App unlock PIN
-          </CardTitle>
-          <CardDescription>
-            PIN gate before the wallet UI opens. Restart the app after enrolling to
-            test the lock screen.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Badge tone={pinEnrolled ? "success" : "neutral"}>
-            {pinEnrolled ? "PIN enrolled" : "Not enrolled"}
-          </Badge>
-          {!pinEnrolled ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="new-password"
-                  maxLength={12}
-                  value={pin}
-                  onChange={(e) =>
-                    setPin(e.target.value.replace(/\D/g, "").slice(0, 12))
-                  }
-                  placeholder="6–12 digit PIN"
-                  className="h-9 w-40 rounded border border-border px-3 text-sm"
-                />
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="new-password"
-                  maxLength={12}
-                  value={confirmPin}
-                  onChange={(e) =>
-                    setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 12))
-                  }
-                  placeholder="Confirm PIN"
-                  className="h-9 w-40 rounded border border-border px-3 text-sm"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => enrollPin.mutate()}
-                  disabled={
-                    pin.length < 6 || pin !== confirmPin || enrollPin.isPending
-                  }
-                >
-                  {enrollPin.isPending ? "Enrolling…" : "Enroll PIN"}
-                </Button>
-              </div>
-              {pin.length > 0 && confirmPin.length > 0 && pin !== confirmPin && (
-                <p className="text-xs text-danger">PINs do not match.</p>
-              )}
-              {enrollPin.error && (
-                <p className="text-xs text-danger">{String(enrollPin.error)}</p>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="current-password"
-                  maxLength={12}
-                  value={pin}
-                  onChange={(e) =>
-                    setPin(e.target.value.replace(/\D/g, "").slice(0, 12))
-                  }
-                  placeholder="Current PIN"
-                  className="h-9 w-40 rounded border border-border px-3 text-sm"
-                />
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => disablePin.mutate()}
-                  disabled={pin.length < 6 || disablePin.isPending}
-                >
-                  {disablePin.isPending ? "Removing…" : "Remove PIN"}
-                </Button>
-              </div>
-              {disablePin.error && (
-                <p className="text-xs text-danger">{String(disablePin.error)}</p>
-              )}
             </div>
           )}
         </CardContent>

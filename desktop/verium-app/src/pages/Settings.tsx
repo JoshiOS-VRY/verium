@@ -29,7 +29,6 @@ import {
 import { useActiveCoin, useEnabledCoins } from "@/lib/coin/context";
 import { clearStakingStoppedByUser } from "@/hooks/useAutoStake";
 import { clearMiningStoppedByUser } from "@/lib/mining-session";
-import { cn } from "@/lib/utils";
 import {
   rpcGetConfig,
   tauriCheckForUpdates,

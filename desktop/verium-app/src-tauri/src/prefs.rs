@@ -5,8 +5,9 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::fs as async_fs;
 
-use crate::coin_profile::{CoinId, NetworkMode, parse_coin_id};
+use crate::coin_profile::{CoinId, NetworkMode};
 use crate::config::{load_config_for_network, resolve_legacy_wallet_outside_cfg, wallet_dat_exists};
+use crate::onboarding::OnboardingCheckpoint;
 use crate::wallet::keystore;
 use crate::wallet::mode::WalletMode;
 use crate::config::app_config_base;
@@ -73,10 +74,10 @@ pub struct UserPreferences {
     /// Optional VRM/USD price assumption for solo revenue estimates.
     #[serde(default)]
     pub mining_vrm_price_usd: Option<f64>,
-    /// VRM address for official pool payouts (Stratum username prefix).
+    /// VRM address for public pool payouts (Stratum username prefix).
     #[serde(default)]
     pub pool_payout_address: Option<String>,
-    /// Worker suffix for official pool mining (`ADDRESS.worker`).
+    /// Worker suffix for public pool mining (`ADDRESS.worker`).
     #[serde(default)]
     pub pool_worker_name: Option<String>,
     /// Last selected mining tab: `solo` or `pool`.
@@ -103,12 +104,22 @@ pub struct UserPreferences {
     /// modes restarts the daemons and clears RPC URL overrides.
     #[serde(default)]
     pub network_mode: NetworkMode,
-    /// Full local node vs Electrum light client.
+    /// App-wide default: full local node vs Electrum light client. Retained as
+    /// the fallback when a coin has no explicit `wallet_mode_by_coin` entry, so
+    /// old prefs keep working and new installs inherit one sensible default.
     #[serde(default)]
     pub wallet_mode: WalletMode,
+    /// Per-coin wallet mode overrides keyed by coin id (`verium`, `vericoin`).
+    /// Enables e.g. Verium full node + Vericoin light on the same device.
+    #[serde(default)]
+    pub wallet_mode_by_coin: Option<HashMap<String, WalletMode>>,
     /// Optional per-coin Electrum server URIs (`host:port` or `tls://host:port`).
     #[serde(default)]
     pub electrum_servers_by_coin: Option<HashMap<String, Vec<String>>>,
+    /// Resumable onboarding checkpoints keyed by coin id. Lets the setup wizard
+    /// survive refreshes and restarts without losing the user's place.
+    #[serde(default)]
+    pub onboarding_by_coin: Option<HashMap<String, OnboardingCheckpoint>>,
 }
 
 fn default_active_coin() -> String {
@@ -192,7 +203,9 @@ impl Default for UserPreferences {
             bootstrap_imported_at_by_coin: None,
             network_mode: NetworkMode::Mainnet,
             wallet_mode: WalletMode::FullNode,
+            wallet_mode_by_coin: None,
             electrum_servers_by_coin: None,
+            onboarding_by_coin: None,
         }
     }
 }
@@ -233,7 +246,9 @@ pub struct PartialUserPreferences {
     pub bootstrap_imported_at_by_coin: Option<HashMap<String, i64>>,
     pub network_mode: Option<NetworkMode>,
     pub wallet_mode: Option<WalletMode>,
+    pub wallet_mode_by_coin: Option<HashMap<String, WalletMode>>,
     pub electrum_servers_by_coin: Option<HashMap<String, Vec<String>>>,
+    pub onboarding_by_coin: Option<HashMap<String, OnboardingCheckpoint>>,
 }
 
 pub fn prefs_path() -> PathBuf {
@@ -260,6 +275,44 @@ pub fn coin_enabled(prefs: &UserPreferences, coin: CoinId) -> bool {
     }
 }
 
+/// Effective wallet mode for one coin: explicit per-coin override, else the
+/// app-wide `wallet_mode` default. This is the single source of truth — call
+/// sites must use this rather than reading `prefs.wallet_mode` directly.
+pub fn wallet_mode_for(prefs: &UserPreferences, coin: CoinId) -> WalletMode {
+    prefs
+        .wallet_mode_by_coin
+        .as_ref()
+        .and_then(|m| m.get(coin.as_str()).copied())
+        .unwrap_or(prefs.wallet_mode)
+}
+
+/// Persist a per-coin wallet mode override (mutates in place; caller saves).
+pub fn set_wallet_mode_for(prefs: &mut UserPreferences, coin: CoinId, mode: WalletMode) {
+    let mut map = prefs.wallet_mode_by_coin.take().unwrap_or_default();
+    map.insert(coin.as_str().to_string(), mode);
+    prefs.wallet_mode_by_coin = Some(map);
+}
+
+/// Read the onboarding checkpoint for a coin (default = not started).
+pub fn onboarding_for(prefs: &UserPreferences, coin: CoinId) -> OnboardingCheckpoint {
+    prefs
+        .onboarding_by_coin
+        .as_ref()
+        .and_then(|m| m.get(coin.as_str()).cloned())
+        .unwrap_or_default()
+}
+
+/// Persist an onboarding checkpoint for a coin (mutates in place; caller saves).
+pub fn set_onboarding_for(
+    prefs: &mut UserPreferences,
+    coin: CoinId,
+    checkpoint: OnboardingCheckpoint,
+) {
+    let mut map = prefs.onboarding_by_coin.take().unwrap_or_default();
+    map.insert(coin.as_str().to_string(), checkpoint);
+    prefs.onboarding_by_coin = Some(map);
+}
+
 pub fn wallet_unlock_duration_for(prefs: &UserPreferences, coin: CoinId) -> u32 {
     prefs
         .wallet_unlock_duration_by_coin
@@ -270,8 +323,8 @@ pub fn wallet_unlock_duration_for(prefs: &UserPreferences, coin: CoinId) -> u32 
 
 const PREFS_STORE_LABEL: &str = "user-preferences";
 
-/// Align setup flags and wallet mode with an on-disk light keystore (e.g. after import).
-fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool> {
+/// Mark setup complete for chains that already have a persisted light keystore.
+pub fn reconcile_setup_flags_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool> {
     let mut changed = false;
     let mut setup = prefs.setup_completed_by_coin.clone().unwrap_or_default();
 
@@ -291,20 +344,41 @@ fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool>
         }
     }
 
-    if !prefs.wallet_mode.is_light() {
-        let active = parse_coin_id(&prefs.active_coin).unwrap_or(CoinId::Verium);
-        if keystore::wallet_exists(active).unwrap_or(false) {
-            if let Ok(cfg) = load_config_for_network(active, prefs.network_mode) {
-                let has_full_node_wallet = wallet_dat_exists(active, &cfg)
-                    || resolve_legacy_wallet_outside_cfg(active, &cfg).is_some();
-                if !has_full_node_wallet {
-                    prefs.wallet_mode = WalletMode::Light;
-                    changed = true;
-                    tracing::info!(
-                        "wallet_mode set to light: {} light wallet exists without wallet.dat",
-                        active.as_str()
-                    );
-                }
+    Ok(changed)
+}
+
+/// Align setup flags and per-coin wallet mode with on-disk light keystores
+/// (e.g. after an import). Sets a coin to light mode when it has a light
+/// keystore but no full-node `wallet.dat` and no explicit full-node override.
+fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool> {
+    let mut changed = reconcile_setup_flags_with_keystore(prefs)?;
+
+    for coin in [CoinId::Verium, CoinId::Vericoin] {
+        if wallet_mode_for(prefs, coin).is_light() {
+            continue;
+        }
+        // Only auto-flip coins that have no explicit per-coin override yet.
+        let has_explicit_override = prefs
+            .wallet_mode_by_coin
+            .as_ref()
+            .map(|m| m.contains_key(coin.as_str()))
+            .unwrap_or(false);
+        if has_explicit_override {
+            continue;
+        }
+        if !keystore::wallet_exists(coin).unwrap_or(false) {
+            continue;
+        }
+        if let Ok(cfg) = load_config_for_network(coin, prefs.network_mode) {
+            let has_full_node_wallet = wallet_dat_exists(coin, &cfg)
+                || resolve_legacy_wallet_outside_cfg(coin, &cfg).is_some();
+            if !has_full_node_wallet {
+                set_wallet_mode_for(prefs, coin, WalletMode::Light);
+                changed = true;
+                tracing::info!(
+                    "wallet_mode[{}] set to light: light wallet exists without wallet.dat",
+                    coin.as_str()
+                );
             }
         }
     }
@@ -387,6 +461,42 @@ pub async fn save(prefs: &UserPreferences) -> AppResult<()> {
     let json = serde_json::to_string_pretty(prefs)?;
     async_fs::write(&path, json).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod mode_tests {
+    use super::*;
+
+    #[test]
+    fn per_coin_mode_falls_back_to_app_wide_default() {
+        let mut prefs = UserPreferences::default();
+        prefs.wallet_mode = WalletMode::FullNode;
+        assert_eq!(wallet_mode_for(&prefs, CoinId::Verium), WalletMode::FullNode);
+        assert_eq!(wallet_mode_for(&prefs, CoinId::Vericoin), WalletMode::FullNode);
+    }
+
+    #[test]
+    fn per_coin_override_wins_independently() {
+        let mut prefs = UserPreferences::default();
+        prefs.wallet_mode = WalletMode::FullNode;
+        set_wallet_mode_for(&mut prefs, CoinId::Vericoin, WalletMode::Light);
+        // Vericoin flips to light; Verium keeps the full-node default.
+        assert_eq!(wallet_mode_for(&prefs, CoinId::Vericoin), WalletMode::Light);
+        assert_eq!(wallet_mode_for(&prefs, CoinId::Verium), WalletMode::FullNode);
+    }
+
+    #[test]
+    fn onboarding_checkpoint_round_trips() {
+        let mut prefs = UserPreferences::default();
+        let mut cp = onboarding_for(&prefs, CoinId::Verium);
+        assert_eq!(cp.phase, crate::onboarding::OnboardingPhase::NotStarted);
+        cp.step = Some("wallet".to_string());
+        set_onboarding_for(&mut prefs, CoinId::Verium, cp);
+        assert_eq!(
+            onboarding_for(&prefs, CoinId::Verium).step.as_deref(),
+            Some("wallet")
+        );
+    }
 }
 
 pub fn merge(current: UserPreferences, partial: PartialUserPreferences) -> UserPreferences {
@@ -487,8 +597,30 @@ pub fn merge(current: UserPreferences, partial: PartialUserPreferences) -> UserP
         },
         network_mode: partial.network_mode.unwrap_or(current.network_mode),
         wallet_mode: partial.wallet_mode.unwrap_or(current.wallet_mode),
+        wallet_mode_by_coin: {
+            let mut merged = current.wallet_mode_by_coin.clone().unwrap_or_default();
+            if let Some(partial_map) = partial.wallet_mode_by_coin {
+                merged.extend(partial_map);
+            }
+            if merged.is_empty() {
+                None
+            } else {
+                Some(merged)
+            }
+        },
         electrum_servers_by_coin: partial
             .electrum_servers_by_coin
             .or(current.electrum_servers_by_coin),
+        onboarding_by_coin: {
+            let mut merged = current.onboarding_by_coin.clone().unwrap_or_default();
+            if let Some(partial_map) = partial.onboarding_by_coin {
+                merged.extend(partial_map);
+            }
+            if merged.is_empty() {
+                None
+            } else {
+                Some(merged)
+            }
+        },
     }
 }

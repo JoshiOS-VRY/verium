@@ -139,6 +139,14 @@ impl CoinId {
         }
     }
 
+    /// Live chain API (`/blocks/latest`, `/block/:height`) on explorer-v2.
+    pub fn explorer_chain_api_base(self) -> &'static str {
+        match self {
+            CoinId::Verium => "https://explorer.vericonomy.com/v1/vrm",
+            CoinId::Vericoin => "https://explorer.vericonomy.com/v1/vrc",
+        }
+    }
+
     pub fn explorer_logo_url(self) -> &'static str {
         match self {
             CoinId::Verium => "https://explorer.vericonomy.com/img/vericonomy/verium-logo.svg",

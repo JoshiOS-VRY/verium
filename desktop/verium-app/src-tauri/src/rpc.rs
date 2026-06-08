@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::Semaphore;
 
 use crate::coin_profile::CoinId;
 use crate::config::DaemonConfig;
@@ -18,6 +19,28 @@ use crate::node::rpc_auth::{resolve_managed_auth_methods, RpcAuth};
 /// resources over a long session, so we reuse a single client per distinct timeout.
 static HTTP_CLIENTS: Lazy<Mutex<HashMap<u64, Client>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Max concurrent in-flight RPC requests per daemon endpoint (host:port).
+///
+/// `veriumd`/`vericoind` serve RPC with a bounded HTTP work queue (we configure
+/// `-rpcworkqueue=256`, `-rpcthreads=16`). Many independent callers — status
+/// pollers, heal loops, `wait_for_rpc`, wallet hooks — can otherwise burst past
+/// the queue while the node is still warming up, producing a flood of
+/// "http work queue depth exceeded" rejections and a node that never reports
+/// ready. Capping in-flight requests well below the queue depth makes callers
+/// wait on this semaphore instead of overwhelming the daemon.
+const MAX_INFLIGHT_PER_ENDPOINT: usize = 12;
+
+static RPC_GATES: Lazy<Mutex<HashMap<String, Arc<Semaphore>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn endpoint_gate(url: &str) -> Arc<Semaphore> {
+    let mut gates = RPC_GATES.lock().expect("RPC gate map poisoned");
+    gates
+        .entry(url.to_string())
+        .or_insert_with(|| Arc::new(Semaphore::new(MAX_INFLIGHT_PER_ENDPOINT)))
+        .clone()
+}
 
 fn shared_http_client(timeout: Duration) -> AppResult<Client> {
     let key = timeout.as_millis() as u64;
@@ -37,6 +60,7 @@ pub struct RpcClient {
     http: Client,
     url: String,
     auth_methods: Vec<RpcAuth>,
+    gate: Arc<Semaphore>,
 }
 
 #[derive(Serialize)]
@@ -84,10 +108,12 @@ impl RpcClient {
         let url = format!("http://{}:{}/", cfg.rpc_host, cfg.rpc_port);
         let auth_methods = resolve_managed_auth_methods(coin, cfg)?;
         let http = shared_http_client(timeout)?;
+        let gate = endpoint_gate(&url);
         Ok(Self {
             http,
             url,
             auth_methods,
+            gate,
         })
     }
 
@@ -96,6 +122,13 @@ impl RpcClient {
         method: &str,
         params: Value,
     ) -> AppResult<T> {
+        // Bound concurrent requests to this endpoint so bursty callers wait here
+        // rather than overflowing the daemon's HTTP work queue during warmup.
+        let _permit = self
+            .gate
+            .acquire()
+            .await
+            .map_err(|_| AppError::other("RPC concurrency gate closed"))?;
         let mut last_unauthorized = None;
         for auth in &self.auth_methods {
             match self.call_with_auth(auth, method, params.clone()).await {

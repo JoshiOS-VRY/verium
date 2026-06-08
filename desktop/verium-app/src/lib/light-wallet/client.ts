@@ -42,6 +42,21 @@ export async function walletModeSet(mode: WalletMode): Promise<void> {
   return invoke("wallet_mode_set", { mode });
 }
 
+/** Effective wallet mode for a single coin (per-coin override or app default). */
+export async function walletModeGetForCoin(
+  coin: CoinId,
+): Promise<WalletModeStatus> {
+  return invoke<WalletModeStatus>("wallet_mode_get_for_coin", { coin });
+}
+
+/** Set the wallet mode for one coin without affecting the other chain. */
+export async function walletModeSetForCoin(
+  coin: CoinId,
+  mode: WalletMode,
+): Promise<void> {
+  return invoke("wallet_mode_set_for_coin", { coin, mode });
+}
+
 export async function electrumServersGet(coin: CoinId): Promise<string[]> {
   return invoke<string[]>("electrum_servers_get", { coin });
 }

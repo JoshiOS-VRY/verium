@@ -13,6 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::features::effective_network_mode;
 use crate::prefs;
 use crate::rpc::RpcClient;
+use vericonomy_node_supervisor::{PortOwner, ProcessRegistry};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -38,6 +39,11 @@ struct Inner {
     last_invalid_clear_at: Mutex<HashMap<CoinId, Instant>>,
     /// Vericoin: P2P paused via `setnetworkactive false` while txindex catches up.
     txindex_network_paused: Mutex<HashSet<CoinId>>,
+    /// Serialize background heal RPC (`reconsiderblock`, `setnetworkactive`, …).
+    rpc_heal_lock: tokio::sync::Mutex<()>,
+    /// Authoritative record of the daemon PID + RPC port we manage per coin.
+    /// Drives the dedup policy: foreign port listeners are never auto-killed.
+    process_registry: Mutex<ProcessRegistry<CoinId>>,
 }
 
 pub use crate::node::constants::{
@@ -98,8 +104,51 @@ impl AppState {
                 daemon_phase: Mutex::new(HashMap::new()),
                 last_invalid_clear_at: Mutex::new(HashMap::new()),
                 txindex_network_paused: Mutex::new(HashSet::new()),
+                rpc_heal_lock: tokio::sync::Mutex::new(()),
+                process_registry: Mutex::new(ProcessRegistry::new()),
             }),
         })
+    }
+
+    /// Record the daemon we just spawned for `coin` (PID + RPC port). Lets the
+    /// dedup policy tell our node apart from a foreign process on the same port.
+    pub fn record_managed_daemon(&self, coin: CoinId, pid: u32, port: u16) {
+        if pid == 0 {
+            return;
+        }
+        if let Ok(mut reg) = self.inner.process_registry.lock() {
+            reg.record_spawn(coin, pid, port);
+        }
+    }
+
+    /// Forget the managed daemon for `coin` after a confirmed stop/exit.
+    pub fn forget_managed_daemon(&self, coin: CoinId) {
+        if let Ok(mut reg) = self.inner.process_registry.lock() {
+            reg.clear(coin);
+        }
+    }
+
+    /// Classify who owns the RPC port given the PIDs currently listening.
+    pub fn port_owner(&self, coin: CoinId, listening_pids: &[u32]) -> PortOwner {
+        self.inner
+            .process_registry
+            .lock()
+            .map(|reg| reg.classify_port_owner(coin, listening_pids))
+            .unwrap_or(PortOwner::Foreign)
+    }
+
+    /// True only when every PID on the RPC port is the daemon we manage — the
+    /// single gate for automatically freeing the port.
+    pub fn safe_to_free_port(&self, coin: CoinId, listening_pids: &[u32]) -> bool {
+        self.inner
+            .process_registry
+            .lock()
+            .map(|reg| reg.safe_to_kill(coin, listening_pids))
+            .unwrap_or(false)
+    }
+
+    pub async fn rpc_heal_lock(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.inner.rpc_heal_lock.lock().await
     }
 
     pub fn txindex_network_paused(&self, coin: CoinId) -> bool {

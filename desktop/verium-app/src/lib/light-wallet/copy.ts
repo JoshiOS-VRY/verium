@@ -4,7 +4,11 @@ export const lightWalletCopy = {
   unlockUnavailableTitle: "Light wallet not set up",
   unlockUnavailableDescription:
     "Create or unlock your light wallet to use this page. Your keys stay on this device; balance and history come from Vericonomy servers.",
-  unlockUnavailableCta: "Open Settings",
+  unlockUnavailableCta: "Open setup",
+  dashboardNoWalletTitle: "No light wallet on this chain",
+  dashboardNoWalletBody:
+    "Light mode is on, but this device has no encrypted wallet saved for this chain yet. If you already imported a phrase, try unlocking from the dashboard card below. Otherwise import from setup, or switch back to full-node mode in Settings if your funds are in wallet.dat.",
+  dashboardNoWalletCta: "Set up or import light wallet",
   unlockVerifying: "Checking passphrase…",
   unlockApplied: "Unlock applied",
   unlockRefreshingBalance:

@@ -14,6 +14,7 @@ mod dace_commands;
 mod daemon;
 mod error;
 mod explorer_api;
+mod local_block_feed;
 mod pool_api;
 mod pool_miner;
 mod pool_miner_sidecar;
@@ -26,7 +27,8 @@ mod logs;
 mod mining_opt;
 mod multisig;
 mod network_mode_commands;
-mod passkey;
+mod onboarding;
+mod onboarding_commands;
 mod prefs;
 mod receive_requests;
 mod hd_wallet_export;
@@ -170,6 +172,8 @@ pub fn run() {
             commands::quit_wallet,
             commands::fetch_explorer_stats,
             commands::fetch_explorer_blocks,
+            commands::fetch_local_blocks_for_feed,
+            commands::fetch_explorer_blocks_for_feed_cmd,
             commands::fetch_explorer_transactions,
             commands::fetch_explorer_extraction,
             commands::fetch_explorer_chain_tips,
@@ -227,11 +231,6 @@ pub fn run() {
             security_commands::two_factor_disable,
             security_commands::two_factor_is_gated,
             security_commands::two_factor_save_config,
-            security_commands::passkey_status,
-            security_commands::passkey_gate_required,
-            security_commands::passkey_enroll_pin,
-            security_commands::passkey_verify_pin,
-            security_commands::passkey_disable,
             security_commands::auto_lock_get_config,
             security_commands::auto_lock_set_config,
             security_commands::auto_lock_record_activity,
@@ -287,6 +286,14 @@ pub fn run() {
             wallet_commands::light_wallet_exists,
             wallet_commands::light_server_status,
             wallet_commands::electrum_cross_verify_tip,
+            wallet_commands::wallet_mode_get_for_coin,
+            wallet_commands::wallet_mode_set_for_coin,
+            onboarding_commands::wallet_profile,
+            onboarding_commands::onboarding_checkpoint_get,
+            onboarding_commands::onboarding_checkpoint_set,
+            onboarding_commands::onboarding_mark_complete,
+            onboarding_commands::legacy_datadir_candidate,
+            onboarding_commands::legacy_request_hd_upgrade,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

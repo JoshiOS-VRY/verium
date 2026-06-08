@@ -106,6 +106,8 @@ export interface WalletInfo {
   unlocked_minting_only?: boolean;
   light_wallet?: boolean;
   light_syncing?: boolean;
+  /** True when the wallet can sign (unlocked with keys available). */
+  private_keys_enabled?: boolean;
 }
 
 export interface TransactionItem {

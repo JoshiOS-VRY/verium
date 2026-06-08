@@ -28,3 +28,22 @@ export async function invalidateWalletQueries(
     }),
   ]);
 }
+
+/** Refresh light-wallet presence, balance, and mode after create/import/unlock. */
+export async function invalidateLightWalletQueries(
+  queryClient: QueryClient,
+  coin: CoinId,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, "getwalletinfo"),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, "light-server-status"),
+    }),
+    queryClient.invalidateQueries({ queryKey: ["wallet-mode-status"] }),
+  ]);
+}

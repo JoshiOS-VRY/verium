@@ -50,7 +50,7 @@ async fn verify_wallet_passphrase_for_send(
         .ok_or_else(|| AppError::other("Wallet passphrase required to send"))?;
 
     let prefs = crate::prefs::load().await?;
-    if prefs.wallet_mode.is_light() {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         crate::wallet::keystore::verify_passphrase(coin, pass)?;
         return Ok(());
     }

@@ -16,10 +16,7 @@ import {
   startPoolMiner,
   stopPoolMiner,
 } from "@/lib/pool-miner-api";
-import {
-  POOL_STRATUM_URL,
-  poolWorkerUsername,
-} from "@/lib/verium-pool";
+import { POOL_STRATUM_URL, poolWorkerUsername } from "@/lib/verium-pool";
 import { MiningThreadControls } from "@/components/MiningThreadControls";
 import { PoolPayoutAddressControls } from "@/components/pool/PoolPayoutAddressControls";
 import { poolPayoutAddressConfigured } from "@/lib/pool-dashboard-address";
@@ -83,8 +80,7 @@ export function PoolMiningControls({
   });
 
   const running = status.data?.running ?? false;
-  const sidecarReady =
-    usesSidecar ?? detect.data?.sidecarFound ?? false;
+  const sidecarReady = usesSidecar ?? detect.data?.sidecarFound ?? false;
   const backendLabel =
     running && status.data?.backend
       ? status.data.backend === "veriumMiner"
@@ -93,10 +89,7 @@ export function PoolMiningControls({
       : sidecarReady
         ? "veriumMiner"
         : "native fallback";
-  const username = poolWorkerUsername(
-    payoutAddress,
-    workerName || "wallet",
-  );
+  const username = poolWorkerUsername(payoutAddress, workerName || "wallet");
 
   const start = useMutation({
     mutationFn: async () => {
@@ -110,7 +103,9 @@ export function PoolMiningControls({
     },
     onSuccess: () => {
       onStartPool();
-      void queryClient.invalidateQueries({ queryKey: ["pool-miner", "status"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["pool-miner", "status"],
+      });
       void queryClient.invalidateQueries({ queryKey: ["pool-miner", "logs"] });
     },
   });
@@ -118,7 +113,9 @@ export function PoolMiningControls({
   const stop = useMutation({
     mutationFn: stopPoolMiner,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["pool-miner", "status"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["pool-miner", "status"],
+      });
       void queryClient.invalidateQueries({ queryKey: ["pool-miner", "logs"] });
     },
   });
@@ -135,7 +132,7 @@ export function PoolMiningControls({
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <Cpu className="h-4 w-4 text-accent" aria-hidden />
-          <CardTitle className="normal-case">Mine on the official pool</CardTitle>
+          <CardTitle className="normal-case">Mine on the public pool</CardTitle>
           {running ? (
             <Badge tone="success">Mining</Badge>
           ) : (
@@ -155,8 +152,8 @@ export function PoolMiningControls({
           ) : (
             <>
               Native pool miner (portable scrypt²) via Stratum to{" "}
-              <span className="font-mono text-xs">{POOL_STRATUM_URL}</span>.
-              Run <code className="text-xs">npm run fetch:cpuminer</code> or set{" "}
+              <span className="font-mono text-xs">{POOL_STRATUM_URL}</span>. Run{" "}
+              <code className="text-xs">npm run fetch:cpuminer</code> or set{" "}
               <code className="text-xs">CPUMINER_PATH</code> for full speed.
             </>
           )}
@@ -196,9 +193,7 @@ export function PoolMiningControls({
           topology={topology}
           logicalCpus={logicalCpus}
           activeThreads={
-            running
-              ? (status.data?.activeThreads ?? threads)
-              : undefined
+            running ? (status.data?.activeThreads ?? threads) : undefined
           }
           isMining={running}
           liveAdaptive={false}

@@ -66,7 +66,7 @@ export function useAutoMine() {
   const blockchain = useQuery({
     queryKey: coinQueryKey(VERIUM, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(VERIUM),
-    refetchInterval: 10_000,
+    refetchInterval: false,
     enabled:
       !isLight &&
       loaded &&
