@@ -1,13 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { coinQueryKey } from "@/lib/coin/profile";
-import { PoolMinerLogPanel } from "@/components/pool/PoolMinerLogPanel";
 import { PoolMiningControls } from "@/components/pool/PoolMiningControls";
+import {
+  MiningHashrateChart,
+  type HashSample,
+} from "@/components/MiningHashrateChart";
 import { ExternalLinkButton } from "@/components/ExternalLinkButton";
 import {
   Card,
-  CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
@@ -26,16 +27,13 @@ export function PoolMiningPanel({
   prefs,
   enabled,
   payoutAddress,
-  onPayoutAddressChange,
   workerName,
-  onWorkerNameChange,
+  onPoolIdentityChange,
   miningThreads,
   autoAdjustThreads,
   manualThreads,
   suggestedThreads,
   maxThreads,
-  scratchpadMib,
-  usesSidecar,
   topology,
   logicalCpus,
   onAutoAdjustChange,
@@ -48,16 +46,13 @@ export function PoolMiningPanel({
   prefs: UserPreferences;
   enabled: boolean;
   payoutAddress: string;
-  onPayoutAddressChange: (address: string) => void;
   workerName: string;
-  onWorkerNameChange: (name: string) => void;
+  onPoolIdentityChange: (payoutAddress: string, workerName: string) => void;
   miningThreads: number;
   autoAdjustThreads: boolean;
   manualThreads: number;
   suggestedThreads?: number;
   maxThreads: number;
-  scratchpadMib?: number;
-  usesSidecar?: boolean;
   topology?: CpuTopology;
   logicalCpus?: number;
   onAutoAdjustChange: (checked: boolean) => void;
@@ -68,6 +63,7 @@ export function PoolMiningPanel({
   onStopSolo: () => void;
 }) {
   const updatePrefs = useUserPreferences((s) => s.update);
+  const prefsLoaded = useUserPreferences((s) => s.loaded);
 
   const addresses = useQuery({
     queryKey: coinQueryKey("verium", "listaddressgroupings"),
@@ -88,14 +84,51 @@ export function PoolMiningPanel({
     refetchInterval: false,
   });
   const localPoolMining = localStatus.data?.running === true;
+  const localHashrate = localStatus.data?.hashrateHm ?? 0;
+
+  // Session hashrate samples for the chart, sourced from the (supervisor-backed)
+  // pool miner status poll. Reset whenever a mining session ends.
+  const [samples, setSamples] = useState<HashSample[]>([]);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number>();
+  const lastSampleRef = useRef<{ t: number; hr: number } | null>(null);
 
   useEffect(() => {
+    if (!localPoolMining) {
+      lastSampleRef.current = null;
+      setSamples([]);
+      setSessionStartedAt(undefined);
+      return;
+    }
+    setSessionStartedAt((prev) => prev ?? Math.floor(Date.now() / 1000));
+  }, [localPoolMining]);
+
+  useEffect(() => {
+    if (!localPoolMining) return;
+    const now = Date.now();
+    const last = lastSampleRef.current;
+    if (last && localHashrate === last.hr && now - last.t < 4000) return;
+    lastSampleRef.current = { t: now, hr: localHashrate };
+    setSamples((prev) =>
+      [...prev, { t: now, hashrate: localHashrate }].slice(-720),
+    );
+  }, [localHashrate, localPoolMining]);
+
+  const sessionAvg = useMemo(() => {
+    if (samples.length === 0) return localPoolMining ? localHashrate : null;
+    return samples.reduce((a, s) => a + s.hashrate, 0) / samples.length;
+  }, [samples, localPoolMining, localHashrate]);
+
+  useEffect(() => {
+    // Wait until persisted prefs are loaded — otherwise we may overwrite a saved
+    // payout address with a first-run suggestion while defaults are still showing.
+    if (!prefsLoaded) return;
     if (prefs.pool_payout_address?.trim()) return;
     const suggested = suggestPoolPayoutAddress(prefs, addresses.data);
     if (suggested) {
       void updatePrefs({ pool_payout_address: suggested });
     }
   }, [
+    prefsLoaded,
     prefs.pool_payout_address,
     prefs.mining_reward_address_mode,
     prefs.mining_reward_address,
@@ -105,20 +138,15 @@ export function PoolMiningPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      {localPoolMining ? <PoolMinerLogPanel /> : null}
-
       <PoolMiningControls
         payoutAddress={payoutAddress}
-        onPayoutAddressChange={onPayoutAddressChange}
         workerName={workerName}
-        onWorkerNameChange={onWorkerNameChange}
+        onPoolIdentityChange={onPoolIdentityChange}
         threads={miningThreads}
         autoAdjustThreads={autoAdjustThreads}
         manualThreads={manualThreads}
         suggestedThreads={suggestedThreads}
         maxThreads={maxThreads}
-        scratchpadMib={scratchpadMib}
-        usesSidecar={usesSidecar}
         topology={topology}
         logicalCpus={logicalCpus}
         onAutoAdjustChange={onAutoAdjustChange}
@@ -130,19 +158,22 @@ export function PoolMiningPanel({
         onStopSolo={onStopSolo}
       />
 
+      {localPoolMining ? (
+        <MiningHashrateChart
+          samples={samples}
+          sessionAvg={sessionAvg}
+          sessionStartedAt={sessionStartedAt}
+          active={localPoolMining}
+        />
+      ) : null}
+
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between gap-3">
           <CardTitle className="normal-case">Pool dashboard</CardTitle>
-          <CardDescription>
-            Workers, hashrate charts, pending rewards, and payout history are on
-            the public pool site — not in the wallet.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
           <ExternalLinkButton href={dashboardHref} variant="primary">
             Open pool.vericonomy.com
           </ExternalLinkButton>
-        </CardContent>
+        </CardHeader>
       </Card>
     </div>
   );

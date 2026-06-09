@@ -61,10 +61,6 @@ export function PoolPayoutAddressControls({
           New
         </Button>
       </div>
-      <span className="text-xs text-fg-subtle">
-        Pool rewards are sent to this address. The worker name below is only a
-        label for stats.
-      </span>
       {!address.trim() ? (
         <p className="text-xs text-warning">
           Choose a payout address before starting pool mining.

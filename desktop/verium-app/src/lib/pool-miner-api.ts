@@ -5,16 +5,28 @@ export interface PoolMinerStartConfig {
   username: string;
   password?: string;
   threads: number;
+  /** Optional comma-separated failover pool URL(s) for the sidecar backend. */
+  backupUrl?: string;
 }
+
+export type PoolMinerBackend = "sidecar" | "native" | string;
 
 export interface PoolMinerStatus {
   running: boolean;
   hashrateHm: number;
   worker: string;
   lastLogLine: string;
-  /** `native` — hashing inside veriumd. */
-  backend: string;
+  /** `sidecar` — dedicated cpuminer process; `native` — hashing inside veriumd. */
+  backend: PoolMinerBackend;
   activeThreads: number;
+  /** Accepted shares this session (sidecar backend only). */
+  acceptedShares: number;
+  /** Rejected shares this session (sidecar backend only). */
+  rejectedShares: number;
+  /** True when the miner reports a live pool connection. */
+  poolConnected: boolean;
+  /** Human-readable connection state (e.g. `connected`, `restarting`). */
+  connectionState: string;
 }
 
 export interface PoolMinerDetectResult {
@@ -27,7 +39,10 @@ export interface PoolMinerDetectResult {
 }
 
 export interface PoolMinerMemoryLimits {
+  /** Auto-adjust / cpuminer `-t 0` recommendation. */
   maxSafeThreads: number;
+  /** Manual thread slider ceiling (P-logical count when hybrid). */
+  maxManualThreads: number;
   scratchpadMib: number;
   totalRamMib: number;
   availableRamMib: number;
@@ -40,10 +55,6 @@ export function detectPoolMiner(): Promise<PoolMinerDetectResult> {
 
 export function fetchPoolMinerStatus(): Promise<PoolMinerStatus> {
   return invoke<PoolMinerStatus>("pool_miner_status");
-}
-
-export function fetchPoolMinerLogLines(maxLines = 120): Promise<string[]> {
-  return invoke<string[]>("pool_miner_log_lines", { maxLines });
 }
 
 export function fetchPoolMinerMemoryLimits(): Promise<PoolMinerMemoryLimits> {

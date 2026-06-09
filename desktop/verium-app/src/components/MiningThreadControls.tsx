@@ -14,7 +14,7 @@ interface MiningThreadControlsProps {
   manualThreads: number;
   /** Device-tuned max threads when auto-adjust is on. */
   suggestedThreads?: number;
-  /** Allowed max threads (detected logical CPUs − 1). */
+  /** Allowed max threads (detected logical CPUs − 1, or cpuminer recommendation). */
   maxThreads: number;
   topology?: CpuTopology;
   logicalCpus?: number;
@@ -25,8 +25,6 @@ interface MiningThreadControlsProps {
   liveAdaptive?: boolean;
   disabled?: boolean;
   compact?: boolean;
-  /** Extra hint shown under manual thread input (e.g. pool RAM limits). */
-  memoryNote?: string;
   onAutoAdjustChange: (autoAdjust: boolean) => void;
   onManualThreadsChange: (threads: number) => void;
 }
@@ -43,7 +41,6 @@ export function MiningThreadControls({
   liveAdaptive = true,
   disabled = false,
   compact = false,
-  memoryNote,
   onAutoAdjustChange,
   onManualThreadsChange,
 }: MiningThreadControlsProps) {
@@ -60,11 +57,6 @@ export function MiningThreadControls({
       ? activeThreads
       : deviceCeiling
     : clampMiningThreads(manualThreads, allowedMax);
-
-  const cpuHint =
-    detected > 0
-      ? `${detected} logical CPU${detected === 1 ? "" : "s"} detected`
-      : null;
 
   const handleManualThreadsChange = (raw: number) => {
     if (triedToMineOnAllLogicalCpus(raw, topology, detected)) {
@@ -106,27 +98,12 @@ export function MiningThreadControls({
               {effectiveThreads}
             </span>{" "}
             thread{effectiveThreads === 1 ? "" : "s"}
-            {cpuHint ? (
-              <>
-                {" "}
-                (max{" "}
-                <span className="tabular-nums">{allowedMax}</span> of{" "}
-                <span className="tabular-nums">{detected}</span> detected — one
-                CPU reserved for the system)
-              </>
-            ) : (
-              " based on CPU topology"
-            )}
-            {suggestedThreads == null ? (
-              " (detecting…)"
-            ) : null}
+            {suggestedThreads == null ? " (detecting…)" : null}
             {isMining && liveAdaptive ? (
               <>
                 {" "}
-                · adjusts every {ADAPTIVE_MINING_POLL_MS / 1000}s from CPU load
+                · adjusts every {ADAPTIVE_MINING_POLL_MS / 1000}s
               </>
-            ) : isMining ? (
-              <> · restart mining to apply thread changes</>
             ) : null}
           </p>
         ) : (
@@ -137,7 +114,7 @@ export function MiningThreadControls({
             <input
               type="number"
               min={MINING_THREADS_MIN}
-              max={detected}
+              max={allowedMax}
               value={effectiveThreads}
               disabled={disabled}
               onChange={(e) =>
@@ -147,20 +124,16 @@ export function MiningThreadControls({
               }
               className="h-9 max-w-[8rem] rounded-md border border-border bg-bg px-3 tabular-nums outline-none focus:border-accent disabled:opacity-50"
             />
-            <p className="text-xs text-fg-subtle">
-              Set between {MINING_THREADS_MIN} and {allowedMax}
-              {cpuHint ? ` (${cpuHint})` : ""}. The UI shows up to {detected}{" "}
-              CPUs, but mining is capped at {allowedMax} so one core stays free.
-              Stop the miner before changing threads.
-              {memoryNote ? ` ${memoryNote}` : ""}
-            </p>
+            {disabled ? (
+              <p className="text-xs text-fg-subtle">
+                Stop mining to change threads.
+              </p>
+            ) : (
+              <p className="text-xs text-fg-subtle">
+                {MINING_THREADS_MIN}–{allowedMax}
+              </p>
+            )}
           </div>
-        )}
-
-        {disabled && !autoAdjust && (
-          <p className="text-xs text-fg-subtle">
-            Stop mining to change thread settings.
-          </p>
         )}
       </div>
 

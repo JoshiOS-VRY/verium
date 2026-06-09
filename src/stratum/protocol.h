@@ -34,6 +34,8 @@ struct WorkerHeaderWork {
 
 double StratumToEffectiveDifficulty(double wire_difficulty);
 void DifficultyToTarget(double difficulty, uint8_t target[32]);
+/** uint32_t[8] target for scanhash/fulltest (matches veriumMiner diff_to_target). */
+void DifficultyToTargetWords(double difficulty, uint32_t target[8]);
 bool HashMeetsTarget(const uint8_t hash[32], const uint8_t target[32]);
 
 bool ParseStratumUrl(const std::string& url, std::string& host_out, uint16_t& port_out);

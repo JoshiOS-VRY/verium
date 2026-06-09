@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import {
   blocksUntilSpendable,
   confirmationProgress,
@@ -43,34 +44,46 @@ export function ConfirmationProgress({
       className={cn("inline-flex items-center justify-end gap-2", className)}
       title={confirmationStatusLabel(confirmations, category)}
     >
-      <svg
-        width={SIZE}
-        height={SIZE}
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="shrink-0"
-        aria-hidden
+      <div
+        className="relative shrink-0"
+        style={{ width: SIZE, height: SIZE }}
       >
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          className="stroke-border"
-          strokeWidth={STROKE}
-        />
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          className={cn(ringColor, "transition-[stroke-dashoffset] duration-300")}
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-          strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={offset}
-          transform={`rotate(-90 ${CENTER} ${CENTER})`}
-        />
-      </svg>
+        <svg
+          width={SIZE}
+          height={SIZE}
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          className="block"
+          aria-hidden
+        >
+          <circle
+            cx={CENTER}
+            cy={CENTER}
+            r={RADIUS}
+            fill="none"
+            className="stroke-border"
+            strokeWidth={STROKE}
+          />
+          <circle
+            cx={CENTER}
+            cy={CENTER}
+            r={RADIUS}
+            fill="none"
+            className={cn(ringColor, "transition-[stroke-dashoffset] duration-300")}
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${CENTER} ${CENTER})`}
+          />
+        </svg>
+        {complete ? (
+          <Check
+            className="pointer-events-none absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-success"
+            strokeWidth={3}
+            aria-hidden
+          />
+        ) : null}
+      </div>
       <span className="min-w-[4rem] text-right text-xs tabular-nums text-fg-muted">
         {confirmations}/{required}
         {remaining > 0 && (

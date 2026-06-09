@@ -12,7 +12,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
@@ -60,9 +59,8 @@ export function MiningHashrateChart({
               booting={minerBooting}
               size="sm"
             />
-            Local hashrate over time
+            Local hashrate
           </CardTitle>
-          <CardDescription>Updated every few seconds while mining.</CardDescription>
         </div>
         <ExplorerLink
           target={{ kind: "raw", url: EXPLORER_PROFITABILITY }}

@@ -44,8 +44,12 @@ import {
   fetchCpuTopology,
   maxMiningThreads,
   optimizedMiningThreads,
+  poolSidecarAutoThreads,
+  poolSidecarManualMaxThreads,
   resolveMiningThreads,
+  resolvePoolMiningThreads,
 } from "@/lib/mining-opt";
+import { poolMiningPrefsPatch } from "@/lib/pool-mining-prefs";
 import {
   miningRewardAddressForStart,
   staticMiningAddressConfigured,
@@ -77,7 +81,12 @@ export function Mining() {
   const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
+  const prefsLoaded = useUserPreferences((s) => s.loaded);
   const updatePrefs = useUserPreferences((s) => s.update);
+
+  const onPoolIdentityChange = (payoutAddress: string, workerName: string) => {
+    void updatePrefs(poolMiningPrefsPatch(payoutAddress, workerName));
+  };
   const topology = useQuery({
     queryKey: ["cpu-topology"],
     queryFn: fetchCpuTopology,
@@ -96,7 +105,16 @@ export function Mining() {
     queryFn: fetchPoolMinerMemoryLimits,
     staleTime: 30_000,
   });
-  const poolMiningThreads = miningThreads;
+  const poolAutoThreads = poolSidecarAutoThreads(poolMemory.data);
+  const poolManualMax = poolSidecarManualMaxThreads(poolMemory.data);
+  const poolMaxThreads = poolManualMax ?? maxThreads;
+  const poolSuggestedThreads = poolAutoThreads ?? suggestedThreads;
+  const poolMiningThreads = resolvePoolMiningThreads(
+    topology.data,
+    autoAdjustThreads,
+    prefs.auto_mine_threads ?? 2,
+    poolMemory.data,
+  );
   const logicalCpus = topology.data?.logicalCpus;
   const [samples, setSamples] = useState<HashSample[]>([]);
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("day");
@@ -165,6 +183,15 @@ export function Mining() {
       void updatePrefs({ auto_mine_threads: cap });
     }
   }, [topology.data, prefs.auto_mine_threads, updatePrefs]);
+
+  useEffect(() => {
+    const cap = poolSidecarManualMaxThreads(poolMemory.data);
+    if (cap == null) return;
+    const current = prefs.auto_mine_threads ?? 2;
+    if (current > cap) {
+      void updatePrefs({ auto_mine_threads: cap });
+    }
+  }, [poolMemory.data, prefs.auto_mine_threads, updatePrefs]);
 
   const handleAutoAdjustChange = (checked: boolean) => {
     const updates: Partial<typeof prefs> = {
@@ -371,25 +398,18 @@ export function Mining() {
             <PoolMiningPanel
               prefs={prefs}
               enabled={explorerEnabled}
-              payoutAddress={prefs.pool_payout_address ?? ""}
-              onPayoutAddressChange={(addr) =>
-                void updatePrefs({ pool_payout_address: addr })
+              payoutAddress={
+                prefsLoaded ? (prefs.pool_payout_address ?? "") : ""
               }
-              workerName={prefs.pool_worker_name ?? "wallet"}
-              onWorkerNameChange={(name) =>
-                void updatePrefs({ pool_worker_name: name })
+              workerName={
+                prefsLoaded ? (prefs.pool_worker_name ?? "wallet") : "wallet"
               }
+              onPoolIdentityChange={onPoolIdentityChange}
               miningThreads={poolMiningThreads}
               autoAdjustThreads={autoAdjustThreads}
               manualThreads={prefs.auto_mine_threads ?? 2}
-              suggestedThreads={suggestedThreads}
-              maxThreads={maxThreads}
-              scratchpadMib={
-                poolMemory.data?.usesSidecar
-                  ? undefined
-                  : poolMemory.data?.scratchpadMib
-              }
-              usesSidecar={poolMemory.data?.usesSidecar}
+              suggestedThreads={poolSuggestedThreads}
+              maxThreads={poolMaxThreads}
               topology={topology.data}
               logicalCpus={logicalCpus}
               onAutoAdjustChange={handleAutoAdjustChange}

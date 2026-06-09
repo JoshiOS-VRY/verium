@@ -927,24 +927,41 @@ pub fn recover_split_chain_layout(coin: CoinId, cfg: &DaemonConfig) -> AppResult
     Ok(recovered)
 }
 
-/// Recommended `-dbcache` (MiB). Keep moderate on desktop — large values spike RAM
-/// during block-index load on mainnet (~1M+ headers).
+/// Recommended `-dbcache` (MiB). Kept modest on desktop: a smaller UTXO cache
+/// trades a little IBD speed for much lower steady-state RAM on an already-synced
+/// node, and avoids RAM spikes during block-index load on mainnet (~1M+ headers).
+/// The wallet bootstraps via CDN snapshot, so full from-scratch IBD is rare.
 pub fn recommended_dbcache_mib() -> u64 {
-    512
+    256
 }
 
-/// veriumd settings that improve block download and validation throughput during IBD.
-pub fn sync_performance_overrides() -> Vec<(&'static str, String)> {
-    vec![
+/// Daemon runtime tuning written to `vericonomy.conf` and passed on the CLI.
+///
+/// Memory-conscious defaults for a desktop wallet. Only keys valid for the target
+/// daemon are emitted: the shared set works on both the unified daemon and the
+/// legacy verium-only v1.x daemon, while the extended set (mempool/buffer caps)
+/// is restricted to the modern unified daemon — passing unknown options to the
+/// legacy daemon on the CLI would abort argument parsing and prevent startup.
+pub fn daemon_runtime_overrides(legacy_flat: bool) -> Vec<(&'static str, String)> {
+    let mut overrides = vec![
         ("dbcache", recommended_dbcache_mib().to_string()),
         // Limit script-check parallelism during index load (default can be 16+).
         ("par", "4".to_string()),
-        ("maxconnections", "32".to_string()),
+        // Fewer peers → fewer per-connection send/receive buffers held in RAM.
+        ("maxconnections", "16".to_string()),
         ("maxuploadtarget", "0".to_string()),
         // Wallet polls status + heal loops concurrently; raise RPC throughput headroom.
         ("rpcworkqueue", "256".to_string()),
         ("rpcthreads", "16".to_string()),
-    ]
+    ];
+    if !legacy_flat {
+        // Modern unified daemon only (bitcoin-core derived).
+        // Cap the mempool (default 300 MiB) — low-volume chains never need that much.
+        overrides.push(("maxmempool", "50".to_string()));
+        // Halve the per-peer receive buffer (KB, default 5000).
+        overrides.push(("maxreceivebuffer", "2500".to_string()));
+    }
+    overrides
 }
 
 /// Ensure `vericonomy.conf` has a complete `[verium]` / `[vericoin]` section that
@@ -960,7 +977,7 @@ pub fn ensure_daemon_conf_complete(coin: CoinId, cfg: &mut DaemonConfig) -> AppR
         ("rpcallowip", "127.0.0.1".to_string()),
         ("checklevel", "0".to_string()),
     ];
-    overrides.extend(sync_performance_overrides());
+    overrides.extend(daemon_runtime_overrides(verium_uses_legacy_flat(cfg)));
     if need_creds {
         let user = cfg
             .rpc_user

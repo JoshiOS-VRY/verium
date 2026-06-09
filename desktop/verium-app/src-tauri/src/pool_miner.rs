@@ -7,8 +7,12 @@ use sysinfo::System;
 use tauri::State;
 
 use crate::coin_profile::{assert_verium, CoinId};
+use crate::cpuminer_topo::{
+    cpuminer_recommended_threads, cpuminer_scratchpad_mib, probe_topo,
+};
 use crate::daemon::{binary_supports_native_pool_mining, resolve_daemon_binary};
 use crate::error::{AppError, AppResult};
+use crate::mining_supervisor;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +22,9 @@ pub struct PoolMinerStartConfig {
     pub username: String,
     pub password: Option<String>,
     pub threads: u32,
+    /// Optional comma-separated failover pool URL(s) for the sidecar backend.
+    #[serde(default)]
+    pub backup_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -28,9 +35,17 @@ pub struct PoolMinerStatus {
     pub hashrate_hm: f64,
     pub worker: String,
     pub last_log_line: String,
-    /// `native` — hashing inside veriumd.
+    /// `sidecar` — dedicated cpuminer process; `native` — hashing inside veriumd.
     pub backend: String,
     pub active_threads: u32,
+    /// Accepted shares this session (sidecar backend only; 0 for native).
+    pub accepted_shares: u64,
+    /// Rejected shares this session (sidecar backend only; 0 for native).
+    pub rejected_shares: u64,
+    /// True when the miner reports a live pool connection.
+    pub pool_connected: bool,
+    /// Human-readable connection state (e.g. `connected`, `restarting`).
+    pub connection_state: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,7 +62,10 @@ pub struct PoolMinerDetectResult {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PoolMinerMemoryLimits {
+    /// Auto-adjust / `-t 0` recommendation (from cpuminer `--tune` when available).
     pub max_safe_threads: u32,
+    /// Manual slider ceiling (P-logical count on hybrid CPUs, else logical − 1).
+    pub max_manual_threads: u32,
     pub scratchpad_mib: u32,
     pub total_ram_mib: u64,
     pub available_ram_mib: u64,
@@ -104,7 +122,32 @@ fn parse_pool_status(value: Value) -> AppResult<PoolMinerStatus> {
             raw.backend
         },
         active_threads: raw.threads,
+        accepted_shares: 0,
+        rejected_shares: 0,
+        pool_connected: raw.running,
+        connection_state: if raw.running {
+            "running".into()
+        } else {
+            "stopped".into()
+        },
     })
+}
+
+fn supervisor_snapshot_to_status(
+    snap: mining_supervisor::SupervisorSnapshot,
+) -> PoolMinerStatus {
+    PoolMinerStatus {
+        running: snap.running,
+        hashrate_hm: snap.hashrate_hm,
+        worker: snap.worker,
+        last_log_line: snap.last_log_line,
+        backend: "sidecar".into(),
+        active_threads: snap.threads,
+        accepted_shares: snap.accepted,
+        rejected_shares: snap.rejected,
+        pool_connected: snap.pool_connected,
+        connection_state: snap.connection_state,
+    }
 }
 
 fn rpc_method_missing(err: &AppError) -> bool {
@@ -117,8 +160,9 @@ fn rpc_method_missing(err: &AppError) -> bool {
     )
 }
 
-/// Stop pool miner through veriumd (used during wallet shutdown).
+/// Stop pool miner everywhere (sidecar + in-process); used during wallet shutdown.
 pub async fn stop_pool_miner_rpc(state: &AppState) -> AppResult<()> {
+    mining_supervisor::stop().await;
     let Ok(client) = verium_rpc(state).await else {
         return Ok(());
     };
@@ -127,6 +171,11 @@ pub async fn stop_pool_miner_rpc(state: &AppState) -> AppResult<()> {
 }
 
 pub async fn pool_miner_status_rpc(state: &AppState) -> AppResult<PoolMinerStatus> {
+    if mining_supervisor::is_active().await {
+        return Ok(supervisor_snapshot_to_status(
+            mining_supervisor::snapshot().await,
+        ));
+    }
     let Ok(client) = verium_rpc(state).await else {
         return Ok(PoolMinerStatus::default());
     };
@@ -159,6 +208,16 @@ fn bundled_pool_miner_detect_uncached() -> Option<PoolMinerDetectResult> {
 }
 
 pub async fn pool_miner_detect_rpc(state: &AppState) -> AppResult<PoolMinerDetectResult> {
+    // Prefer the dedicated cpuminer sidecar when its binary is bundled.
+    if let Some(path) = mining_supervisor::resolve_cpuminer_binary() {
+        return Ok(PoolMinerDetectResult {
+            found: true,
+            rpc_ready: false,
+            sidecar_found: true,
+            path: Some(path.display().to_string()),
+            source: "sidecar".into(),
+        });
+    }
     match verium_rpc(state).await {
         Ok(client) => match client.call("poolminerdetect", json!([])).await {
             Ok(value) => {
@@ -201,12 +260,38 @@ pub async fn pool_miner_detect_rpc(state: &AppState) -> AppResult<PoolMinerDetec
     }
 }
 
-pub async fn pool_miner_memory_limits_rpc(state: &AppState) -> AppResult<PoolMinerMemoryLimits> {
+pub async fn pool_miner_memory_limits_rpc(_state: &AppState) -> AppResult<PoolMinerMemoryLimits> {
     let (total_ram_mib, available_ram_mib) = probe_system_memory_mib();
-    let max_safe_threads = pool_cpu_thread_ceiling();
+    let uses_sidecar = mining_supervisor::sidecar_available();
+    if uses_sidecar {
+        let scratchpad_mib = cpuminer_scratchpad_mib(true);
+        let binary = mining_supervisor::resolve_cpuminer_binary();
+        let max_safe_threads = cpuminer_recommended_threads(binary.as_deref());
+        let topo = probe_topo();
+        let max_manual_threads = if topo.performance_cpus > 0 {
+            topo.performance_cpus
+        } else {
+            pool_cpu_thread_ceiling()
+        }
+        .max(max_safe_threads);
+        return Ok(PoolMinerMemoryLimits {
+            max_safe_threads,
+            max_manual_threads,
+            scratchpad_mib,
+            total_ram_mib,
+            available_ram_mib,
+            uses_sidecar: true,
+        });
+    }
+    // In-process MinGW path uses a much smaller lazily-faulted scratchpad.
+    let scratchpad_mib: u32 = 128;
+    let cpu_ceiling = pool_cpu_thread_ceiling();
+    let ram_ceiling = (available_ram_mib / scratchpad_mib.max(1) as u64).max(1) as u32;
+    let max_safe_threads = cpu_ceiling.min(ram_ceiling).max(1);
     Ok(PoolMinerMemoryLimits {
         max_safe_threads,
-        scratchpad_mib: 128,
+        max_manual_threads: max_safe_threads,
+        scratchpad_mib,
         total_ram_mib,
         available_ram_mib,
         uses_sidecar: false,
@@ -239,8 +324,11 @@ pub async fn pool_miner_log_lines(
     max_lines: Option<usize>,
 ) -> AppResult<Vec<String>> {
     assert_verium(CoinId::Verium)?;
-    let st = pool_miner_status_rpc(state.inner()).await?;
     let cap = max_lines.unwrap_or(120).max(1);
+    if mining_supervisor::is_active().await {
+        return Ok(mining_supervisor::log_lines(cap).await);
+    }
+    let st = pool_miner_status_rpc(state.inner()).await?;
     if st.last_log_line.is_empty() {
         return Ok(Vec::new());
     }
@@ -260,7 +348,61 @@ pub async fn pool_miner_start(
 ) -> AppResult<()> {
     assert_verium(CoinId::Verium)?;
     let password = config.password.as_deref().unwrap_or("x");
-    let threads = config.threads.max(1).min(pool_cpu_thread_ceiling());
+    let sidecar_binary = mining_supervisor::resolve_cpuminer_binary();
+    let (auto_ceiling, manual_ceiling) = if let Some(ref binary) = sidecar_binary {
+        let recommended = cpuminer_recommended_threads(Some(binary.as_path()));
+        let topo = probe_topo();
+        let manual = if topo.performance_cpus > 0 {
+            topo.performance_cpus
+        } else {
+            pool_cpu_thread_ceiling()
+        }
+        .max(recommended);
+        (recommended, manual)
+    } else {
+        let cap = pool_cpu_thread_ceiling();
+        (cap, cap)
+    };
+    let threads = config.threads.max(1).min(manual_ceiling);
+    if threads > auto_ceiling {
+        tracing::info!(
+            "pool miner: {} threads exceeds auto recommendation {} (cpuminer may warn about bandwidth)",
+            threads,
+            auto_ceiling
+        );
+    }
+
+    // Prefer the dedicated cpuminer sidecar (MSVC SIMD, isolated from the node).
+    if let Some(binary) = sidecar_binary {
+        // Stop in-process solo mining first; the sidecar owns the CPU when pool mining.
+        if let Ok(client) = verium_rpc(state.inner()).await {
+            let _ = client.call::<Value>("minerstop", json!([])).await;
+        }
+        mining_supervisor::start(mining_supervisor::RunConfig {
+            binary,
+            stratum_url: config.stratum_url.trim().to_string(),
+            backup_url: config.backup_url.as_ref().and_then(|s| {
+                let t = s.trim();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t.to_string())
+                }
+            }),
+            username: config.username.trim().to_string(),
+            password: password.to_string(),
+            threads,
+        })
+        .await
+        .map_err(AppError::other)?;
+        // Surface an immediate launch failure (bad binary, etc.) to the UI.
+        mining_supervisor::verify_started()
+            .await
+            .map_err(AppError::other)?;
+        return Ok(());
+    }
+
+    // Fallback: in-process veriumd pool miner.
     let params = json!([
         threads,
         config.stratum_url.trim(),

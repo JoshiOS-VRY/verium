@@ -10,6 +10,7 @@ mod chain_tip_watcher;
 mod coin_profile;
 mod commands;
 mod config;
+mod cpuminer_topo;
 mod dace_commands;
 mod daemon;
 mod error;
@@ -24,6 +25,7 @@ mod hardware_wallet;
 mod installer_verify;
 mod logs;
 mod mining_opt;
+mod mining_supervisor;
 mod multisig;
 mod network_mode_commands;
 mod onboarding;
@@ -99,6 +101,11 @@ pub fn run() {
             let startup_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 node::orchestrator::startup(startup_app, &startup_state).await;
+            });
+            // Reap any pool-miner sidecar orphaned by a previous (crashed) session
+            // so it does not hold the API port or double-mine.
+            tauri::async_runtime::spawn(async move {
+                mining_supervisor::kill_stray_miners().await;
             });
             app.manage(state);
             Ok(())

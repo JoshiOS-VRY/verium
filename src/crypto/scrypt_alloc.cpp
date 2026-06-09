@@ -33,7 +33,7 @@ static size_t ScryptScratchSize()
     return static_cast<size_t>(N) * static_cast<size_t>(SCRYPT_MAX_WAYS) * 128 + 63;
 }
 
-unsigned char* ScryptScratchAlloc(size_t size)
+unsigned char* ScryptScratchAllocEx(size_t size, bool prefault)
 {
     if (size == 0) size = ScryptScratchSize();
     unsigned char* buf = nullptr;
@@ -53,7 +53,12 @@ unsigned char* ScryptScratchAlloc(size_t size)
     }
     buf = static_cast<unsigned char*>(VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE));
     if (buf) {
-        ScryptScratchPrefault(buf, size);
+        if (prefault) ScryptScratchPrefault(buf, size);
+        return buf;
+    }
+    buf = static_cast<unsigned char*>(VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (buf) {
+        if (prefault) ScryptScratchPrefault(buf, size);
         return buf;
     }
 #elif defined(__APPLE__)
@@ -61,32 +66,42 @@ unsigned char* ScryptScratchAlloc(size_t size)
     kern_return_t kr = mach_vm_allocate(mach_task_self(), &addr, size, VM_FLAGS_ANYWHERE | VM_FLAGS_SUPERPAGE_SIZE_2MB);
     if (kr == KERN_SUCCESS) {
         buf = reinterpret_cast<unsigned char*>(addr);
-        ScryptScratchPrefault(buf, size);
+        if (prefault) ScryptScratchPrefault(buf, size);
         return buf;
     }
 #elif defined(__linux__)
     buf = static_cast<unsigned char*>(mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_2MB, -1, 0));
     if (buf != MAP_FAILED) {
-        ScryptScratchPrefault(buf, size);
+        if (prefault) ScryptScratchPrefault(buf, size);
         return buf;
     }
     buf = nullptr;
     if (posix_memalign(reinterpret_cast<void**>(&buf), 4096, size) == 0 && buf) {
         madvise(buf, size, MADV_HUGEPAGE);
-        ScryptScratchPrefault(buf, size);
+        if (prefault) ScryptScratchPrefault(buf, size);
         return buf;
     }
 #endif
 
-    buf = scrypt_buffer_alloc();
-    if (buf) ScryptScratchPrefault(buf, ScryptScratchSize());
+    if (size == ScryptScratchSize()) {
+        buf = scrypt_buffer_alloc();
+        if (buf && prefault) ScryptScratchPrefault(buf, size);
+        return buf;
+    }
+    buf = static_cast<unsigned char*>(malloc(size));
+    if (buf && prefault) ScryptScratchPrefault(buf, size);
     return buf;
 }
 
-void ScryptScratchFree(unsigned char* buf)
+unsigned char* ScryptScratchAlloc(size_t size)
+{
+    return ScryptScratchAllocEx(size, true);
+}
+
+void ScryptScratchFreeSized(unsigned char* buf, size_t size)
 {
     if (!buf) return;
-    const size_t size = ScryptScratchSize();
+    if (size == 0) size = ScryptScratchSize();
 #if defined(_WIN32)
     VirtualFree(buf, 0, MEM_RELEASE);
 #elif defined(__APPLE__)
@@ -98,6 +113,11 @@ void ScryptScratchFree(unsigned char* buf)
 #else
     free(buf);
 #endif
+}
+
+void ScryptScratchFree(unsigned char* buf)
+{
+    ScryptScratchFreeSized(buf, 0);
 }
 
 void ScryptScratchPrefault(unsigned char* buf, size_t size)

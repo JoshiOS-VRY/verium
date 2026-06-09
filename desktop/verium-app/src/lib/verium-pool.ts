@@ -1,6 +1,11 @@
 /** Public Verium pool constants (aligned with explorer + pool web). */
 export const POOL_WEB_URL = "https://pool.vericonomy.com";
 export const POOL_STRATUM_URL = "stratum+tcp://mine.vericonomy.com:3333";
+/**
+ * Optional comma-separated failover stratum URL(s) for the sidecar backend.
+ * Empty by default (single endpoint); set when a backup pool node is available.
+ */
+export const POOL_STRATUM_BACKUP_URL = "";
 export const POOL_FEE_PERCENT = 0;
 export const POOL_PAYOUT_THRESHOLD_VRM = 1.0;
 export const POOL_MIN_PAYOUT_CONFIRMATIONS = 120;

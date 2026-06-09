@@ -9,7 +9,13 @@
 /** Allocate scrypt scratch with huge-page / NUMA-local hints when available. */
 unsigned char* ScryptScratchAlloc(size_t size);
 
+/** Like ScryptScratchAlloc; skip page prefault when prefault is false (pool hot path). */
+unsigned char* ScryptScratchAllocEx(size_t size, bool prefault);
+
 void ScryptScratchFree(unsigned char* buf);
+
+/** Free a buffer allocated with ScryptScratchAlloc(nonzero size). */
+void ScryptScratchFreeSized(unsigned char* buf, size_t size);
 
 /** Touch every page so the mining loop does not fault mid-hash. */
 void ScryptScratchPrefault(unsigned char* buf, size_t size);

@@ -10,6 +10,7 @@
 #include <logging.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <vector>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
@@ -113,9 +114,32 @@ constexpr bool kScryptMingwSafeMode = true;
 constexpr bool kScryptMingwSafeMode = false;
 #endif
 
+/**
+ * Opt-in override for MinGW safe mode. Multi-lane SIMD remains gated by the KAT
+ * self-test, so enabling this can only ever select a SIMD tier that produces
+ * bit-identical hashes; otherwise the build falls back to throughput 1. This lets
+ * MSVC-validated or hand-tested Windows builds use full SIMD without a code change,
+ * while the default MinGW cross-build stays on the safe single-lane path.
+ */
+bool ScryptForceSimdEnabled()
+{
+    static const bool forced = [] {
+        const char* v = std::getenv("VERIUM_SCRYPT_SIMD");
+        return v != nullptr
+            && (v[0] == '1' || v[0] == 'y' || v[0] == 'Y' || v[0] == 't' || v[0] == 'T');
+    }();
+    return forced;
+}
+
+/** True when the single-lane safe path should be forced (MinGW default, no override). */
+bool ScryptSafeModeActive()
+{
+    return kScryptMingwSafeMode && !ScryptForceSimdEnabled();
+}
+
 int ComputeValidatedThroughput(int base)
 {
-    if (kScryptMingwSafeMode) {
+    if (ScryptSafeModeActive()) {
         return 1;
     }
     return ComputeThroughput(base);
@@ -151,7 +175,7 @@ void SelectBestTier()
     std::vector<TierCandidate> candidates;
 
 #if defined(__x86_64__) || defined(_M_X64)
-    if (kScryptMingwSafeMode) {
+    if (ScryptSafeModeActive()) {
         candidates.push_back({ScryptDispatchTier::REFERENCE, "sse3way", 1, scrypt_N_1_1_256_multi, scryptHash, true});
     } else {
 #if defined(ENABLE_AVX512)
@@ -263,6 +287,43 @@ void ScryptDispatchHash(const void* input, char* output)
     g_hash_fn(input, output);
 }
 
+bool ScryptDispatchPoolBatch(
+    const void* header_template,
+    const uint8_t pool_target[32],
+    uint32_t* logical_nonce,
+    uint32_t nonce_stride,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce)
+{
+    if (!g_dispatch_init.load()) ScryptDispatchInit();
+    return scrypt_N_1_1_256_multi_pool(
+        header_template, pool_target, logical_nonce, nonce_stride, nHashesDone, scratchbuf, winning_logical_nonce);
+}
+
+void ScryptDispatchPoolPrepareWork(const void* header80, uint32_t pdata[20], uint32_t midstate[8])
+{
+    if (!g_dispatch_init.load()) ScryptDispatchInit();
+    scrypt_pool_prepare_work(header80, pdata, midstate);
+}
+
+bool ScryptDispatchPoolBurst(
+    uint32_t pdata[20],
+    uint32_t midstate[8],
+    const uint32_t pool_target[8],
+    uint32_t* logical_nonce,
+    uint32_t nonce_stride,
+    int burst_hashes,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce,
+    const std::atomic<bool>* stop_flag)
+{
+    if (!g_dispatch_init.load()) ScryptDispatchInit();
+    return scrypt_pool_mining_burst(
+        pdata, midstate, pool_target, logical_nonce, nonce_stride, burst_hashes, nHashesDone, scratchbuf, winning_logical_nonce, stop_flag);
+}
+
 unsigned char* ScryptDispatchBufferAlloc()
 {
     return ScryptScratchAlloc(0);
@@ -270,5 +331,25 @@ unsigned char* ScryptDispatchBufferAlloc()
 
 void ScryptDispatchBufferFree(unsigned char* buf)
 {
+    ScryptScratchFree(buf);
+}
+
+unsigned char* ScryptDispatchPoolScratchAlloc()
+{
+    if (!g_dispatch_init.load()) ScryptDispatchInit();
+    if (g_active_throughput <= 1) {
+        return ScryptScratchAllocEx(SCRYPT_SCRATCHPAD_SIZE, false);
+    }
+    return ScryptScratchAlloc(0);
+}
+
+void ScryptDispatchPoolScratchFree(unsigned char* buf)
+{
+    if (!buf) return;
+    if (!g_dispatch_init.load()) ScryptDispatchInit();
+    if (g_active_throughput <= 1) {
+        ScryptScratchFreeSized(buf, SCRYPT_SCRATCHPAD_SIZE);
+        return;
+    }
     ScryptScratchFree(buf);
 }

@@ -16,25 +16,38 @@ import {
   startPoolMiner,
   stopPoolMiner,
 } from "@/lib/pool-miner-api";
-import { POOL_STRATUM_URL, poolWorkerUsername } from "@/lib/verium-pool";
+import {
+  POOL_STRATUM_BACKUP_URL,
+  POOL_STRATUM_URL,
+  poolWorkerUsername,
+} from "@/lib/verium-pool";
 import { MiningThreadControls } from "@/components/MiningThreadControls";
 import { PoolPayoutAddressControls } from "@/components/pool/PoolPayoutAddressControls";
 import { poolPayoutAddressConfigured } from "@/lib/pool-dashboard-address";
+import {
+  normalizePoolPayoutAddress,
+  normalizePoolWorkerName,
+} from "@/lib/pool-mining-prefs";
 import type { CpuTopology } from "@/lib/mining-opt";
 import { cn } from "@/lib/utils";
 
+function formatPoolMinerError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  const text = String(error).trim();
+  return text && text !== "[object Object]"
+    ? text
+    : "Pool miner failed to start";
+}
+
 export function PoolMiningControls({
   payoutAddress,
-  onPayoutAddressChange,
   workerName,
-  onWorkerNameChange,
+  onPoolIdentityChange,
   threads,
   autoAdjustThreads,
   manualThreads,
   suggestedThreads,
   maxThreads,
-  scratchpadMib,
-  usesSidecar,
   topology,
   logicalCpus,
   onAutoAdjustChange,
@@ -46,16 +59,13 @@ export function PoolMiningControls({
   onStopSolo,
 }: {
   payoutAddress: string;
-  onPayoutAddressChange: (address: string) => void;
   workerName: string;
-  onWorkerNameChange: (name: string) => void;
+  onPoolIdentityChange: (payoutAddress: string, workerName: string) => void;
   threads: number;
   autoAdjustThreads: boolean;
   manualThreads: number;
   suggestedThreads?: number;
   maxThreads: number;
-  scratchpadMib?: number;
-  usesSidecar?: boolean;
   topology?: CpuTopology;
   logicalCpus?: number;
   onAutoAdjustChange: (checked: boolean) => void;
@@ -82,10 +92,13 @@ export function PoolMiningControls({
     },
   });
 
+  const usesSidecar = detect.data?.source === "sidecar";
+
   const status = useQuery({
     queryKey: ["pool-miner", "status"],
     queryFn: fetchPoolMinerStatus,
-    enabled: nodeRpcConnected && (detect.data?.rpcReady ?? false),
+    enabled:
+      nodeRpcConnected && (usesSidecar || (detect.data?.rpcReady ?? false)),
     refetchInterval: false,
     gcTime: 60_000,
   });
@@ -93,22 +106,43 @@ export function PoolMiningControls({
   const running = status.data?.running ?? false;
   const poolMinerBundled = detect.data?.found ?? false;
   const poolMinerRpcReady = detect.data?.rpcReady ?? false;
-  const poolMinerReady = poolMinerRpcReady;
-  const backendLabel = running || poolMinerRpcReady
-    ? "native"
-    : poolMinerBundled
-      ? "restart node"
-      : "upgrade node";
+  const poolMinerReady = usesSidecar || poolMinerRpcReady;
+  const acceptedShares = status.data?.acceptedShares ?? 0;
+  const rejectedShares = status.data?.rejectedShares ?? 0;
+  const totalShares = acceptedShares + rejectedShares;
+  const rejectRate = totalShares > 0 ? rejectedShares / totalShares : 0;
+  const showRejectWarning = running && totalShares >= 10 && rejectRate > 0.05;
+
   const username = poolWorkerUsername(payoutAddress, workerName || "wallet");
+
+  const persistIdentity = (
+    address: string,
+    worker: string,
+  ) => {
+    onPoolIdentityChange(
+      normalizePoolPayoutAddress(address),
+      normalizePoolWorkerName(worker),
+    );
+  };
 
   const start = useMutation({
     mutationFn: async () => {
       onStopSolo();
+      // Persist payout address + worker name before connecting so the next
+      // session restores the same pool identity.
+      persistIdentity(payoutAddress, workerName);
+      // IBD-aware cap: while the node is still syncing, leave headroom for the
+      // sidecar to mine without starving node validation.
+      const effectiveThreads =
+        usesSidecar && !chainSynced
+          ? Math.max(1, Math.floor(threads / 2))
+          : threads;
       await startPoolMiner({
         stratumUrl: POOL_STRATUM_URL,
         username,
         password: "x",
-        threads,
+        threads: effectiveThreads,
+        backupUrl: POOL_STRATUM_BACKUP_URL || undefined,
       });
     },
     onSuccess: () => {
@@ -116,7 +150,6 @@ export function PoolMiningControls({
       void queryClient.invalidateQueries({
         queryKey: ["pool-miner", "status"],
       });
-      void queryClient.invalidateQueries({ queryKey: ["pool-miner", "logs"] });
     },
   });
 
@@ -126,14 +159,15 @@ export function PoolMiningControls({
       void queryClient.invalidateQueries({
         queryKey: ["pool-miner", "status"],
       });
-      void queryClient.invalidateQueries({ queryKey: ["pool-miner", "logs"] });
     },
   });
 
+  // The sidecar connects straight to the pool, so it can mine during node IBD;
+  // the in-process (native) miner stays gated on a synced node.
+  const syncGateOk = usesSidecar || (chainSynced && !syncStalled);
   const canStart =
     poolMinerReady &&
-    chainSynced &&
-    !syncStalled &&
+    syncGateOk &&
     poolPayoutAddressConfigured({ pool_payout_address: payoutAddress }) &&
     !running &&
     !start.isPending;
@@ -149,45 +183,20 @@ export function PoolMiningControls({
           ) : (
             <Badge tone="neutral">Stopped</Badge>
           )}
-          <Badge
-            tone={
-              running || poolMinerRpcReady
-                ? "success"
-                : poolMinerBundled
-                  ? "warning"
-                  : "warning"
-            }
-          >
-            {backendLabel}
-          </Badge>
         </div>
-        <CardDescription>
-          {poolMinerRpcReady || running ? (
-            <>
-              Pool mining runs inside veriumd (Stratum to{" "}
-              <span className="font-mono text-xs">{POOL_STRATUM_URL}</span>) —
-              same SIMD path as solo mining, no separate miner binary.
-            </>
-          ) : poolMinerBundled ? (
-            <>
-              A pool-capable veriumd is bundled, but the running node is still
-              on an older build. Stop and restart the Verium node (or restart
-              the wallet) to enable in-process pool mining.
-            </>
-          ) : (
-            <>
-              This veriumd build does not support in-process pool mining.
-              Rebuild veriumd from the latest sources and restart the Verium
-              node.
-            </>
-          )}
-        </CardDescription>
+        {!usesSidecar && !poolMinerRpcReady && !running ? (
+          <CardDescription>
+            {poolMinerBundled
+              ? "Restart the Verium node to enable pool mining."
+              : "Update veriumd to enable pool mining."}
+          </CardDescription>
+        ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <PoolPayoutAddressControls
           address={payoutAddress}
           disabled={running}
-          onAddressChange={onPayoutAddressChange}
+          onAddressChange={(addr) => persistIdentity(addr, workerName)}
         />
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -195,7 +204,8 @@ export function PoolMiningControls({
             <span className="text-fg-muted">Worker name</span>
             <input
               value={workerName}
-              onChange={(e) => onWorkerNameChange(e.target.value)}
+              onChange={(e) => persistIdentity(payoutAddress, e.target.value)}
+              onBlur={() => persistIdentity(payoutAddress, workerName)}
               disabled={running}
               placeholder="wallet"
               className="h-9 rounded-md border border-border bg-bg-panel px-3 font-mono text-sm outline-none focus:border-accent disabled:opacity-60"
@@ -222,15 +232,6 @@ export function PoolMiningControls({
           isMining={running}
           liveAdaptive={false}
           disabled={running}
-          memoryNote={
-            poolMinerRpcReady
-              ? "Each thread uses ~128 MiB scrypt scratchpad inside veriumd — thread count is limited to logical CPUs minus one."
-              : poolMinerBundled
-                ? "Restart the Verium node to load the bundled pool-capable veriumd."
-                : scratchpadMib != null
-                  ? "Upgrade veriumd to enable native pool mining."
-                  : undefined
-          }
           onAutoAdjustChange={onAutoAdjustChange}
           onManualThreadsChange={onManualThreadsChange}
         />
@@ -245,12 +246,19 @@ export function PoolMiningControls({
                 <AnimatedHashrate
                   value={status.data?.hashrateHm}
                   fractionDigits={2}
-                  immediate={running}
                 />
               ) : (
                 <AnimatedHashrate value={0} fractionDigits={2} />
               )}
             </p>
+            {usesSidecar && running ? (
+              <p className="mt-1 text-xs text-fg-subtle tabular-nums">
+                {acceptedShares} accepted · {rejectedShares} rejected
+                {status.data?.connectionState
+                  ? ` · ${status.data.connectionState}`
+                  : ""}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -283,9 +291,17 @@ export function PoolMiningControls({
         </div>
 
         {start.error ? (
-          <p className="text-sm text-danger">{String(start.error.message)}</p>
+          <p className="text-sm text-danger">
+            {formatPoolMinerError(start.error)}
+          </p>
         ) : null}
-        {!chainSynced && !syncStalled ? (
+        {showRejectWarning ? (
+          <p className="text-sm text-warning">
+            High reject rate ({(rejectRate * 100).toFixed(1)}%). Check your
+            connection or lower the thread count if this persists.
+          </p>
+        ) : null}
+        {!usesSidecar && !chainSynced && !syncStalled ? (
           <p className="text-sm text-warning">
             Wait for the node to sync before starting the pool miner.
           </p>

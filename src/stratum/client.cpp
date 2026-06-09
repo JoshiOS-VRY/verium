@@ -167,8 +167,10 @@ bool StratumClient::TryParseBufferedLine(StratumEvent& event_out, std::string& e
 
     UniValue msg;
     if (!msg.read(line)) {
-        error_out = "invalid stratum json";
-        return false;
+        LogPrintf("stratum: skipping invalid json line\n");
+        event_out = StratumEvent{};
+        error_out.clear();
+        return true;
     }
     event_out = ParseMessage(msg);
     return true;
@@ -268,22 +270,19 @@ StratumEvent StratumClient::ParseMessage(const UniValue& msg)
             ev.notify.clean_jobs = p[8].isBool() ? p[8].get_bool() : false;
             return ev;
         }
-        ev.type = StratumEventType::Disconnected;
-        ev.disconnect_reason = strprintf("unknown method %s", method);
+        LogPrintf("stratum: ignoring unknown method %s\n", method);
         return ev;
     }
 
     if (!msg.exists("id")) {
-        ev.type = StratumEventType::Disconnected;
-        ev.disconnect_reason = "unhandled message";
+        LogPrintf("stratum: ignoring message without id\n");
         return ev;
     }
 
     const uint64_t id = msg["id"].isNum() ? (uint64_t)msg["id"].get_int64() : 0;
     auto it = m_pending.find(id);
     if (it == m_pending.end()) {
-        ev.type = StratumEventType::Disconnected;
-        ev.disconnect_reason = "unexpected response id";
+        LogPrintf("stratum: ignoring unexpected response id %u\n", id);
         return ev;
     }
     const PendingKind kind = it->second;

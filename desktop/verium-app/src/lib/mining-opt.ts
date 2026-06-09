@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { PoolMinerMemoryLimits } from "@/lib/pool-miner-api";
 
 export interface CpuTopology {
   logicalCpus: number;
@@ -207,4 +208,40 @@ export function resolveMiningThreads(
   const max = maxMiningThreads(topology);
   if (autoAdjust) return adaptiveMiningCeiling(topology);
   return clampMiningThreads(manualThreads, max);
+}
+
+/** Auto-adjust ceiling for the cpuminer sidecar (`-t 0` / `--tune`). */
+export function poolSidecarAutoThreads(
+  limits: PoolMinerMemoryLimits | undefined,
+): number | undefined {
+  if (limits?.usesSidecar && limits.maxSafeThreads > 0) {
+    return limits.maxSafeThreads;
+  }
+  return undefined;
+}
+
+/** Manual slider max for the cpuminer sidecar (P-logical count on hybrid CPUs). */
+export function poolSidecarManualMaxThreads(
+  limits: PoolMinerMemoryLimits | undefined,
+): number | undefined {
+  if (limits?.usesSidecar && limits.maxManualThreads > 0) {
+    return limits.maxManualThreads;
+  }
+  return undefined;
+}
+
+/** Pool mining thread count — sidecar uses cpuminer tune for auto; native uses solo rules. */
+export function resolvePoolMiningThreads(
+  topology: CpuTopology | undefined,
+  autoAdjust: boolean,
+  manualThreads: number,
+  limits: PoolMinerMemoryLimits | undefined,
+): number {
+  const autoMax = poolSidecarAutoThreads(limits);
+  const manualMax = poolSidecarManualMaxThreads(limits);
+  if (autoMax != null && manualMax != null) {
+    if (autoAdjust) return autoMax;
+    return clampMiningThreads(manualThreads, manualMax);
+  }
+  return resolveMiningThreads(topology, autoAdjust, manualThreads);
 }

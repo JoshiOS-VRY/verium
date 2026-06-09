@@ -31,6 +31,7 @@
 #include <crypto/scrypt_alloc.h>
 #include <crypto/scrypt_dispatch.h>
 #include <compat.h>
+#include <atomic>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
@@ -941,6 +942,220 @@ bool scrypt_N_1_1_256_multi(void *input, uint256 hashTarget, int *nHashesDone, u
             return true;
         }
     }
+    return false;
+}
+
+static bool pool_hash_meets_target(const uint32_t dhash[8], const uint8_t pool_target[32])
+{
+    const uint8_t* hash = reinterpret_cast<const uint8_t*>(dhash);
+    uint8_t rev[32];
+    for (int i = 0; i < 32; ++i) {
+        rev[i] = hash[31 - i];
+    }
+    return memcmp(rev, pool_target, 32) <= 0;
+}
+
+static void scrypt_pool_set_nonce_word(uint32_t pdata[20], uint32_t logical_nonce)
+{
+    uint8_t nonce_bytes[4];
+    memcpy(nonce_bytes, &logical_nonce, 4);
+    pdata[19] = be32dec(reinterpret_cast<const uint32_t*>(nonce_bytes));
+}
+
+void scrypt_pool_prepare_work(const void* header80, uint32_t pdata[20], uint32_t midstate[8])
+{
+    for (int i = 0; i < 20; i++) {
+        pdata[i] = be32dec(&((const uint32_t*)header80)[i]);
+    }
+    uint32_t data[20];
+    memcpy(data, pdata, 80);
+    sha256_init(midstate);
+    sha256_transform(midstate, data, 0);
+}
+
+static bool scrypt_pool_hash_lanes_cached(
+    uint32_t pdata[20],
+    uint32_t midstate[8],
+    const uint32_t pool_target[8],
+    uint32_t start_logical_nonce,
+    uint32_t nonce_stride,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce)
+{
+    uint32_t data[SCRYPT_MAX_WAYS * 20];
+    uint32_t dhash[SCRYPT_MAX_WAYS * 8];
+    const int throughput = scrypt_best_throughput();
+    const uint32_t Htarg = pool_target[7];
+    int i;
+
+    if (nonce_stride == 0) {
+        nonce_stride = 1;
+    }
+
+    scrypt_pool_set_nonce_word(pdata, start_logical_nonce);
+    for (i = 0; i < throughput; i++) {
+        memcpy(data + i * 20, pdata, 80);
+    }
+
+    for (i = 1; i < throughput; i++) {
+        const uint32_t lane_logical = start_logical_nonce + (uint32_t)i * nonce_stride;
+        scrypt_pool_set_nonce_word(pdata, lane_logical);
+        data[i * 20 + 19] = pdata[19];
+    }
+
+#if defined(HAVE_SHA256_4WAY)
+    if (throughput == 4) {
+        scrypt_N_1_1_256_4way(data, dhash, midstate, scratchbuf, N);
+    } else
+#endif
+#if defined(HAVE_SCRYPT_3WAY) && defined(HAVE_SHA256_4WAY)
+    if (throughput == 12) {
+        scrypt_N_1_1_256_12way(data, dhash, midstate, scratchbuf, N);
+    } else
+#endif
+#if defined(HAVE_SCRYPT_6WAY)
+    if (throughput == 24) {
+        scrypt_N_1_1_256_24way(data, dhash, midstate, scratchbuf, N);
+    } else
+#endif
+#if defined(HAVE_SCRYPT_8WAY)
+    if (throughput == 48) {
+        scrypt_N_1_1_256_48way(data, dhash, midstate, scratchbuf, N);
+    } else
+#endif
+#if defined(HAVE_SCRYPT_3WAY)
+    if (throughput == 3) {
+        scrypt_N_1_1_256_3way(data, dhash, midstate, scratchbuf, N);
+    } else
+#endif
+    {
+        scrypt_N_1_1_256(data, dhash, midstate, scratchbuf);
+    }
+
+    *nHashesDone = throughput;
+
+    for (i = 0; i < throughput; i++) {
+        const uint32_t* lane_hash = dhash + i * 8;
+        if (lane_hash[7] <= Htarg && fulltest(lane_hash, pool_target)) {
+            const uint32_t lane_logical = start_logical_nonce + (uint32_t)i * nonce_stride;
+            if (winning_logical_nonce) {
+                *winning_logical_nonce = lane_logical;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool scrypt_pool_mining_burst(
+    uint32_t pdata[20],
+    uint32_t midstate[8],
+    const uint32_t pool_target[8],
+    uint32_t* logical_nonce,
+    uint32_t nonce_stride,
+    int burst_hashes,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce,
+    const std::atomic<bool>* stop_flag)
+{
+    if (!logical_nonce || !nHashesDone || !pdata || !midstate || !scratchbuf || !pool_target || burst_hashes <= 0) {
+        if (nHashesDone) {
+            *nHashesDone = 0;
+        }
+        return false;
+    }
+    if (nonce_stride == 0) {
+        nonce_stride = 1;
+    }
+    if (winning_logical_nonce) {
+        *winning_logical_nonce = 0;
+    }
+
+    const int throughput = scrypt_best_throughput() > 0 ? scrypt_best_throughput() : 1;
+    const uint32_t Htarg = pool_target[7];
+    int total_done = 0;
+
+    if (throughput <= 1) {
+        uint32_t dhash[8];
+        while (total_done < burst_hashes) {
+            if (stop_flag && stop_flag->load(std::memory_order_relaxed)) {
+                break;
+            }
+            scrypt_pool_set_nonce_word(pdata, *logical_nonce);
+            scrypt_N_1_1_256(pdata, dhash, midstate, scratchbuf);
+            ++total_done;
+            if (dhash[7] <= Htarg && fulltest(dhash, pool_target)) {
+                if (winning_logical_nonce) {
+                    *winning_logical_nonce = *logical_nonce;
+                }
+                *logical_nonce += nonce_stride;
+                *nHashesDone = total_done;
+                return true;
+            }
+            *logical_nonce += nonce_stride;
+        }
+        *nHashesDone = total_done;
+        return false;
+    }
+
+    while (total_done < burst_hashes) {
+        if (stop_flag && stop_flag->load(std::memory_order_relaxed)) {
+            break;
+        }
+        int lane_done = 0;
+        const uint32_t start_nonce = *logical_nonce;
+        const bool found = scrypt_pool_hash_lanes_cached(
+            pdata, midstate, pool_target, start_nonce, nonce_stride, &lane_done, scratchbuf, winning_logical_nonce);
+        if (lane_done <= 0) {
+            break;
+        }
+        total_done += lane_done;
+        if (found) {
+            *logical_nonce = *winning_logical_nonce + nonce_stride;
+            *nHashesDone = total_done;
+            return true;
+        }
+        *logical_nonce = start_nonce + (uint32_t)lane_done * nonce_stride;
+    }
+
+    *nHashesDone = total_done;
+    return false;
+}
+
+bool scrypt_N_1_1_256_multi_pool(
+    const void* header_template,
+    const uint8_t pool_target[32],
+    uint32_t* logical_nonce,
+    uint32_t nonce_stride,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce)
+{
+    if (!logical_nonce || !nHashesDone || !header_template || !scratchbuf || !pool_target) {
+        return false;
+    }
+    if (nonce_stride == 0) {
+        nonce_stride = 1;
+    }
+
+    uint32_t pdata[20];
+    uint32_t midstate[8];
+    uint32_t dhash[8];
+    scrypt_pool_prepare_work(header_template, pdata, midstate);
+    scrypt_pool_set_nonce_word(pdata, *logical_nonce);
+    scrypt_N_1_1_256(pdata, dhash, midstate, scratchbuf);
+    *nHashesDone = 1;
+
+    if (pool_hash_meets_target(dhash, pool_target)) {
+        if (winning_logical_nonce) {
+            *winning_logical_nonce = *logical_nonce;
+        }
+        *logical_nonce += nonce_stride;
+        return true;
+    }
+    *logical_nonce += nonce_stride;
     return false;
 }
 

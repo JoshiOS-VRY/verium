@@ -18,7 +18,7 @@ use std::time::Instant;
 use once_cell::sync::Lazy;
 
 use crate::coin_profile::CoinId;
-use crate::config::{app_config_base, sync_cfg_rpc_credentials_from_conf, sync_performance_overrides, verium_uses_legacy_flat, DaemonConfig};
+use crate::config::{app_config_base, daemon_runtime_overrides, sync_cfg_rpc_credentials_from_conf, verium_uses_legacy_flat, DaemonConfig};
 use crate::error::{AppError, AppResult};
 
 /// BIP14 user-agent comment appended to the bundled daemons' P2P subversion
@@ -193,7 +193,7 @@ impl DaemonManager {
         if legacy_flat {
             std_cmd.arg("-conf=verium.conf");
         }
-        for (key, value) in sync_performance_overrides() {
+        for (key, value) in daemon_runtime_overrides(legacy_flat) {
             std_cmd.arg(format!("-{key}={value}"));
         }
         if let Some(user) = spawn_cfg.rpc_user.as_deref().filter(|u| !u.is_empty()) {

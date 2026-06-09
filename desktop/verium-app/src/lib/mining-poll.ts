@@ -1,7 +1,7 @@
 /** Intervals for the single app-wide mining poll coordinator (see useMiningPollCoordinator). */
 
-/** Pool sidecar / native status — one poll for all UI observers. */
-export const POOL_MINER_STATUS_POLL_MS = 15_000;
+/** Pool native status — matches veriumd 5s hashrate window in poolminer.cpp. */
+export const POOL_MINER_STATUS_POLL_MS = 5_000;
 
 /** Solo miner active flag + thread count. */
 export const MINER_STATE_POLL_MS = 15_000;

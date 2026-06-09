@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <atomic>
+
 static const int SCRYPT_SCRATCHPAD_SIZE = 134218239;
 static const int N = 1048576;
 
@@ -16,6 +18,39 @@ static const int N = 1048576;
 int scrypt_best_throughput();
 
 bool scrypt_N_1_1_256_multi(void* input, uint256 hashTarget, int* nHashesDone, unsigned char* scratchbuf);
+
+/**
+ * Pool mining batch — same SIMD lanes as scrypt_N_1_1_256_multi, but checks each
+ * lane against a Stratum big-endian target. *logical_nonce is the Stratum/header
+ * nonce for lane 0 (advanced on return). *winning_logical_nonce set on success.
+ */
+bool scrypt_N_1_1_256_multi_pool(
+    const void* header_template,
+    const uint8_t pool_target[32],
+    uint32_t* logical_nonce,
+    uint32_t nonce_stride,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce);
+
+/** Precompute pdata + SHA256 midstate for a pool header (reuse while job unchanged). */
+void scrypt_pool_prepare_work(const void* header80, uint32_t pdata[20], uint32_t midstate[8]);
+
+/**
+ * Hash up to burst_hashes nonces using cached pdata/midstate (hot path).
+ * Returns true when a share is found.
+ */
+bool scrypt_pool_mining_burst(
+    uint32_t pdata[20],
+    uint32_t midstate[8],
+    const uint32_t pool_target[8],
+    uint32_t* logical_nonce,
+    uint32_t nonce_stride,
+    int burst_hashes,
+    int* nHashesDone,
+    unsigned char* scratchbuf,
+    uint32_t* winning_logical_nonce,
+    const std::atomic<bool>* stop_flag = nullptr);
 
 void scryptHash(const void* input, char* output);
 unsigned char* scrypt_buffer_alloc();

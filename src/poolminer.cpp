@@ -2,6 +2,19 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+// ---------------------------------------------------------------------------
+// FROZEN — fallback path only.
+//
+// The desktop wallet now drives pool mining through the dedicated cpuminer
+// (veriumMiner) sidecar under the Rust mining supervisor
+// (desktop/verium-app/src-tauri/src/mining_supervisor.rs), which provides full
+// SIMD throughput and isolates hashing from the node process. This in-process
+// miner remains only as a degraded fallback when the sidecar binary is absent.
+//
+// Do not invest new features here; limit changes to maintenance/correctness
+// fixes. See docs in the pool mining architecture plan for the migration path.
+// ---------------------------------------------------------------------------
+
 #include <poolminer.h>
 
 #include <crypto/scrypt_dispatch.h>
@@ -13,6 +26,7 @@
 #include <util/threadnames.h>
 #include <util/time.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -20,10 +34,28 @@
 #include <thread>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#elif defined(__linux__)
+#include <pthread.h>
+#include <sched.h>
+#endif
+
 namespace {
 
-constexpr uint32_t JOB_REFRESH_INTERVAL = 32;
+/** Re-read job state periodically (not every nonce — scrypt batches are large). */
+constexpr uint32_t JOB_REFRESH_INTERVAL = 4096;
 constexpr size_t MAX_SHARE_QUEUE = 256;
+
+/** Short bursts so hashrate updates and stop/cancel stay responsive (~1–4s per burst on MinGW). */
+static int PoolHashBurstSize()
+{
+    const int tp = std::max(1, ScryptDispatchActiveThroughput());
+    return std::min(128, std::max(16, tp * 8));
+}
 
 struct ShareFound {
     std::string job_id;
@@ -58,6 +90,7 @@ std::vector<std::thread> g_worker_threads;
 
 bool g_running = false;
 double g_hashrate_hm = 0.0;
+double g_hashrate_ema = 0.0;
 std::string g_worker;
 std::string g_backend = "native";
 std::string g_last_log;
@@ -68,8 +101,32 @@ JobState g_job_state;
 
 CCriticalSection g_share_mutex;
 std::vector<ShareFound> g_share_queue;
+std::atomic<size_t> g_share_queue_depth{0};
 
 std::atomic<uint64_t> g_hash_counter{0};
+
+int PoolWorkerThreadPriority()
+{
+    const std::string mode = gArgs.GetArg("-minerpriority", "idle");
+    if (mode == "above") return THREAD_PRIORITY_ABOVE_NORMAL;
+    if (mode == "normal") return THREAD_PRIORITY_NORMAL;
+    if (mode == "below") return THREAD_PRIORITY_BELOW_NORMAL;
+    return THREAD_PRIORITY_LOWEST;
+}
+
+void PinPoolWorkerThread(int thread_index)
+{
+    const unsigned int hw = std::max(1u, std::thread::hardware_concurrency());
+    const unsigned int cpu = static_cast<unsigned int>(thread_index) % hw;
+#if defined(__linux__)
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(cpu, &mask);
+    pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
+#elif defined(_WIN32)
+    SetThreadAffinityMask(GetCurrentThread(), DWORD_PTR(1) << cpu);
+#endif
+}
 
 void SetLastLog(const std::string& line)
 {
@@ -77,10 +134,24 @@ void SetLastLog(const std::string& line)
     g_last_log = line;
 }
 
+void StopPoolMinerWithReason(const std::string& reason)
+{
+    LogPrintf("poolminer: %s\n", reason);
+    SetLastLog(reason);
+    g_cancel.store(true);
+}
+
 void WorkerLoop(int thread_id, int thread_count)
 {
     util::ThreadRename(strprintf("poolminer-%d", thread_id));
-    // ScryptDispatchHash uses a per-thread scratch buffer internally (~128 MiB).
+    SetThreadPriority(PoolWorkerThreadPriority());
+    PinPoolWorkerThread(thread_id);
+
+    unsigned char* scratchbuf = ScryptDispatchPoolScratchAlloc();
+    if (!scratchbuf) {
+        LogPrintf("poolminer: thread %d scratch buffer allocation failed\n", thread_id);
+        return;
+    }
 
     const std::string en2_hex = (thread_id == 0 && thread_count == 1)
         ? "00000000"
@@ -91,7 +162,10 @@ void WorkerLoop(int thread_id, int thread_count)
     uint32_t nonce = (uint32_t)thread_id;
     stratum::WorkerHeaderWork header_work;
     bool have_work = false;
-    uint8_t target[32]{};
+    uint32_t target[8]{};
+    uint8_t header[80]{};
+    uint32_t pdata[20]{};
+    uint32_t midstate[8]{};
     uint32_t hashes_since_refresh = 0;
 
     while (!g_cancel.load() && !g_shutdown.load()) {
@@ -108,10 +182,9 @@ void WorkerLoop(int thread_id, int thread_count)
                 continue;
             }
 
-            memcpy(target, snapshot.target, 32);
+            stratum::DifficultyToTargetWords(snapshot.effective_difficulty, target);
             if (snapshot.generation != local_gen || !have_work) {
                 local_gen = snapshot.generation;
-                nonce = (uint32_t)thread_id;
                 std::vector<uint8_t> en2_use = en2;
                 if (snapshot.extranonce2_size != 4) {
                     en2_use.assign(snapshot.extranonce2_size, 0);
@@ -122,6 +195,9 @@ void WorkerLoop(int thread_id, int thread_count)
                     MilliSleep(500);
                     continue;
                 }
+                nonce = (uint32_t)thread_id;
+                memcpy(header, header_work.header_base, 80);
+                ScryptDispatchPoolPrepareWork(header, pdata, midstate);
                 have_work = true;
             }
         }
@@ -131,33 +207,52 @@ void WorkerLoop(int thread_id, int thread_count)
             continue;
         }
 
-        uint8_t header[80];
-        stratum::HeaderWithNonce(header_work, nonce, header);
+        if (g_share_queue_depth.load(std::memory_order_relaxed) >= MAX_SHARE_QUEUE) {
+            MilliSleep(50);
+            continue;
+        }
 
-        char hashbuf[32];
-        ScryptDispatchHash(header, hashbuf);
+        int n_hashes_done = 0;
+        uint32_t winning_nonce = 0;
+        const bool found_share = ScryptDispatchPoolBurst(
+            pdata,
+            midstate,
+            target,
+            &nonce,
+            (uint32_t)thread_count,
+            PoolHashBurstSize(),
+            &n_hashes_done,
+            scratchbuf,
+            &winning_nonce,
+            &g_cancel);
 
-        g_hash_counter.fetch_add(1, std::memory_order_relaxed);
-        hashes_since_refresh++;
+        if (n_hashes_done > 0) {
+            g_hash_counter.fetch_add((uint64_t)n_hashes_done, std::memory_order_relaxed);
+            hashes_since_refresh += (uint32_t)n_hashes_done;
+        }
 
-        if (stratum::HashMeetsTarget(reinterpret_cast<const uint8_t*>(hashbuf), target)) {
+        if (found_share) {
             ShareFound found;
             found.job_id = header_work.job_id;
             found.extranonce2_hex = header_work.extranonce2_hex;
             found.ntime_hex = header_work.ntime_hex;
-            found.nonce_hex = stratum::Uint32LeHex(nonce);
+            found.nonce_hex = stratum::Uint32LeHex(winning_nonce);
             LOCK(g_share_mutex);
             if (g_share_queue.size() < MAX_SHARE_QUEUE) {
                 g_share_queue.push_back(std::move(found));
+                g_share_queue_depth.store(g_share_queue.size(), std::memory_order_relaxed);
             }
-            LogPrintf("poolminer: thread %d found share nonce=%u\n", thread_id, nonce);
+            if (thread_id == 0) {
+                LogPrintf("poolminer: thread %d found share nonce=%u\n", thread_id, winning_nonce);
+            }
         }
 
-        nonce += (uint32_t)thread_count;
-        if (nonce % 4096 == (uint32_t)thread_id) {
+        if (hashes_since_refresh > 0 && hashes_since_refresh % 4096 == 0) {
             std::this_thread::yield();
         }
     }
+
+    ScryptDispatchPoolScratchFree(scratchbuf);
 }
 
 void JoinWorkerThreads()
@@ -176,6 +271,7 @@ void MarkPoolMinerStopped()
     LOCK(g_pool_mutex);
     g_running = false;
     g_hashrate_hm = 0.0;
+    g_hashrate_ema = 0.0;
 }
 
 void RunEngine(EngineConfig cfg)
@@ -191,21 +287,25 @@ void RunEngine(EngineConfig cfg)
     {
         LOCK(g_share_mutex);
         g_share_queue.clear();
+        g_share_queue_depth.store(0);
     }
 
     stratum::StratumClient client;
     std::string err;
     if (!client.Connect(cfg.host, cfg.port, err)) {
+        LogPrintf("poolminer: Pool connect failed: %s\n", err);
         SetLastLog(strprintf("Pool connect failed: %s", err));
         MarkPoolMinerStopped();
         return;
     }
     if (!client.Subscribe(err)) {
+        LogPrintf("poolminer: Subscribe failed: %s\n", err);
         SetLastLog(strprintf("Subscribe failed: %s", err));
         MarkPoolMinerStopped();
         return;
     }
     if (!client.Authorize(cfg.username, cfg.password, err)) {
+        LogPrintf("poolminer: Authorize failed: %s\n", err);
         SetLastLog(strprintf("Authorize failed: %s", err));
         MarkPoolMinerStopped();
         return;
@@ -228,6 +328,7 @@ void RunEngine(EngineConfig cfg)
             {
                 LOCK(g_share_mutex);
                 pending.swap(g_share_queue);
+                g_share_queue_depth.store(0, std::memory_order_relaxed);
             }
             for (const auto& share : pending) {
                 if (!client.SubmitShare(cfg.username, share.job_id, share.extranonce2_hex, share.ntime_hex, share.nonce_hex, err)) {
@@ -242,8 +343,7 @@ void RunEngine(EngineConfig cfg)
         for (;;) {
             stratum::StratumEvent event;
             if (!client.ReadEvent(event, err)) {
-                SetLastLog(strprintf("Stratum read error: %s", err));
-                g_cancel.store(true);
+                StopPoolMinerWithReason(strprintf("Stratum read error: %s", err));
                 break;
             }
             if (event.type == stratum::StratumEventType::None) {
@@ -291,8 +391,7 @@ void RunEngine(EngineConfig cfg)
                 : strprintf("Share rejected: %s", event.submit_error));
             break;
             case stratum::StratumEventType::Disconnected:
-                SetLastLog(strprintf("Stratum disconnected: %s", event.disconnect_reason));
-                g_cancel.store(true);
+                StopPoolMinerWithReason(strprintf("Stratum disconnected: %s", event.disconnect_reason));
                 break;
             default:
                 break;
@@ -313,7 +412,17 @@ void RunEngine(EngineConfig cfg)
             const double sec = (now - hashrate_window_start) / 1000.0;
             if (sec > 0.0) {
                 LOCK(g_pool_mutex);
-                g_hashrate_hm = (double)delta * 60.0 / sec;
+                const double instant = (double)delta * 60.0 / sec;
+                if (delta > 0) {
+                    if (g_hashrate_ema <= 0.0) {
+                        g_hashrate_ema = instant;
+                    } else {
+                        g_hashrate_ema = 0.35 * instant + 0.65 * g_hashrate_ema;
+                    }
+                } else if (g_hashrate_ema > 0.0) {
+                    g_hashrate_ema *= 0.6;
+                }
+                g_hashrate_hm = g_hashrate_ema;
             }
             last_hash_total = total;
             hashrate_window_start = now;
@@ -321,6 +430,15 @@ void RunEngine(EngineConfig cfg)
     }
 
     JoinWorkerThreads();
+    std::string stop_line;
+    {
+        LOCK(g_pool_mutex);
+        stop_line = g_last_log;
+    }
+    if (stop_line.empty()) {
+        stop_line = g_cancel.load() ? "stopped" : "shutdown";
+    }
+    LogPrintf("poolminer: engine stopped (%s)\n", stop_line);
     MarkPoolMinerStopped();
 }
 
@@ -384,6 +502,7 @@ std::string PoolMinerStart(int threads, const std::string& stratum_url,
         LOCK(g_pool_mutex);
         g_running = true;
         g_hashrate_hm = 0.0;
+        g_hashrate_ema = 0.0;
         g_worker = username;
         g_backend = "native";
         g_threads = threads;
@@ -400,6 +519,11 @@ std::string PoolMinerStart(int threads, const std::string& stratum_url,
 
 std::string PoolMinerStop()
 {
+    LogPrintf("poolminer: stop requested\n");
+    {
+        LOCK(g_pool_mutex);
+        g_last_log = "Pool miner stopped";
+    }
     g_cancel.store(true);
     if (g_engine_thread.joinable()) {
         g_engine_thread.join();
@@ -407,7 +531,7 @@ std::string PoolMinerStop()
     LOCK(g_pool_mutex);
     g_running = false;
     g_hashrate_hm = 0.0;
-    g_last_log = "Pool miner stopped";
+    g_hashrate_ema = 0.0;
     return {};
 }
 

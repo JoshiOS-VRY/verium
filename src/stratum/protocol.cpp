@@ -126,6 +126,28 @@ double StratumToEffectiveDifficulty(double wire_difficulty)
     return wire_difficulty / SCRYPT2_STRATUM_FACTOR;
 }
 
+void DifficultyToTargetWords(double difficulty, uint32_t target[8])
+{
+    if (difficulty <= 0.0) {
+        memset(target, 0xff, 32);
+        return;
+    }
+    int k = 6;
+    double diff = difficulty;
+    while (k > 0 && diff > 1.0) {
+        diff /= 4294967296.0;
+        --k;
+    }
+    const uint64_t m = (uint64_t)(4294901760.0 / diff);
+    if (m == 0 && k == 6) {
+        memset(target, 0xff, 32);
+        return;
+    }
+    memset(target, 0, 32);
+    target[k] = (uint32_t)m;
+    target[k + 1] = (uint32_t)(m >> 32);
+}
+
 void DifficultyToTarget(double difficulty, uint8_t target[32])
 {
     if (difficulty <= 0.0) {
