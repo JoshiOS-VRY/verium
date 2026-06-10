@@ -1,25 +1,38 @@
 #!/usr/bin/env node
 /**
- * Fetch veriumMiner (cpuminer) into src-tauri/binaries/cpuminer-<triple>{.exe}
+ * Fetch or copy veriumMiner (cpuminer) into src-tauri/binaries/cpuminer-<triple>{.exe}
+ *
+ * Version is pinned in cpuminer.lock.json (never duplicate miner source in this repo).
  *
  * Usage:
  *   node scripts/fetch-cpuminer.cjs
- *   CPUMINER_LOCAL=C:/path/to/cpuminer.exe node scripts/fetch-cpuminer.cjs
- *   CPUMINER_SKIP_IF_PRESENT=1 node scripts/fetch-cpuminer.cjs
+ *   node scripts/fetch-cpuminer.cjs --monorepo     # prefer ../../../veriumMiner build
+ *   CPUMINER_LOCAL=/path/to/cpuminer node scripts/fetch-cpuminer.cjs
+ *   CPUMINER_REQUIRE=1 node scripts/fetch-cpuminer.cjs   # fail instead of stub (CI)
  */
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const https = require("node:https");
 
 const ROOT = path.resolve(__dirname, "..");
 const BINARIES = path.join(ROOT, "src-tauri", "binaries");
-const VERSION = process.env.CPUMINER_VERSION || "1.4.5";
-const REPO = process.env.CPUMINER_REPO || "JoshiOS-VRY/veriumMiner";
+const LOCK_PATH = path.join(ROOT, "cpuminer.lock.json");
+const MONOREPO_MINER = path.resolve(ROOT, "../../../veriumMiner");
 
 function log(msg) {
   process.stdout.write(`[fetch-cpuminer] ${msg}\n`);
+}
+
+function readLock() {
+  if (!fs.existsSync(LOCK_PATH)) {
+    throw new Error(`missing ${LOCK_PATH}`);
+  }
+  const lock = JSON.parse(fs.readFileSync(LOCK_PATH, "utf8"));
+  if (!lock.version) throw new Error("cpuminer.lock.json missing version");
+  lock.repo = lock.repo || "JoshiOS-VRY/veriumMiner";
+  return lock;
 }
 
 function detectTriple() {
@@ -40,32 +53,19 @@ function sidecarPath(triple) {
   return path.join(BINARIES, `cpuminer-${triple}${ext}`);
 }
 
-/** Map Rust triple → veriumMiner release zip/tar.gz name fragment. */
 function releasePlatformFragment(triple) {
-  if (triple.includes("windows") && triple.includes("x86_64")) {
-    return "windows-x86_64";
-  }
-  if (triple.includes("windows") && triple.includes("aarch64")) {
-    return "windows-arm64";
-  }
-  if (triple.includes("apple") && triple.includes("aarch64")) {
-    return "macos-arm64";
-  }
-  if (triple.includes("apple") && triple.includes("x86_64")) {
-    return "macos-x86_64";
-  }
-  if (triple.includes("linux") && triple.includes("aarch64")) {
-    return "linux-arm64";
-  }
-  if (triple.includes("linux")) {
-    return "linux-x86_64";
-  }
+  if (triple.includes("windows") && triple.includes("x86_64")) return "windows-x86_64";
+  if (triple.includes("windows") && triple.includes("aarch64")) return "windows-arm64";
+  if (triple.includes("apple") && triple.includes("aarch64")) return "macos-arm64";
+  if (triple.includes("apple") && triple.includes("x86_64")) return "macos-x86_64";
+  if (triple.includes("linux") && triple.includes("aarch64")) return "linux-arm64";
+  if (triple.includes("linux")) return "linux-x86_64";
   return triple;
 }
 
-function pickReleaseAsset(assets, triple) {
+function pickReleaseAsset(assets, triple, version) {
   const platform = releasePlatformFragment(triple);
-  const ver = VERSION.replace(/^v/, "");
+  const ver = String(version).replace(/^v/, "");
   const preferred = [
     `veriumminer-${ver}-${platform}.zip`,
     `veriumminer-${ver}-${platform}.tar.gz`,
@@ -141,20 +141,111 @@ function download(url, dest) {
 }
 
 function writeStub(dest) {
-  const stub = process.platform === "win32"
-    ? Buffer.from("MZ\x00\x00stub cpuminer — npm run fetch:cpuminer\n")
-    : Buffer.from("#!/bin/sh\necho 'stub cpuminer' >&2\nexit 1\n");
+  const stub =
+    process.platform === "win32"
+      ? Buffer.from("MZ\x00\x00stub cpuminer — npm run fetch:cpuminer\n")
+      : Buffer.from("#!/bin/sh\necho 'stub cpuminer' >&2\nexit 1\n");
   fs.writeFileSync(dest, stub);
   log(`Wrote build placeholder stub at ${dest}`);
 }
 
+function copyBinary(src, dest) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+  if (process.platform !== "win32") {
+    fs.chmodSync(dest, 0o755);
+  }
+  log(`Installed ${dest} from ${src}`);
+}
+
+function monorepoBuildCandidates() {
+  const exe = process.platform === "win32" ? "cpuminer.exe" : "cpuminer";
+  const dirs = ["build", "build-msys", "build-release"];
+  const out = [];
+  for (const dir of dirs) {
+    out.push(path.join(MONOREPO_MINER, dir, exe));
+  }
+  return out;
+}
+
+function resolveMonorepoBinary() {
+  if (!fs.existsSync(MONOREPO_MINER)) return null;
+  for (const candidate of monorepoBuildCandidates()) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).size > 100_000) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function extractArchive(archivePath, triple, dest) {
+  const binName = triple.includes("windows") ? "cpuminer.exe" : "cpuminer";
+  const extractDir = path.join(BINARIES, "cpuminer-extract");
+  fs.rmSync(extractDir, { recursive: true, force: true });
+  fs.mkdirSync(extractDir, { recursive: true });
+
+  if (archivePath.endsWith(".zip")) {
+    if (process.platform === "win32") {
+      execFileSync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-Command",
+          `Expand-Archive -Force -Path '${archivePath}' -DestinationPath '${extractDir}'`,
+        ],
+        { stdio: "inherit" },
+      );
+    } else {
+      spawnSync("unzip", ["-q", archivePath, "-d", extractDir], { stdio: "inherit" });
+    }
+  } else if (archivePath.endsWith(".tar.gz")) {
+    spawnSync("tar", ["-xzf", archivePath, "-C", extractDir], { stdio: "inherit" });
+  } else {
+    throw new Error(`unsupported archive: ${archivePath}`);
+  }
+
+  const extracted = findFileRecursive(extractDir, binName);
+  if (!extracted) throw new Error(`${binName} not found in release archive`);
+  copyBinary(extracted, dest);
+  fs.rmSync(extractDir, { recursive: true, force: true });
+}
+
+async function fetchRelease(dest, lock, triple) {
+  const version = process.env.CPUMINER_VERSION || lock.version;
+  const repo = process.env.CPUMINER_REPO || lock.repo;
+  const release = await fetchJson(
+    `https://api.github.com/repos/${repo}/releases/tags/v${version.replace(/^v/, "")}`,
+  );
+  const assets = release.assets || [];
+  const asset = pickReleaseAsset(assets, triple, version);
+  if (!asset) {
+    const names = assets.map((a) => a.name).join(", ") || "(none)";
+    throw new Error(
+      `No release asset for ${triple} in ${repo} v${version}. Assets: ${names}`,
+    );
+  }
+
+  const tmp = path.join(BINARIES, asset.name);
+  log(`Downloading ${repo} v${version} → ${asset.name}`);
+  await download(asset.browser_download_url, tmp);
+  extractArchive(tmp, triple, dest);
+  fs.unlinkSync(tmp);
+}
+
 async function main() {
+  const requireReal =
+    process.env.CPUMINER_REQUIRE === "1" || process.argv.includes("--require");
+  const useMonorepo =
+    process.env.CPUMINER_MONOREPO === "1" || process.argv.includes("--monorepo");
   const skipIfPresent =
     process.env.CPUMINER_SKIP_IF_PRESENT === "1" ||
     process.argv.includes("--skip-if-present");
   const writeStubOnly =
     process.env.CPUMINER_STUB === "1" || process.argv.includes("--stub");
+  const force =
+    process.env.CPUMINER_FORCE === "1" || process.argv.includes("--force");
 
+  const lock = readLock();
   const triple = detectTriple();
   const dest = sidecarPath(triple);
   fs.mkdirSync(BINARIES, { recursive: true });
@@ -164,57 +255,35 @@ async function main() {
     return;
   }
 
-  if (process.env.CPUMINER_LOCAL) {
-    const src = path.resolve(process.env.CPUMINER_LOCAL);
-    if (!fs.existsSync(src)) throw new Error(`CPUMINER_LOCAL not found: ${src}`);
-    fs.copyFileSync(src, dest);
-    log(`Copied ${src} -> ${dest}`);
-    return;
-  }
-
-  if (skipIfPresent && fs.existsSync(dest)) {
+  if (!force && skipIfPresent && fs.existsSync(dest) && fs.statSync(dest).size > 100_000) {
     log(`Skip — already present: ${dest}`);
     return;
   }
 
+  if (process.env.CPUMINER_LOCAL) {
+    const src = path.resolve(process.env.CPUMINER_LOCAL);
+    if (!fs.existsSync(src)) throw new Error(`CPUMINER_LOCAL not found: ${src}`);
+    copyBinary(src, dest);
+    return;
+  }
+
+  if (useMonorepo) {
+    const built = resolveMonorepoBinary();
+    if (built) {
+      copyBinary(built, dest);
+      return;
+    }
+    log(`No monorepo build in ${MONOREPO_MINER} — falling back to release v${lock.version}`);
+  }
+
   try {
-    const release = await fetchJson(
-      `https://api.github.com/repos/${REPO}/releases/tags/v${VERSION}`,
-    );
-    const assets = release.assets || [];
-    const asset = pickReleaseAsset(assets, triple);
-    if (!asset) {
-      const names = assets.map((a) => a.name).join(", ") || "(none)";
-      throw new Error(
-        `No release asset for ${triple} in ${REPO} v${VERSION}. Assets: ${names}`,
-      );
-    }
-
-    const tmp = path.join(BINARIES, asset.name);
-    log(`Downloading ${asset.name}…`);
-    await download(asset.browser_download_url, tmp);
-
-    if (asset.name.endsWith(".zip")) {
-      const { execSync } = require("node:child_process");
-      const extractDir = path.join(BINARIES, "cpuminer-extract");
-      fs.rmSync(extractDir, { recursive: true, force: true });
-      execSync(
-        `powershell -NoProfile -Command "Expand-Archive -Force -Path '${tmp}' -DestinationPath '${extractDir}'"`,
-        { stdio: "inherit" },
-      );
-      const extracted = findFileRecursive(extractDir, "cpuminer.exe");
-      if (!extracted) throw new Error("cpuminer.exe not found in release zip");
-      fs.copyFileSync(extracted, dest);
-      fs.rmSync(extractDir, { recursive: true, force: true });
-    } else {
-      throw new Error("tar.gz extract not implemented — use CPUMINER_LOCAL");
-    }
-
-    fs.unlinkSync(tmp);
-    log(`Installed ${dest}`);
+    await fetchRelease(dest, lock, triple);
   } catch (e) {
+    if (requireReal) {
+      throw e;
+    }
     log(`Fetch failed (${e.message}) — writing stub so Tauri can compile.`);
-    log("Pool mining will use the native fallback until you run fetch:cpuminer again.");
+    log("Pool mining will use the in-process veriumd fallback until fetch succeeds.");
     writeStub(dest);
   }
 }
