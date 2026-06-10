@@ -14,23 +14,70 @@ use zeroize::Zeroizing;
 use crate::config::app_config_base;
 use crate::error::{AppError, AppResult};
 
-const KEYCHAIN_SERVICE: &str = "com.vericonomy.wallet.desktop";
 const KEYCHAIN_ACCOUNT: &str = "secret-store-master-v1";
 const NONCE_LEN: usize = 12;
 const SALT_LEN: usize = 16;
+#[cfg(mobile)]
+const MASTER_KEY_FILE: &str = ".master-key";
 
-const ORPHANED_ENCRYPTED_DATA_MSG: &str = "Windows Credential Manager entry missing for com.vericonomy.wallet.desktop/secret-store-master-v1 but encrypted wallet data exists. Restore the saved credential or recover from your recovery phrase — creating a new master key would make existing light wallets unreadable.";
+fn keychain_service() -> &'static str {
+    if cfg!(target_os = "ios") {
+        "com.vericonomy.wallet.ios"
+    } else if cfg!(target_os = "android") {
+        "com.vericonomy.wallet.android"
+    } else {
+        "com.vericonomy.wallet.desktop"
+    }
+}
+
+fn keychain_label() -> &'static str {
+    if cfg!(windows) {
+        "Windows Credential Manager"
+    } else if cfg!(target_os = "macos") {
+        "macOS Keychain"
+    } else if cfg!(target_os = "ios") {
+        "iOS Keychain"
+    } else if cfg!(target_os = "android") {
+        "Android Keystore"
+    } else {
+        "system keychain"
+    }
+}
+
+fn orphaned_encrypted_data_message_text() -> String {
+    format!(
+        "{} entry missing for {}/{} but encrypted wallet data exists. \
+         Restore the saved credential or recover from your recovery phrase — creating a new master key \
+         would make existing light wallets unreadable.",
+        keychain_label(),
+        keychain_service(),
+        KEYCHAIN_ACCOUNT
+    )
+}
 
 /// True when the OS keychain has no master key but encrypted `.enc` blobs remain.
 pub fn encrypted_data_orphaned() -> bool {
+    #[cfg(not(test))]
+    if MASTER_KEY
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .is_some()
+    {
+        return false;
+    }
+    #[cfg(mobile)]
+    if mobile_master_key_available() {
+        return false;
+    }
     match keyring_entry().get_password() {
         Err(keyring::Error::NoEntry) => secure_dir_has_encrypted_blobs(),
         _ => false,
     }
 }
 
-pub fn orphaned_encrypted_data_message() -> &'static str {
-    ORPHANED_ENCRYPTED_DATA_MSG
+pub fn orphaned_encrypted_data_message() -> String {
+    orphaned_encrypted_data_message_text()
 }
 
 fn store_dir() -> PathBuf {
@@ -90,7 +137,49 @@ pub fn blob_backup_readable(label: &str) -> bool {
 }
 
 fn keyring_entry() -> keyring::Entry {
-    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).expect("keyring entry")
+    keyring::Entry::new(keychain_service(), KEYCHAIN_ACCOUNT).expect("keyring entry")
+}
+
+#[cfg(mobile)]
+fn master_key_file_path() -> PathBuf {
+    store_dir().join(MASTER_KEY_FILE)
+}
+
+#[cfg(mobile)]
+fn load_master_key_from_file() -> Option<[u8; 32]> {
+    let path = master_key_file_path();
+    let hex_key = std::fs::read_to_string(path).ok()?;
+    let bytes = hex::decode(hex_key.trim()).ok()?;
+    if bytes.len() != 32 {
+        return None;
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    Some(key)
+}
+
+#[cfg(mobile)]
+fn save_master_key_to_file(key: &[u8; 32]) -> AppResult<()> {
+    std::fs::create_dir_all(store_dir())?;
+    let path = master_key_file_path();
+    let tmp = path.with_extension("new");
+    std::fs::write(&tmp, hex::encode(key)).map_err(|e| {
+        AppError::other(format!("could not write mobile master key file: {e}"))
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)).ok();
+    }
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        AppError::other(format!("could not finalize mobile master key file: {e}"))
+    })?;
+    Ok(())
+}
+
+#[cfg(mobile)]
+fn mobile_master_key_available() -> bool {
+    load_master_key_from_file().is_some()
 }
 
 /// Process-wide master key cache. Windows Credential Manager can be slow or
@@ -122,15 +211,32 @@ fn load_master_key_from_keyring() -> AppResult<[u8; 32]> {
             Ok(key)
         }
         Err(keyring::Error::NoEntry) => {
+            #[cfg(mobile)]
+            if let Some(key) = load_master_key_from_file() {
+                return Ok(key);
+            }
             if secure_dir_has_encrypted_blobs() {
-                return Err(AppError::other(ORPHANED_ENCRYPTED_DATA_MSG));
+                return Err(AppError::other(orphaned_encrypted_data_message_text()));
             }
             let mut key = [0u8; 32];
             rand::thread_rng().fill_bytes(&mut key);
             let hex_key = hex::encode(key);
-            keyring_entry()
-                .set_password(&hex_key)
-                .map_err(|e| AppError::other(format!("could not store master key: {e}")))?;
+            if let Err(e) = keyring_entry().set_password(&hex_key) {
+                #[cfg(mobile)]
+                {
+                    tracing::warn!(
+                        "keychain write failed ({e}); persisting master key to app secure storage"
+                    );
+                    save_master_key_to_file(&key)?;
+                    return Ok(key);
+                }
+                #[cfg(not(mobile))]
+                return Err(AppError::other(format!("could not store master key: {e}")));
+            }
+            #[cfg(mobile)]
+            {
+                let _ = save_master_key_to_file(&key);
+            }
             Ok(key)
         }
         Err(e) => Err(AppError::other(format!("keychain read failed: {e}"))),
@@ -242,7 +348,9 @@ pub fn read_decrypted_blob(label: &str) -> AppResult<Zeroizing<Vec<u8>>> {
     })?;
     decrypt(&blob).map_err(|e| {
         AppError::other(format!(
-            "could not decrypt {label}: {e}. Check Windows Credential Manager (service: {KEYCHAIN_SERVICE})."
+            "could not decrypt {label}: {e}. Check {} (service: {}).",
+            keychain_label(),
+            keychain_service()
         ))
     })
     .map(Zeroizing::new)
@@ -476,7 +584,12 @@ pub fn load_json<T: serde::de::DeserializeOwned>(
 /// Save JSON to encrypted store.
 pub fn save_json<T: serde::Serialize + ?Sized>(label: &str, value: &T) -> AppResult<()> {
     if encrypted_data_orphaned() {
-        return Err(AppError::other(ORPHANED_ENCRYPTED_DATA_MSG));
+        return Err(AppError::other(orphaned_encrypted_data_message_text()));
+    }
+    #[cfg(mobile)]
+    if let Ok(key) = ensure_master_key() {
+        let _ = save_master_key_to_file(&key);
+        let _ = keyring_entry().set_password(&hex::encode(key));
     }
     let json = serde_json::to_string_pretty(value)?;
     seal(label, json.as_bytes())

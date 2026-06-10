@@ -3600,6 +3600,8 @@ async fn ensure_daemon_running_locked(state: &AppState, coin: CoinId, cfg: &Daem
         if let Err(e) = start_inner_impl(state, coin, false).await {
             tracing::warn!("ensure ({}): failed to start daemon: {e}", coin.as_str());
         }
+    } else if crate::features::is_light_wallet() {
+        state.set_daemon_phase(coin, "awaiting_remote");
     } else {
         state.set_daemon_phase(coin, "binary_missing");
         tracing::warn!(

@@ -33,6 +33,8 @@ pub struct WalletModeStatus {
     pub light_wallet_enabled: bool,
     pub light_wallet_exists: bool,
     pub electrum_servers: Vec<String>,
+    /// True on iOS/Android — app runs Electrum light wallet only (no local node).
+    pub mobile_only: bool,
 }
 
 fn wallet_mode_status_for(prefs: &UserPreferences, coin: CoinId) -> WalletModeStatus {
@@ -46,6 +48,7 @@ fn wallet_mode_status_for(prefs: &UserPreferences, coin: CoinId) -> WalletModeSt
             .as_ref()
             .and_then(|m| m.get(coin.as_str()).cloned())
             .unwrap_or_else(|| coin.default_electrum_servers(network)),
+        mobile_only: crate::features::is_light_wallet(),
     }
 }
 
@@ -66,6 +69,11 @@ pub async fn wallet_mode_get_for_coin(coin: String) -> AppResult<WalletModeStatu
 
 #[tauri::command]
 pub async fn wallet_mode_set(mode: String) -> AppResult<()> {
+    if crate::features::is_light_wallet() && mode != "light" {
+        return Err(crate::error::AppError::other(
+            "Mobile builds only support light wallet (Electrum) mode.",
+        ));
+    }
     let mut prefs = prefs::load().await?;
     // App-wide default still set for backward compatibility; per-coin overrides
     // win when present (see prefs::wallet_mode_for).
@@ -77,6 +85,11 @@ pub async fn wallet_mode_set(mode: String) -> AppResult<()> {
 /// Set the wallet mode for a single coin without touching the other chain.
 #[tauri::command]
 pub async fn wallet_mode_set_for_coin(coin: String, mode: String) -> AppResult<()> {
+    if crate::features::is_light_wallet() && mode != "light" {
+        return Err(crate::error::AppError::other(
+            "Mobile builds only support light wallet (Electrum) mode.",
+        ));
+    }
     let coin = parse_coin_id(&coin)?;
     let mut prefs = prefs::load().await?;
     prefs::set_wallet_mode_for(&mut prefs, coin, WalletMode::from_str_lossy(&mode));

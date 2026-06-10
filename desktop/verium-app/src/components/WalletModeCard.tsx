@@ -39,6 +39,7 @@ export function WalletModeCard() {
 
 function WalletModeCardInner() {
   const activeCoin = useActiveCoin();
+  const { mobileOnly } = useWalletMode();
   const queryClient = useQueryClient();
   const reloadPrefs = useUserPreferences((s) => s.load);
   const invalidateWalletMode = useInvalidateWalletMode();
@@ -53,7 +54,7 @@ function WalletModeCardInner() {
   const servers = useQuery({
     queryKey: ["electrum-servers", activeCoin],
     queryFn: () => electrumServersGet(activeCoin),
-    enabled: modeStatus.data?.mode === "light",
+    enabled: mobileOnly || modeStatus.data?.mode === "light",
   });
 
   const setMode = useMutation({
@@ -90,8 +91,10 @@ function WalletModeCardInner() {
     mutationFn: () => electrumTestConnection(activeCoin),
   });
 
-  const activeMode = modeStatus.data?.mode ?? "full_node";
-  const isLight = activeMode === "light";
+  const activeMode = mobileOnly
+    ? "light"
+    : (modeStatus.data?.mode ?? "full_node");
+  const isLight = mobileOnly || activeMode === "light";
 
   return (
     <Card>
@@ -103,55 +106,59 @@ function WalletModeCardInner() {
           </Badge>
         </CardTitle>
         <CardDescription>
-          Full node mode (recommended) validates the chain locally. Light mode is
-          a convenience tier that trusts Electrum index servers for balance data;
-          keys still sign on this device.
+          {mobileOnly
+            ? lightWalletCopy.setupMobileOnly
+            : "Full node mode (recommended) validates the chain locally. Light mode is a convenience tier that trusts Electrum index servers for balance data; keys still sign on this device."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {isLight && (
+        {(isLight || mobileOnly) && (
           <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-            {lightWalletCopy.lightModeBanner}
+            {mobileOnly
+              ? lightWalletCopy.setupMobileOnly
+              : lightWalletCopy.lightModeBanner}
           </p>
         )}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-              !isLight
-                ? "border-accent bg-accent/10"
-                : "border-border hover:border-accent/50"
-            }`}
-            onClick={() => setConfirmSwitch("full_node")}
-          >
-            <div className="mb-1 flex items-center gap-2 font-medium">
-              <HardDrive className="h-4 w-4" />
-              Full node (recommended)
-            </div>
-            <p className="text-xs text-fg-muted">
-              {lightWalletCopy.setupFullNodeRecommended}
-            </p>
-          </button>
-          <button
-            type="button"
-            className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-              isLight
-                ? "border-warning bg-warning/10"
-                : "border-border hover:border-accent/50"
-            }`}
-            onClick={() => setConfirmSwitch("light")}
-          >
-            <div className="mb-1 flex items-center gap-2 font-medium">
-              <Cloud className="h-4 w-4" />
-              Light wallet (convenience)
-            </div>
-            <p className="text-xs text-fg-muted">
-              {lightWalletCopy.lightConvenienceWarning}
-            </p>
-          </button>
-        </div>
+        {!mobileOnly && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              className={`rounded-lg border p-3 text-left text-sm transition-colors ${
+                !isLight
+                  ? "border-accent bg-accent/10"
+                  : "border-border hover:border-accent/50"
+              }`}
+              onClick={() => setConfirmSwitch("full_node")}
+            >
+              <div className="mb-1 flex items-center gap-2 font-medium">
+                <HardDrive className="h-4 w-4" />
+                Full node (recommended)
+              </div>
+              <p className="text-xs text-fg-muted">
+                {lightWalletCopy.setupFullNodeRecommended}
+              </p>
+            </button>
+            <button
+              type="button"
+              className={`rounded-lg border p-3 text-left text-sm transition-colors ${
+                isLight
+                  ? "border-warning bg-warning/10"
+                  : "border-border hover:border-accent/50"
+              }`}
+              onClick={() => setConfirmSwitch("light")}
+            >
+              <div className="mb-1 flex items-center gap-2 font-medium">
+                <Cloud className="h-4 w-4" />
+                Light wallet (convenience)
+              </div>
+              <p className="text-xs text-fg-muted">
+                {lightWalletCopy.lightConvenienceWarning}
+              </p>
+            </button>
+          </div>
+        )}
 
-        {confirmSwitch && confirmSwitch !== activeMode && (
+        {!mobileOnly && confirmSwitch && confirmSwitch !== activeMode && (
           <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
             <p className="mb-1 font-medium text-fg">
               {confirmSwitch === "light"
@@ -191,7 +198,7 @@ function WalletModeCardInner() {
           </div>
         )}
 
-        {isLight && (
+        {(isLight || mobileOnly) && (
           <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-subtle p-3 text-xs">
             <div className="flex items-center gap-2 font-medium text-fg">
               <Server className="h-3.5 w-3.5" />

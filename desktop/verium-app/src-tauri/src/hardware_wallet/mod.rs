@@ -149,10 +149,11 @@ pub fn coin_type_for(coin: CoinId) -> u32 {
 
 /// Detect connected hardware wallets (best-effort USB enumeration).
 pub fn detect_devices() -> Vec<HardwareVendor> {
-    let mut found = Vec::new();
+    let found = Vec::new();
     // Trezor: vendor ID 0x1209 or 0x534c
     // Ledger: vendor ID 0x2c97
     // Coldcard: air-gapped only
+    #[cfg(not(mobile))]
     if hidapi::HidApi::new().is_ok() {
         // Simplified detection — actual device comms require vendor SDKs
         found.push(HardwareVendor::Manual);

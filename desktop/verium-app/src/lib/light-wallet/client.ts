@@ -8,6 +8,8 @@ export interface WalletModeStatus {
   light_wallet_enabled: boolean;
   light_wallet_exists: boolean;
   electrum_servers: string[];
+  /** iOS/Android — Electrum light wallet only; no local node. */
+  mobile_only?: boolean;
 }
 
 export interface LightServerStatus {

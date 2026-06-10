@@ -33,6 +33,8 @@ import {
 
 interface SetupWalletHubProps {
   walletMode: WalletModeChoice;
+  /** iOS/Android — Electrum light wallet only. */
+  mobileOnly?: boolean;
   onWalletModeChange: (mode: WalletModeChoice) => void;
   /** @deprecated light mode is now shown inline; retained for caller compat. */
   showAdvancedLightMode?: boolean;
@@ -137,6 +139,7 @@ function CoinHubCard({
 
 export function SetupWalletHub({
   walletMode,
+  mobileOnly = false,
   onWalletModeChange,
   onSelectCoin,
   onOpenDashboard,
@@ -186,7 +189,7 @@ export function SetupWalletHub({
   );
 
   const profileErrorMessage =
-    "Could not read wallet status. Check Windows Credential Manager (service: com.vericonomy.wallet.desktop) and restart the app.";
+    "Could not read wallet status. Restart the app or recover from your recovery phrase if encrypted settings cannot be unlocked.";
 
   const anyNeedsLightRecovery = options.some((coin) =>
     needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
@@ -268,7 +271,14 @@ export function SetupWalletHub({
         </p>
       </div>
 
-      {LIGHT_WALLET_ENABLED && (
+      {mobileOnly && (
+        <div className="rounded-md border border-accent/30 bg-accent/5 p-3 text-xs text-fg-muted">
+          <p className="font-medium text-fg">Light wallet only</p>
+          <p className="mt-1">{lightWalletCopy.setupMobileOnly}</p>
+        </div>
+      )}
+
+      {LIGHT_WALLET_ENABLED && !mobileOnly && (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-bg-subtle p-3">
           <p className="text-xs font-medium text-fg">Default wallet mode</p>
           <p className="text-[11px] text-fg-subtle">

@@ -126,6 +126,7 @@ export function Setup() {
   const isTestNetwork = useIsTestNetwork();
   const {
     isLight,
+    mobileOnly,
     mode: persistedWalletMode,
     isLoading: walletModeLoading,
   } = useWalletMode();
@@ -134,7 +135,7 @@ export function Setup() {
     "full_node",
   );
   const [showAdvancedLightMode, setShowAdvancedLightMode] = useState(false);
-  const lightSetupActive = setupWalletMode === "light";
+  const lightSetupActive = mobileOnly || setupWalletMode === "light";
   const [step, setStep] = useState<Step>("hub");
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
   const [datadirDraft, setDatadirDraft] = useState<string>("");
@@ -157,11 +158,18 @@ export function Setup() {
   useEffect(() => {
     if (!prefsLoaded || hubModeInitialized.current) return;
     hubModeInitialized.current = true;
-    if (prefs.wallet_mode === "light") {
+    if (mobileOnly || prefs.wallet_mode === "light") {
       setSetupWalletMode("light");
       setShowAdvancedLightMode(true);
     }
-  }, [prefsLoaded, prefs.wallet_mode]);
+  }, [prefsLoaded, prefs.wallet_mode, mobileOnly]);
+
+  useEffect(() => {
+    if (!mobileOnly) return;
+    if (step === "daemon" || step === "advanced") {
+      setStep("wallet");
+    }
+  }, [mobileOnly, step]);
 
   const resetCoinOnboarding = useCallback(() => {
     setWalletAction("choose");
@@ -355,6 +363,7 @@ export function Setup() {
     !legacyFreshStart;
 
   const switchToFullNodeSetup = async () => {
+    if (mobileOnly) return;
     setSetupWalletMode("full_node");
     setWalletAction("choose");
     try {
@@ -420,12 +429,13 @@ export function Setup() {
 
   const handleSetupWalletModeChange = useCallback(
     async (mode: "light" | "full_node") => {
+      if (mobileOnly && mode === "full_node") return;
       setSetupWalletMode(mode);
       if (mode === "light") {
         setShowAdvancedLightMode(true);
       }
     },
-    [],
+    [mobileOnly],
   );
 
   useEffect(() => {
@@ -635,8 +645,20 @@ export function Setup() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-8 text-fg">
-      <Card className="w-full max-w-2xl">
+    <div
+      className={
+        mobileOnly
+          ? "mobile-setup flex min-h-screen flex-col bg-bg text-fg"
+          : "flex min-h-screen items-center justify-center bg-bg p-8 text-fg"
+      }
+    >
+      <Card
+        className={
+          mobileOnly
+            ? "mobile-setup-card min-h-screen w-full max-w-none rounded-none border-0 shadow-none"
+            : "w-full max-w-2xl"
+        }
+      >
         <CardHeader>
           <CardTitle className="!normal-case !tracking-normal !text-base">
             {step === "hub"
@@ -645,7 +667,9 @@ export function Setup() {
           </CardTitle>
           <CardDescription>
             {step === "hub"
-              ? "Pick Verium or Vericoin, choose light or full-node mode, then walk through setup for each chain."
+              ? mobileOnly
+                ? lightWalletCopy.setupHubMobileOnly
+                : "Pick Verium or Vericoin, choose light or full-node mode, then walk through setup for each chain."
               : lightWalletFlow
                 ? `Set up your ${profile.symbol} light wallet, save your recovery phrase, and enable app-wide 2FA. No local node or blockchain sync required.`
                 : `Start the bundled ${profile.binaryName} node, set up your ${profile.symbol} wallet and recovery phrase, enable app-wide 2FA, then optionally import a chain bootstrap.`}
@@ -655,6 +679,7 @@ export function Setup() {
           {step === "hub" && (
             <SetupWalletHub
               walletMode={setupWalletMode}
+              mobileOnly={mobileOnly}
               onWalletModeChange={(mode) =>
                 void handleSetupWalletModeChange(mode)
               }
@@ -673,9 +698,11 @@ export function Setup() {
           {step === "welcome" && (
             <div className="flex flex-col gap-4 text-sm text-fg-muted">
               <p>
-                {setupWalletMode === "light" && LIGHT_WALLET_ENABLED
-                  ? lightWalletCopy.setupWelcomeLight
-                  : lightWalletCopy.setupWelcomeFull}
+                {mobileOnly
+                  ? lightWalletCopy.setupMobileOnly
+                  : setupWalletMode === "light" && LIGHT_WALLET_ENABLED
+                    ? lightWalletCopy.setupWelcomeLight
+                    : lightWalletCopy.setupWelcomeFull}
               </p>
               {coin === "vericoin" && setupWalletMode !== "light" && (
                 <p>
@@ -685,7 +712,8 @@ export function Setup() {
                 </p>
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {setupWalletMode === "light" && LIGHT_WALLET_ENABLED ? (
+                {mobileOnly ||
+                (setupWalletMode === "light" && LIGHT_WALLET_ENABLED) ? (
                   <>
                     <FeatureTile
                       icon={<ShieldCheck className="h-4 w-4" />}
@@ -733,7 +761,7 @@ export function Setup() {
                   </>
                 )}
               </div>
-              {showFullNodeMigrationHint && (
+              {showFullNodeMigrationHint && !mobileOnly && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs text-fg-muted">
                   <p className="font-medium text-fg">
                     {lightWalletCopy.setupFullNodeWalletFoundTitle}
@@ -761,22 +789,25 @@ export function Setup() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   onClick={async () => {
-                    if (LIGHT_WALLET_ENABLED) {
-                      await walletModeSet(setupWalletMode);
+                    const mode = mobileOnly ? "light" : setupWalletMode;
+                    if (LIGHT_WALLET_ENABLED || mobileOnly) {
+                      await walletModeSet(mode);
                       invalidateWalletMode();
                     }
-                    setStep(setupWalletMode === "light" ? "wallet" : "daemon");
+                    setStep(lightSetupActive ? "wallet" : "daemon");
                   }}
                 >
                   Continue
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setStep("advanced")}
-                >
-                  Advanced setup
-                </Button>
+                {!mobileOnly && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setStep("advanced")}
+                  >
+                    Advanced setup
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -789,7 +820,7 @@ export function Setup() {
             </div>
           )}
 
-          {step === "daemon" && (
+          {step === "daemon" && !mobileOnly && (
             <div className="flex flex-col gap-4 text-sm">
               <div className="rounded-md border border-border bg-bg-subtle p-3">
                 <div className="flex items-center gap-2 font-medium text-fg">
@@ -922,7 +953,7 @@ export function Setup() {
                       </Button>
                     )}
                   </div>
-                  {showFullNodeMigrationHint && (
+                  {showFullNodeMigrationHint && !mobileOnly && (
                     <p className="text-xs text-fg-subtle">
                       {lightWalletCopy.setupCreateNewWarn}
                     </p>
@@ -1345,7 +1376,7 @@ export function Setup() {
             </div>
           )}
 
-          {step === "advanced" && (
+          {step === "advanced" && !mobileOnly && (
             <div className="flex flex-col gap-4 text-sm">
               <p className="text-fg-muted">
                 Point the app at an existing data directory or remote node. Most

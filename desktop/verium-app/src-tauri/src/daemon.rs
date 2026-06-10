@@ -20,6 +20,7 @@ use once_cell::sync::Lazy;
 use crate::coin_profile::CoinId;
 use crate::config::{app_config_base, daemon_runtime_overrides, sync_cfg_rpc_credentials_from_conf, verium_uses_legacy_flat, DaemonConfig};
 use crate::error::{AppError, AppResult};
+use crate::features::is_light_wallet;
 
 /// BIP14 user-agent comment appended to the bundled daemons' P2P subversion
 /// string. Lets the network and block explorer peer lists identify nodes
@@ -1176,7 +1177,18 @@ pub fn sidecar_stub_present(coin: CoinId) -> bool {
     sidecar_stub_path(coin).is_some()
 }
 
+fn light_wallet_missing_hint(coin: CoinId) -> String {
+    format!(
+        "Mobile light wallet — no local {} node. Balance and history sync via \
+         Vericonomy Electrum servers. Customize servers in Settings → Wallet mode.",
+        coin.display_name()
+    )
+}
+
 pub fn binary_missing_hint(coin: CoinId) -> Option<String> {
+    if is_light_wallet() {
+        return Some(light_wallet_missing_hint(coin));
+    }
     if detect_binary(coin).found {
         return None;
     }
@@ -1277,6 +1289,19 @@ fn unavailable_binary_status(coin: CoinId) -> DaemonBinaryStatus {
 }
 
 pub fn detect_binary(coin: CoinId) -> DaemonBinaryStatus {
+    if is_light_wallet() {
+        return DaemonBinaryStatus {
+            found: false,
+            path: None,
+            source: DaemonBinarySource::None,
+            manageable: true,
+            runtime: "electrum".into(),
+            coin: coin.as_str().to_string(),
+            stub_sidecar: false,
+            missing_hint: Some(light_wallet_missing_hint(coin)),
+        };
+    }
+
     if let Some(sidecar) = detect_sidecar_binary(coin) {
         return DaemonBinaryStatus {
             found: true,

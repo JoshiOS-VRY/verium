@@ -1,95 +1,17 @@
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeftRight,
-  BookOpen,
-  BookUser,
-  Coins,
-  Cpu,
-  Gauge,
-  Link2,
-  Lock,
-  Network as NetworkIcon,
-  ScrollText,
-  Settings as SettingsIcon,
-  ShieldCheck,
-  Terminal,
-} from "lucide-react";
+import { Lock } from "lucide-react";
 import { CoinSwitcher } from "@/components/CoinSwitcher";
 import { QuitWalletButton } from "@/components/QuitWalletButton";
 import { useActiveCoin, useEnabledCoins } from "@/lib/coin/context";
 import { coinQueryKey } from "@/lib/coin/profile";
+import { APP_NAV_ITEMS, filterAppNavItems } from "@/lib/app-nav";
 import { BINARYTEST_ENABLED } from "@/lib/features";
 import { useIsTestNetwork } from "@/lib/network-mode";
 import { rpcGetWalletInfo } from "@/lib/rpc/client";
 import { useWalletMode } from "@/hooks/useWalletMode";
 import { cn } from "@/lib/utils";
 import { isWalletLocked } from "@/lib/wallet-unlock";
-
-interface NavItem {
-  to: string;
-  label: string;
-  icon: typeof Gauge;
-  coins?: ("verium" | "vericoin")[];
-  /** Shown only while the wallet is in binarytest (DACE) mode. */
-  testNetworkOnly?: boolean;
-  /** Hidden in light wallet mode (requires local full node). */
-  fullNodeOnly?: boolean;
-  /** Page is gated by WalletUnlockGate and needs the wallet passphrase. */
-  requiresPassphrase?: boolean;
-}
-
-const items: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge },
-  {
-    to: "/mining",
-    label: "Mining",
-    icon: Cpu,
-    coins: ["verium"],
-    requiresPassphrase: true,
-    fullNodeOnly: true,
-  },
-  {
-    to: "/staking",
-    label: "Staking",
-    icon: Coins,
-    coins: ["vericoin"],
-    requiresPassphrase: true,
-    fullNodeOnly: true,
-  },
-  { to: "/network", label: "Network", icon: NetworkIcon, fullNodeOnly: true },
-  {
-    to: "/binary-chain",
-    label: "Binary Chain",
-    icon: Link2,
-    testNetworkOnly: true,
-  },
-  {
-    to: "/transactions",
-    label: "Transactions",
-    icon: ArrowLeftRight,
-    requiresPassphrase: true,
-  },
-  { to: "/addresses", label: "Address book", icon: BookUser },
-  { to: "/security", label: "Security", icon: Lock, requiresPassphrase: true },
-  {
-    to: "/sign",
-    label: "Sign & verify",
-    icon: ShieldCheck,
-    requiresPassphrase: true,
-    fullNodeOnly: true,
-  },
-  {
-    to: "/console",
-    label: "RPC console",
-    icon: Terminal,
-    requiresPassphrase: true,
-    fullNodeOnly: true,
-  },
-  { to: "/logs", label: "Logs", icon: ScrollText, fullNodeOnly: true },
-  { to: "/resources", label: "Resources", icon: BookOpen },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
-];
 
 const APP_VERSION =
   (import.meta as unknown as { env: Record<string, string> }).env
@@ -101,9 +23,6 @@ export function Sidebar() {
   const isTestNetwork = useIsTestNetwork();
   const { isLight } = useWalletMode();
 
-  // Shared with WalletUnlockGate (same query key) so the indicator stays in
-  // sync without an extra fetch. Locked == encrypted AND currently locked;
-  // unencrypted or unlocked wallets report false, so no icon is shown.
   const wallet = useQuery({
     queryKey: coinQueryKey(activeCoin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(activeCoin),
@@ -111,15 +30,12 @@ export function Sidebar() {
   });
   const walletLocked = isWalletLocked(wallet.data);
 
-  const visibleItems = items.filter((item) => {
-    if (item.fullNodeOnly && isLight) return false;
-    if (item.testNetworkOnly && (!BINARYTEST_ENABLED || !isTestNetwork)) {
-      return false;
-    }
-    if (!item.coins) return true;
-    return item.coins.some(
-      (coin) => enabledCoins.includes(coin) && coin === activeCoin,
-    );
+  const visibleItems = filterAppNavItems(APP_NAV_ITEMS, {
+    activeCoin,
+    enabledCoins,
+    isLight,
+    isTestNetwork,
+    binarytestEnabled: BINARYTEST_ENABLED,
   });
 
   return (
@@ -160,7 +76,7 @@ export function Sidebar() {
       <div className="border-t border-border px-5 py-3 text-xs text-fg-subtle">
         <QuitWalletButton />
         Vericonomy Wallet v{APP_VERSION}
-        <div className="mt-0.5 text-[10px] uppercase tracking-wider flex items-center gap-2">
+        <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-wider">
           <NetworkBadge />
         </div>
       </div>
@@ -168,14 +84,11 @@ export function Sidebar() {
   );
 }
 
-/** Small inline badge that appears in the sidebar footer when the wallet
- *  is pointed at the binarytest (DACE) network. Mirrors the persistent
- *  banner at the top of AppShell. */
 function NetworkBadge() {
   const isTest = useIsTestNetwork();
   if (!BINARYTEST_ENABLED || !isTest) return null;
   return (
-    <span className="rounded bg-amber-500/20 border border-amber-500/40 text-amber-200 px-1.5 py-[1px] text-[9px] font-semibold normal-case">
+    <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-[1px] text-[9px] font-semibold normal-case text-amber-200">
       binarytest
     </span>
   );

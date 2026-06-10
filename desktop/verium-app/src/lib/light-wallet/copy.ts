@@ -26,6 +26,10 @@ export const lightWalletCopy = {
     "This page requires a local full node. Switch to Full node mode in Settings.",
   setupWelcomeLight:
     "Connect to Vericonomy light wallet servers. No blockchain download — your recovery phrase and passphrase stay on this device.",
+  setupMobileOnly:
+    "This device uses light wallet mode only. Your keys stay encrypted here; balance and history sync via Vericonomy Electrum servers.",
+  setupHubMobileOnly:
+    "Pick Verium or Vericoin, then set up a light wallet for each chain. No local node or blockchain sync on mobile.",
   setupWelcomeFull:
     "This wallet ships with a bundled node. Your keys can live in wallet.dat on this machine, with optional blockchain sync.",
   setupFullNodeRecommended:

@@ -76,6 +76,35 @@
   }
 }
 
+/* iOS / mobile shell — safe areas and touch-first spacing */
+@layer components {
+  .mobile-shell {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .mobile-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .mobile-main {
+    padding: 1rem 1rem 0;
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-tab-bar {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-setup {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-setup-card {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -474,11 +503,13 @@
     }
   }
 
-  tr.block-row-enter {
+  tr.block-row-enter,
+  .recent-block-card.block-row-enter {
     animation: block-row-enter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  tr.block-row-nudge {
+  tr.block-row-nudge,
+  .recent-block-card.block-row-nudge {
     animation: block-row-nudge 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
@@ -522,6 +553,8 @@
   .animated-block-number,
   tr.block-row-enter,
   tr.block-row-nudge,
+  .recent-block-card.block-row-enter,
+  .recent-block-card.block-row-nudge,
   .metric-flash-up,
   .metric-flash-down {
     animation: none !important;

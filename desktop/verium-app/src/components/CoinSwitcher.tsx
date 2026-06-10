@@ -140,7 +140,7 @@ export function CoinSwitcher() {
                         queryFn: () => tauriWalletProfile(coin),
                         staleTime: 60_000,
                       }));
-                    if (!isProfileOpenable(profile)) {
+                    if (!profile || !isProfileOpenable(profile)) {
                       navigate("/setup", { state: { setupHub: true } });
                       return;
                     }

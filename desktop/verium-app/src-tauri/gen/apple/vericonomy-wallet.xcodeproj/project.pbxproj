@@ -1,0 +1,562 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3107EC077B3B686D486BBD5A /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC4E32C6EC0C325309F76FE6 /* CoreGraphics.framework */; };
+		4749C16C2128927F02690BF7 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 890413F90367E0B575CC6DAC /* LaunchScreen.storyboard */; };
+		58923432597EE14B872D7409 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 78A572671AA30585BD3101EA /* assets */; };
+		71E75118E403F99C00149AB3 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5F8622C09A802BF289E66A1 /* Security.framework */; };
+		79675EC1AA1795E1CEA7EF50 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D48AD96390D0ED92AC6E5D9 /* MetalKit.framework */; };
+		8BF61846DE5BEF778D43C46A /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0E54B91A3C8FD6E283D3E5A0 /* libapp.a */; };
+		AAECF40DF1B0DB301C4B8A0D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0127F559653341D3FEC3BE79 /* Assets.xcassets */; };
+		C39317567D1AF1F6EE0F039D /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 48761B72C7A28A9996ED43A1 /* main.mm */; };
+		D32C2B3E1774D29099D46EF6 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85636DE5F44D34B9B898EDC6 /* WebKit.framework */; };
+		E5533CECAB8A2C2A78139435 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BF3295CC79E1CF74754B83D2 /* UIKit.framework */; };
+		EF4E5B244851E5ABF19C40EB /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3D1EA8CC92C805D64519C1CE /* Metal.framework */; };
+		FE1C48E6FC3DC8A56EF7770C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD42BE52025C83A87611A328 /* QuartzCore.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		00FD63D635A372EF6117B5BC /* backup_scheduler.rs */ = {isa = PBXFileReference; path = backup_scheduler.rs; sourceTree = "<group>"; };
+		0127F559653341D3FEC3BE79 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		0A8B6A8AB82CF7F93A0DEBB2 /* mining_opt.rs */ = {isa = PBXFileReference; path = mining_opt.rs; sourceTree = "<group>"; };
+		0C5137348C6AA1DA46D6E422 /* snapshot.rs */ = {isa = PBXFileReference; path = snapshot.rs; sourceTree = "<group>"; };
+		0E54B91A3C8FD6E283D3E5A0 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		118F757588A50300AE00250A /* prefs.rs */ = {isa = PBXFileReference; path = prefs.rs; sourceTree = "<group>"; };
+		26C202FEAC4E222C23091349 /* auto_lock.rs */ = {isa = PBXFileReference; path = auto_lock.rs; sourceTree = "<group>"; };
+		28BED724B47236F84F611091 /* orchestrator.rs */ = {isa = PBXFileReference; path = orchestrator.rs; sourceTree = "<group>"; };
+		2ADCA82D20578C6E4496EC6F /* status.rs */ = {isa = PBXFileReference; path = status.rs; sourceTree = "<group>"; };
+		30A981E367D8B2B4CB0F0A3B /* gpu_miner.rs */ = {isa = PBXFileReference; path = gpu_miner.rs; sourceTree = "<group>"; };
+		32BD6A537BFE885F80984E85 /* bootstrap.rs */ = {isa = PBXFileReference; path = bootstrap.rs; sourceTree = "<group>"; };
+		3567463BDA2043F2D58FC720 /* vericonomy-wallet_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "vericonomy-wallet_iOS.entitlements"; sourceTree = "<group>"; };
+		396B1E120FCF96664B15D588 /* dace_commands.rs */ = {isa = PBXFileReference; path = dace_commands.rs; sourceTree = "<group>"; };
+		3AD18D9FF3052F89DDECE42E /* error.rs */ = {isa = PBXFileReference; path = error.rs; sourceTree = "<group>"; };
+		3B7AE4990FCF7ECC65116C7C /* audit_log.rs */ = {isa = PBXFileReference; path = audit_log.rs; sourceTree = "<group>"; };
+		3CFA00D58B9ACC18FDEE07D2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3D1EA8CC92C805D64519C1CE /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		443A7927FAF3DA25D0A2FAE5 /* vericonomy-wallet_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "vericonomy-wallet_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		445B7D24A38BD01F82BD3299 /* chain_tip_watcher.rs */ = {isa = PBXFileReference; path = chain_tip_watcher.rs; sourceTree = "<group>"; };
+		47EADD799BF15E7BCFB407DD /* updates.rs */ = {isa = PBXFileReference; path = updates.rs; sourceTree = "<group>"; };
+		48761B72C7A28A9996ED43A1 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		4BA79B37CB7E1D1CC8A3E045 /* secret_store.rs */ = {isa = PBXFileReference; path = secret_store.rs; sourceTree = "<group>"; };
+		4CA9E4B8BA0D98EA8768511E /* installer_verify.rs */ = {isa = PBXFileReference; path = installer_verify.rs; sourceTree = "<group>"; };
+		500F51789807CA9E6655FBB4 /* wallet_secrets.rs */ = {isa = PBXFileReference; path = wallet_secrets.rs; sourceTree = "<group>"; };
+		522951FCC48E47484CA73111 /* features.rs */ = {isa = PBXFileReference; path = features.rs; sourceTree = "<group>"; };
+		5535A156568BF48DA53C05C2 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		56F0B3FAC39DEBAC778242AF /* coin_profile.rs */ = {isa = PBXFileReference; path = coin_profile.rs; sourceTree = "<group>"; };
+		5FC11D60579E4F940AC6B5EC /* security_commands.rs */ = {isa = PBXFileReference; path = security_commands.rs; sourceTree = "<group>"; };
+		606F5DD72641A29FB55D1C12 /* diagnostics.rs */ = {isa = PBXFileReference; path = diagnostics.rs; sourceTree = "<group>"; };
+		61F1C23C8EE1EDF750F52E9F /* logs.rs */ = {isa = PBXFileReference; path = logs.rs; sourceTree = "<group>"; };
+		64EF868E285792B063FF71E1 /* constants.rs */ = {isa = PBXFileReference; path = constants.rs; sourceTree = "<group>"; };
+		687FE0D68DCD2A8948CFA7DC /* config.rs */ = {isa = PBXFileReference; path = config.rs; sourceTree = "<group>"; };
+		6D48AD96390D0ED92AC6E5D9 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		6E054C4DB98DE5021D07BE95 /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
+		70907CA23E025E175CF37E60 /* rpc.rs */ = {isa = PBXFileReference; path = rpc.rs; sourceTree = "<group>"; };
+		78A572671AA30585BD3101EA /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		7AA2B25C83D669DAFE29C542 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		80C6D3A07F1449CCB9A6AB1E /* passkey.rs */ = {isa = PBXFileReference; path = passkey.rs; sourceTree = "<group>"; };
+		81558521101F6541D9FDC65D /* slip39_recovery.rs */ = {isa = PBXFileReference; path = slip39_recovery.rs; sourceTree = "<group>"; };
+		81F9079C9F72C7358847BADC /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		85636DE5F44D34B9B898EDC6 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		890413F90367E0B575CC6DAC /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8ECC9331B0B65513E5D087DB /* network_mode_commands.rs */ = {isa = PBXFileReference; path = network_mode_commands.rs; sourceTree = "<group>"; };
+		9AF6EFCFB8BF5DD7E45FB3EB /* daemon.rs */ = {isa = PBXFileReference; path = daemon.rs; sourceTree = "<group>"; };
+		A43C32F37A45B05CA3F95861 /* receive_requests.rs */ = {isa = PBXFileReference; path = receive_requests.rs; sourceTree = "<group>"; };
+		B72C5BEC4A7F1FA2FC9E8DE2 /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
+		BF3295CC79E1CF74754B83D2 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		C3CC824513F7E80C66212276 /* addressbook.rs */ = {isa = PBXFileReference; path = addressbook.rs; sourceTree = "<group>"; };
+		CAC0DD1634A6A8775B57036F /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		D5F8622C09A802BF289E66A1 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		D8743DA1F7FB8C6988FB8DFD /* multisig.rs */ = {isa = PBXFileReference; path = multisig.rs; sourceTree = "<group>"; };
+		DDF6A29C17E14DC89EF73E45 /* two_factor.rs */ = {isa = PBXFileReference; path = two_factor.rs; sourceTree = "<group>"; };
+		DE5CCB60908E0620BCA101F7 /* recovery.rs */ = {isa = PBXFileReference; path = recovery.rs; sourceTree = "<group>"; };
+		DEE1C751B42D8E00FDECD977 /* psbt.rs */ = {isa = PBXFileReference; path = psbt.rs; sourceTree = "<group>"; };
+		EC4E32C6EC0C325309F76FE6 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		EE0D64BFF272355A13F1674B /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
+		EFADC76D17CBAB13DAA14300 /* rpc_auth.rs */ = {isa = PBXFileReference; path = rpc_auth.rs; sourceTree = "<group>"; };
+		F3692FD2349A8097994E1045 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		F6D81BCAE9BA437BA784B4D2 /* explorer_api.rs */ = {isa = PBXFileReference; path = explorer_api.rs; sourceTree = "<group>"; };
+		F74DB805EC510A31B8B5649E /* spending_controls.rs */ = {isa = PBXFileReference; path = spending_controls.rs; sourceTree = "<group>"; };
+		FD42BE52025C83A87611A328 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5337401487E6A5669F7C1CB4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8BF61846DE5BEF778D43C46A /* libapp.a in Frameworks */,
+				3107EC077B3B686D486BBD5A /* CoreGraphics.framework in Frameworks */,
+				EF4E5B244851E5ABF19C40EB /* Metal.framework in Frameworks */,
+				79675EC1AA1795E1CEA7EF50 /* MetalKit.framework in Frameworks */,
+				FE1C48E6FC3DC8A56EF7770C /* QuartzCore.framework in Frameworks */,
+				71E75118E403F99C00149AB3 /* Security.framework in Frameworks */,
+				E5533CECAB8A2C2A78139435 /* UIKit.framework in Frameworks */,
+				D32C2B3E1774D29099D46EF6 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		137F2996D1EFB806B254B831 /* vericonomy-wallet_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3CFA00D58B9ACC18FDEE07D2 /* Info.plist */,
+				3567463BDA2043F2D58FC720 /* vericonomy-wallet_iOS.entitlements */,
+			);
+			path = "vericonomy-wallet_iOS";
+			sourceTree = "<group>";
+		};
+		4966A56D3946E1C49FC57A93 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				5535A156568BF48DA53C05C2 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		50E6D59143410DEDE05E0830 /* node */ = {
+			isa = PBXGroup;
+			children = (
+				64EF868E285792B063FF71E1 /* constants.rs */,
+				606F5DD72641A29FB55D1C12 /* diagnostics.rs */,
+				CAC0DD1634A6A8775B57036F /* mod.rs */,
+				28BED724B47236F84F611091 /* orchestrator.rs */,
+				EFADC76D17CBAB13DAA14300 /* rpc_auth.rs */,
+				0C5137348C6AA1DA46D6E422 /* snapshot.rs */,
+				B72C5BEC4A7F1FA2FC9E8DE2 /* state.rs */,
+				2ADCA82D20578C6E4496EC6F /* status.rs */,
+			);
+			path = node;
+			sourceTree = "<group>";
+		};
+		579DD8EE99044191759B6AAA /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				FC3833881A4FFE7AE4A06B95 /* vericonomy-wallet */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		628ECF54C95A40910A18B2F3 = {
+			isa = PBXGroup;
+			children = (
+				78A572671AA30585BD3101EA /* assets */,
+				0127F559653341D3FEC3BE79 /* Assets.xcassets */,
+				890413F90367E0B575CC6DAC /* LaunchScreen.storyboard */,
+				A37817D41369695DAD2FFC04 /* Externals */,
+				579DD8EE99044191759B6AAA /* Sources */,
+				649463BBA92BD8C5EDEBD43C /* src */,
+				137F2996D1EFB806B254B831 /* vericonomy-wallet_iOS */,
+				7C3F28DA530E57838AF54D21 /* Frameworks */,
+				8792BB3F55CEA183B43761E0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		649463BBA92BD8C5EDEBD43C /* src */ = {
+			isa = PBXGroup;
+			children = (
+				C3CC824513F7E80C66212276 /* addressbook.rs */,
+				3B7AE4990FCF7ECC65116C7C /* audit_log.rs */,
+				26C202FEAC4E222C23091349 /* auto_lock.rs */,
+				00FD63D635A372EF6117B5BC /* backup_scheduler.rs */,
+				32BD6A537BFE885F80984E85 /* bootstrap.rs */,
+				445B7D24A38BD01F82BD3299 /* chain_tip_watcher.rs */,
+				56F0B3FAC39DEBAC778242AF /* coin_profile.rs */,
+				EE0D64BFF272355A13F1674B /* commands.rs */,
+				687FE0D68DCD2A8948CFA7DC /* config.rs */,
+				396B1E120FCF96664B15D588 /* dace_commands.rs */,
+				9AF6EFCFB8BF5DD7E45FB3EB /* daemon.rs */,
+				3AD18D9FF3052F89DDECE42E /* error.rs */,
+				F6D81BCAE9BA437BA784B4D2 /* explorer_api.rs */,
+				522951FCC48E47484CA73111 /* features.rs */,
+				30A981E367D8B2B4CB0F0A3B /* gpu_miner.rs */,
+				4CA9E4B8BA0D98EA8768511E /* installer_verify.rs */,
+				7AA2B25C83D669DAFE29C542 /* lib.rs */,
+				61F1C23C8EE1EDF750F52E9F /* logs.rs */,
+				81F9079C9F72C7358847BADC /* main.rs */,
+				0A8B6A8AB82CF7F93A0DEBB2 /* mining_opt.rs */,
+				D8743DA1F7FB8C6988FB8DFD /* multisig.rs */,
+				8ECC9331B0B65513E5D087DB /* network_mode_commands.rs */,
+				80C6D3A07F1449CCB9A6AB1E /* passkey.rs */,
+				118F757588A50300AE00250A /* prefs.rs */,
+				A43C32F37A45B05CA3F95861 /* receive_requests.rs */,
+				DE5CCB60908E0620BCA101F7 /* recovery.rs */,
+				70907CA23E025E175CF37E60 /* rpc.rs */,
+				4BA79B37CB7E1D1CC8A3E045 /* secret_store.rs */,
+				5FC11D60579E4F940AC6B5EC /* security_commands.rs */,
+				81558521101F6541D9FDC65D /* slip39_recovery.rs */,
+				F74DB805EC510A31B8B5649E /* spending_controls.rs */,
+				6E054C4DB98DE5021D07BE95 /* state.rs */,
+				DDF6A29C17E14DC89EF73E45 /* two_factor.rs */,
+				47EADD799BF15E7BCFB407DD /* updates.rs */,
+				500F51789807CA9E6655FBB4 /* wallet_secrets.rs */,
+				C4096F40B090E3E60F92ACE3 /* hardware_wallet */,
+				50E6D59143410DEDE05E0830 /* node */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		7C3F28DA530E57838AF54D21 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				EC4E32C6EC0C325309F76FE6 /* CoreGraphics.framework */,
+				0E54B91A3C8FD6E283D3E5A0 /* libapp.a */,
+				3D1EA8CC92C805D64519C1CE /* Metal.framework */,
+				6D48AD96390D0ED92AC6E5D9 /* MetalKit.framework */,
+				FD42BE52025C83A87611A328 /* QuartzCore.framework */,
+				D5F8622C09A802BF289E66A1 /* Security.framework */,
+				BF3295CC79E1CF74754B83D2 /* UIKit.framework */,
+				85636DE5F44D34B9B898EDC6 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8792BB3F55CEA183B43761E0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				443A7927FAF3DA25D0A2FAE5 /* vericonomy-wallet_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A37817D41369695DAD2FFC04 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		C4096F40B090E3E60F92ACE3 /* hardware_wallet */ = {
+			isa = PBXGroup;
+			children = (
+				F3692FD2349A8097994E1045 /* mod.rs */,
+				DEE1C751B42D8E00FDECD977 /* psbt.rs */,
+			);
+			path = hardware_wallet;
+			sourceTree = "<group>";
+		};
+		FC3833881A4FFE7AE4A06B95 /* vericonomy-wallet */ = {
+			isa = PBXGroup;
+			children = (
+				48761B72C7A28A9996ED43A1 /* main.mm */,
+				4966A56D3946E1C49FC57A93 /* bindings */,
+			);
+			path = "vericonomy-wallet";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		FB1D73249094A644C188129C /* vericonomy-wallet_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FD53ACA736571776B23E1836 /* Build configuration list for PBXNativeTarget "vericonomy-wallet_iOS" */;
+			buildPhases = (
+				DBE40E3333BBB02F6C4CDF99 /* Build Rust Code */,
+				3F218AD7500CDFE6A5A5E35F /* Sources */,
+				EE45A065663CE0598A02D848 /* Resources */,
+				5337401487E6A5669F7C1CB4 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "vericonomy-wallet_iOS";
+			packageProductDependencies = (
+			);
+			productName = "vericonomy-wallet_iOS";
+			productReference = 443A7927FAF3DA25D0A2FAE5 /* vericonomy-wallet_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6C8381E58B01228DC7B500A0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 3F15AE8723559432A9B47876 /* Build configuration list for PBXProject "vericonomy-wallet" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 628ECF54C95A40910A18B2F3;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8792BB3F55CEA183B43761E0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FB1D73249094A644C188129C /* vericonomy-wallet_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EE45A065663CE0598A02D848 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAECF40DF1B0DB301C4B8A0D /* Assets.xcassets in Resources */,
+				4749C16C2128927F02690BF7 /* LaunchScreen.storyboard in Resources */,
+				58923432597EE14B872D7409 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		DBE40E3333BBB02F6C4CDF99 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} 0 ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3F218AD7500CDFE6A5A5E35F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C39317567D1AF1F6EE0F039D /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0B3864BD51F8EA01548AB4A5 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "vericonomy-wallet_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vericonomy.wallet.ios;
+				PRODUCT_NAME = "Vericonomy Wallet";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		25967A9E1ABF1513D3B62AC9 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		D69108A091B693FFE716A0F0 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		EBF48CB1AC3D7799CD56FE15 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "vericonomy-wallet_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vericonomy.wallet.ios;
+				PRODUCT_NAME = "Vericonomy Wallet";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3F15AE8723559432A9B47876 /* Build configuration list for PBXProject "vericonomy-wallet" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D69108A091B693FFE716A0F0 /* debug */,
+				25967A9E1ABF1513D3B62AC9 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		FD53ACA736571776B23E1836 /* Build configuration list for PBXNativeTarget "vericonomy-wallet_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EBF48CB1AC3D7799CD56FE15 /* debug */,
+				0B3864BD51F8EA01548AB4A5 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 6C8381E58B01228DC7B500A0 /* Project object */;
+}

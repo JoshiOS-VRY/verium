@@ -159,7 +159,7 @@ pub async fn cpu_topology() -> AppResult<CpuTopology> {
     let arm_sha2 = std::fs::read_to_string("/proc/cpuinfo")
         .map(|s| s.contains("sha2"))
         .unwrap_or(false);
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    #[cfg(all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios")))]
     let arm_sha2 = true;
     #[cfg(not(target_arch = "aarch64"))]
     let arm_sha2 = false;

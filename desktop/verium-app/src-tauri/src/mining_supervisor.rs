@@ -330,7 +330,7 @@ fn spawn_miner(cfg: &RunConfig) -> std::io::Result<tokio::process::Child> {
         const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
         std_cmd.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
     }
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     {
         use std::os::unix::process::CommandExt;
         std_cmd.nice(10);
