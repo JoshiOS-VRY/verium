@@ -73,27 +73,31 @@ function main() {
     },
     {
       name: "cpuminer",
-      optional: true,
       hint:
-        "Optional pool-mining sidecar. CPUMINER_LOCAL=/path/to/cpuminer npm run fetch:cpuminer " +
-        "(pool mining falls back to the in-process veriumd path when absent).",
+        "Pool-mining sidecar (veriumMiner). Bump cpuminer.lock.json on miner releases, then " +
+        "npm run fetch:cpuminer. Dev monorepo: npm run fetch:cpuminer:local",
+      required: process.env.CPUMINER_REQUIRE === "1",
     },
   ];
   let failed = false;
-  for (const { name, hint, optional } of coins) {
+  for (const { name, hint, required } of coins) {
     const r = check(name);
     if (r.ok) {
       log(`OK ${name} (${(r.size / 1_000_000).toFixed(1)} MB) at ${r.file}`);
       continue;
     }
-    const impact = optional
-      ? "Pool mining will use the in-process veriumd fallback until a real binary is installed."
-      : "Vericoin/VRC will not run until you install a real binary.";
+    const cpuminerOptional = name === "cpuminer" && !required;
+    const impact =
+      cpuminerOptional
+        ? "Pool mining will use the in-process veriumd fallback until a real binary is installed."
+        : name === "cpuminer"
+          ? "Pool mining requires a real cpuminer sidecar."
+          : "Vericoin/VRC will not run until you install a real binary.";
     const msg =
       r.reason === "stub"
         ? `${name} is a build placeholder (${r.size} bytes) at ${r.file}. ${impact} ${hint}`
         : `${name} sidecar missing at ${r.file}. ${impact} ${hint}`;
-    if (warnOnly || optional) {
+    if (warnOnly || cpuminerOptional) {
       log(`WARN ${msg}`);
     } else {
       process.stderr.write(`[assert-sidecars] ERROR: ${msg}\n`);

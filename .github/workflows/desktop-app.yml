@@ -386,19 +386,26 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x src-tauri/binaries/vericoind-${{ matrix.target }} || true
 
-      - name: Fetch optional cpuminer pool-mining sidecar
-        # Optional: pool mining falls back to in-process veriumd when absent.
-        # Writes a build stub on failure so the externalBin entry still resolves.
+      - name: Verify cpuminer lock matches monorepo veriumMiner
+        working-directory: desktop/verium-app
+        run: npm run sync:check:cpuminer
+
+      - name: Fetch cpuminer pool-mining sidecar
+        working-directory: desktop/verium-app
         env:
           CPUMINER_TARGET_TRIPLE: ${{ matrix.target }}
-          CPUMINER_SKIP_IF_PRESENT: "1"
-        run: npm run fetch:cpuminer
+          CPUMINER_REQUIRE: "1"
+        run: npm run fetch:cpuminer -- --force
 
       - name: Mark cpuminer sidecar executable
         if: runner.os != 'Windows'
+        working-directory: desktop/verium-app
         run: chmod +x src-tauri/binaries/cpuminer-${{ matrix.target }} || true
 
       - name: Assert real daemon sidecars (no build placeholders)
+        working-directory: desktop/verium-app
+        env:
+          CPUMINER_REQUIRE: "1"
         run: npm run assert:sidecars
 
       - name: Prepare frontendDist for Cargo tests
