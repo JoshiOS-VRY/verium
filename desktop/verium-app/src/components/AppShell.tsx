@@ -6,6 +6,7 @@ import { NodeRecoveryBanner } from "./NodeRecoveryBanner";
 import { NetworkModeBanner } from "./NetworkModeBanner";
 import { ShutdownProgressOverlay } from "./ShutdownProgressOverlay";
 import { SyncStallBanner } from "./SyncStallBanner";
+import { CoinSwitchOverlay } from "./CoinSwitchOverlay";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -22,7 +23,8 @@ export function AppShell() {
             binarytest. See vericoin/doc/dace/binarytest-network.md. */}
         <NetworkModeBanner />
         <TopBar />
-        <main className="flex-1 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6 lg:px-6 xl:px-8">
+        <main className="relative flex-1 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6 lg:px-6 xl:px-8">
+          <CoinSwitchOverlay />
           <div className="mx-auto flex flex-col gap-4">
             {!isLight && <DashboardNodeActivity coin={coin} />}
             {!isLight && <NodeRecoveryBanner />}

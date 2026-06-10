@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
@@ -33,7 +33,7 @@ use crate::config::{
     PartialDaemonConfig, RpcAuthDiagnostics,
 };
 use crate::daemon::{
-    apply_wallet_p2p_subversion, binary_supports_unified_chain_selector, bundled_sidecar_available,
+    apply_wallet_p2p_subversion, bundled_sidecar_available,
     binary_missing_hint, detect_binary, force_stop_native_daemon, free_rpc_port,
     kill_port_listeners, native_daemon_image_running, native_daemon_process_count,
     pids_listening_on_port,
@@ -55,11 +55,11 @@ use crate::pool_api::{
 use crate::logs::{
     current_log_session, detect_chain_corruption_session,
     detect_daemon_warming, detect_datadir_lock_conflict,
-    detect_node_starting, detect_reindex_active_session,
+    detect_reindex_active_session,
     detect_reindex_file_rebuild_session,
     detect_invalid_block_hashes, detect_recent_coin_age_failure, detect_reindex_progress,
     detect_sync_stall, detect_txindex_complete, detect_txindex_pos_stall, effective_txindex_height,
-    parse_txindex_enabled_height, parse_txindex_sync_height, tail_coin_debug_log,
+    tail_coin_debug_log,
     tail_debug_log,
     rpc_reports_synced,
     is_timestamp_rule_failure, log_recently_modified,
@@ -102,7 +102,7 @@ fn emit_shutdown_progress(app: Option<&AppHandle>, step: &str, message: &str, pe
     );
 }
 
-async fn stop_inner(state: &AppState, coin: CoinId) -> AppResult<()> {
+pub(crate) async fn stop_inner(state: &AppState, coin: CoinId) -> AppResult<()> {
     stop_inner_with_policy(None, state, coin, false).await
 }
 
@@ -221,6 +221,9 @@ pub async fn shutdown_all_vericonomy_processes(
     for coin in CoinId::all() {
         lock_wallet_best_effort(app, state, *coin).await;
     }
+
+    // Release pooled Electrum connections so no light-mode sockets are leaked.
+    crate::wallet::backend::drop_all_pooled_electrum_clients();
 
     let prefs = prefs::load().await.unwrap_or_default();
 
@@ -756,7 +759,11 @@ pub async fn get_node_status(
     coin: String,
 ) -> AppResult<NodeStatus> {
     let coin = parse_coin_id(&coin)?;
-    let mut cfg = state.config_fresh(coin).await?;
+    // The UI polling status is the primary "daemon is needed" signal. Refresh
+    // demand so the supervisor keeps (or brings) the daemon up while in use and
+    // the idle watchdog only stops it once the UI stops polling.
+    crate::node::orchestrator::note_daemon_demand(coin);
+    let cfg = state.config_fresh(coin).await?;
 
     if !state.inner().bootstrap_loading_active(coin)
         && !state.inner().bootstrap_session_active()
@@ -790,12 +797,29 @@ pub async fn get_node_status(
         )));
     }
     let status = match RpcClient::status_client_for_coin(coin, &cfg) {
-        Ok(client) => match client.call::<Value>("getblockchaininfo", json!([])).await {
+        Ok(client) => {
+            // Single HTTP round-trip for both status RPCs (JSON-RPC batch).
+            let batch = client
+                .call_batch(&[
+                    ("getblockchaininfo", json!([])),
+                    ("getnetworkinfo", json!([])),
+                ])
+                .await;
+            let (chain_result, network_info) = match batch {
+                Ok(mut results) => {
+                    let net = results
+                        .get(1)
+                        .and_then(|r| r.as_ref().ok().cloned())
+                        .unwrap_or(Value::Null);
+                    let chain = results.drain(..).next().unwrap_or_else(|| {
+                        Err(AppError::other("missing getblockchaininfo response"))
+                    });
+                    (chain, net)
+                }
+                Err(e) => (Err(e), Value::Null),
+            };
+            match chain_result {
             Ok(chain_info) => {
-                let network_info: Value = client
-                    .call("getnetworkinfo", json!([]))
-                    .await
-                    .unwrap_or(Value::Null);
                 NodeStatus {
                     connected: true,
                     warming_up: false,
@@ -847,7 +871,8 @@ pub async fn get_node_status(
             }
             Err(AppError::Rpc { code, message }) if is_rpc_warmup(code) => warming_up(message),
             Err(e) => return Err(e),
-        },
+            }
+        }
         Err(AppError::DaemonUnreachable(msg)) => {
             if daemon_boot_in_progress(state.inner(), coin, &cfg).await
                 || daemon_log_suggests_loading(state.inner(), coin, &cfg).await
@@ -1501,8 +1526,7 @@ pub async fn get_wallet_info(
 ) -> AppResult<Option<Value>> {
     let coin = parse_coin_id(&coin)?;
     let prefs = crate::prefs::load().await?;
-    let light_keystore_wallet = crate::wallet::keystore::wallet_exists(coin).unwrap_or(false);
-    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() || light_keystore_wallet {
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         return crate::wallet::service::get_wallet_info_json(&state, coin, None).await;
     }
     let client = state.rpc_client(coin).await?;
@@ -1705,6 +1729,7 @@ pub async fn miner_start(
     reward_address: Option<String>,
 ) -> AppResult<MinerLocalState> {
     let coin = parse_coin_id(&coin)?;
+    crate::node::orchestrator::note_daemon_demand(coin);
     assert_verium(coin)?;
     let mut params = vec![json!(threads)];
     if let Some(addr) = reward_address.and_then(|a| {
@@ -1768,6 +1793,7 @@ pub async fn staking_start(
     coin: String,
 ) -> AppResult<EarnLocalState> {
     let coin = parse_coin_id(&coin)?;
+    crate::node::orchestrator::note_daemon_demand(coin);
     assert_vericoin(coin)?;
     let _: Value = state
         .rpc_client(coin)
@@ -1923,17 +1949,7 @@ pub async fn try_auto_unlock_wallet(
 }
 
 fn wallet_info_is_locked(info: &Value) -> bool {
-    let Some(until) = info.get("unlocked_until").and_then(Value::as_i64) else {
-        return false;
-    };
-    if until == 0 {
-        return true;
-    }
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    until <= now
+    crate::wallet::full_node_unlock::wallet_info_is_locked(info)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2449,7 +2465,6 @@ pub async fn wallet_send_with_inputs(
     Ok(txid)
 }
 
-#[cfg(feature = "dev-rpc-console")]
 #[tauri::command]
 pub async fn rpc_raw_call(
     state: State<'_, AppState>,
@@ -2780,7 +2795,7 @@ fn sync_rpc_daemon_config(coin: CoinId, cfg: &mut DaemonConfig) -> AppResult<(St
     Ok((user, pass))
 }
 
-async fn restart_managed_daemon(state: &AppState, coin: CoinId, cfg: &DaemonConfig) -> AppResult<()> {
+async fn restart_managed_daemon(state: &AppState, coin: CoinId, _cfg: &DaemonConfig) -> AppResult<()> {
     if detect_binary(coin).manageable {
         let _ = stop_inner(state, coin).await;
         tokio::time::sleep(Duration::from_millis(1500)).await;
@@ -3169,6 +3184,10 @@ pub async fn set_user_preferences(
     partial: PartialUserPreferences,
 ) -> AppResult<UserPreferences> {
     let current = prefs::load().await.unwrap_or_default();
+    let active_changed = partial
+        .active_coin
+        .as_deref()
+        .is_some_and(|next| next != current.active_coin.as_str());
     let next = prefs::merge(current.clone(), partial);
     for coin in CoinId::all() {
         let was = prefs::wallet_unlock_duration_for(&current, *coin);
@@ -3180,6 +3199,10 @@ pub async fn set_user_preferences(
         }
     }
     prefs::save(&next).await?;
+    if active_changed {
+        let new_active = parse_coin_id(&next.active_coin)?;
+        crate::node::orchestrator::on_active_coin_changed(state.inner(), new_active).await;
+    }
     Ok(next)
 }
 
@@ -3686,6 +3709,7 @@ pub async fn ensure_daemon_connected(
     coin: String,
 ) -> AppResult<EnsureConnectResult> {
     let coin = parse_coin_id(&coin)?;
+    crate::node::orchestrator::note_daemon_demand(coin);
     let binary = coin.binary_base();
     let cfg = state.config_fresh(coin).await?;
     if state.inner().bootstrap_session_active() {

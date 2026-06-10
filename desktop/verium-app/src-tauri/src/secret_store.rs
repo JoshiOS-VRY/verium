@@ -19,8 +19,48 @@ const KEYCHAIN_ACCOUNT: &str = "secret-store-master-v1";
 const NONCE_LEN: usize = 12;
 const SALT_LEN: usize = 16;
 
+const ORPHANED_ENCRYPTED_DATA_MSG: &str = "Windows Credential Manager entry missing for com.vericonomy.wallet.desktop/secret-store-master-v1 but encrypted wallet data exists. Restore the saved credential or recover from your recovery phrase — creating a new master key would make existing light wallets unreadable.";
+
+/// True when the OS keychain has no master key but encrypted `.enc` blobs remain.
+pub fn encrypted_data_orphaned() -> bool {
+    match keyring_entry().get_password() {
+        Err(keyring::Error::NoEntry) => secure_dir_has_encrypted_blobs(),
+        _ => false,
+    }
+}
+
+pub fn orphaned_encrypted_data_message() -> &'static str {
+    ORPHANED_ENCRYPTED_DATA_MSG
+}
+
 fn store_dir() -> PathBuf {
     app_config_base().join("secure")
+}
+
+fn secure_dir_has_encrypted_blobs() -> bool {
+    let dir = store_dir();
+    if !dir.exists() {
+        return false;
+    }
+    std::fs::read_dir(dir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .any(|e| {
+            e.path()
+                .extension()
+                .is_some_and(|ext| ext == "enc" && e.path().file_stem().is_some())
+        })
+}
+
+fn try_decrypt_backup_blob(label: &str) -> Option<Zeroizing<Vec<u8>>> {
+    let bak = blob_backup_path(label);
+    if !bak.exists() {
+        return None;
+    }
+    let blob = std::fs::read(&bak).ok()?;
+    decrypt(&blob).ok().map(Zeroizing::new)
 }
 
 fn blob_path(label: &str) -> PathBuf {
@@ -35,6 +75,18 @@ pub fn blob_exists(label: &str) -> bool {
 /// Whether the encrypted blob exists and decrypts with the current master key.
 pub fn blob_readable(label: &str) -> bool {
     blob_decrypts(label)
+}
+
+/// Whether the `.enc.bak` copy exists and decrypts with the current master key.
+pub fn blob_backup_readable(label: &str) -> bool {
+    let path = blob_backup_path(label);
+    if !path.exists() {
+        return false;
+    }
+    match std::fs::read(path) {
+        Ok(blob) => decrypt(&blob).is_ok(),
+        Err(_) => false,
+    }
 }
 
 fn keyring_entry() -> keyring::Entry {
@@ -70,6 +122,9 @@ fn load_master_key_from_keyring() -> AppResult<[u8; 32]> {
             Ok(key)
         }
         Err(keyring::Error::NoEntry) => {
+            if secure_dir_has_encrypted_blobs() {
+                return Err(AppError::other(ORPHANED_ENCRYPTED_DATA_MSG));
+            }
             let mut key = [0u8; 32];
             rand::thread_rng().fill_bytes(&mut key);
             let hex_key = hex::encode(key);
@@ -108,6 +163,9 @@ fn ensure_master_key() -> AppResult<[u8; 32]> {
 }
 
 fn blob_decrypts(label: &str) -> bool {
+    if encrypted_data_orphaned() {
+        return false;
+    }
     let path = blob_path(label);
     if !path.exists() {
         return false;
@@ -270,13 +328,31 @@ fn open_with_recovery(
             tracing::warn!(
                 "secret_store: decrypt failed for {label} ({e}); attempting recovery"
             );
+            if let Some(plain) = try_decrypt_backup_blob(label) {
+                tracing::warn!("secret_store: recovered {label} from encrypted backup");
+                let _ = quarantine_corrupt_blob(label);
+                if let Err(seal_err) = seal(label, plain.as_ref()) {
+                    tracing::warn!(
+                        "secret_store: could not re-seal recovered {label}: {seal_err}"
+                    );
+                }
+                return Ok(Some(plain));
+            }
             if let Some(fallback) = plaintext_fallback {
                 if migrate_plaintext_json(label, fallback)? {
                     return open_with_recovery(label, Some(fallback));
                 }
                 if let Some(plain) = read_plaintext_fallback(Some(fallback))? {
                     quarantine_corrupt_blob(label)?;
-                    seal(label, plain.as_ref())?;
+                    if encrypted_data_orphaned() {
+                        tracing::warn!(
+                            "secret_store: using plaintext fallback for {label} (credential manager orphaned)"
+                        );
+                    } else if let Err(seal_err) = seal(label, plain.as_ref()) {
+                        tracing::warn!(
+                            "secret_store: could not re-seal plaintext fallback for {label}: {seal_err}"
+                        );
+                    }
                     return Ok(Some(plain));
                 }
             }
@@ -338,6 +414,9 @@ pub fn migrate_plaintext_json(label: &str, plaintext_path: &std::path::Path) -> 
         }
         return Ok(false);
     }
+    if encrypted_data_orphaned() {
+        return Ok(false);
+    }
     let raw = std::fs::read_to_string(plaintext_path)?;
     seal(label, raw.as_bytes())?;
     std::fs::remove_file(plaintext_path)?;
@@ -396,8 +475,70 @@ pub fn load_json<T: serde::de::DeserializeOwned>(
 
 /// Save JSON to encrypted store.
 pub fn save_json<T: serde::Serialize + ?Sized>(label: &str, value: &T) -> AppResult<()> {
+    if encrypted_data_orphaned() {
+        return Err(AppError::other(ORPHANED_ENCRYPTED_DATA_MSG));
+    }
     let json = serde_json::to_string_pretty(value)?;
     seal(label, json.as_bytes())
+}
+
+#[cfg(not(test))]
+fn clear_master_key_cache() {
+    if let Ok(mut guard) = MASTER_KEY.lock() {
+        *guard = None;
+    }
+}
+
+#[cfg(test)]
+fn clear_master_key_cache() {}
+
+/// Move orphaned encrypted blobs aside so a fresh credential-manager key can be created.
+/// Existing light-wallet ciphertext becomes unreadable unless the user restores the old CM entry.
+pub fn quarantine_orphaned_encrypted_data() -> AppResult<String> {
+    if !encrypted_data_orphaned() {
+        return Err(AppError::other(
+            "Credential Manager entry is present; quarantine is not needed.",
+        ));
+    }
+    let dir = store_dir();
+    if !dir.exists() {
+        return Err(AppError::other("no secure storage directory found"));
+    }
+    let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+    let dest = dir.join(format!("orphaned-{stamp}"));
+    std::fs::create_dir_all(&dest)?;
+    let mut moved = 0usize;
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if name.ends_with(".enc")
+            || name.ends_with(".enc.bak")
+            || name.ends_with(".enc.new")
+            || name.ends_with(".enc.corrupt")
+        {
+            let target = dest.join(name);
+            std::fs::rename(&path, &target)?;
+            moved += 1;
+        }
+    }
+    if moved == 0 {
+        let _ = std::fs::remove_dir(&dest);
+        return Err(AppError::other("no encrypted blobs found to quarantine"));
+    }
+    clear_master_key_cache();
+    let _ = ensure_master_key()?;
+    tracing::warn!(
+        "quarantined {moved} encrypted blob(s) to {}; a new Credential Manager master key was created",
+        dest.display()
+    );
+    Ok(dest.display().to_string())
 }
 
 fn derive_key_from_passphrase(passphrase: &str, salt: &[u8]) -> AppResult<[u8; 32]> {

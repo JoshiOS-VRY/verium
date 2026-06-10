@@ -2,11 +2,12 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChainSynced } from "@/hooks/useChainSynced";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import { useCoinWalletMode } from "@/hooks/useWalletMode";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { subscribeChainTip } from "@/lib/chain-tip-store";
 import { addSeenTxid } from "@/lib/seen-txid-set";
 import { walletTransactionsQueryKey } from "@/lib/wallet-transactions-query";
+import { useUserPreferences } from "@/lib/user-preferences";
 import { type TransactionItem } from "@/lib/rpc/client";
 
 export interface StakeRewardEvent {
@@ -47,8 +48,12 @@ function stakeSortKey(tx: TransactionItem): number {
 
 /** Polls vericoin wallet for new stake-mint rewards and emits when synced. */
 export function useStakeRewardWatcher(): void {
-  const { isLight } = useWalletMode();
-  const { data: status } = useDaemonStatus(VERICOIN);
+  const { isLight } = useCoinWalletMode("vericoin");
+  const stakeSound = useUserPreferences(
+    (s) => s.prefs.play_sound_on_stake_reward === true,
+  );
+  const watchEnabled = stakeSound && !isLight;
+  const { data: status } = useDaemonStatus(VERICOIN, { enabled: watchEnabled });
   const { synced } = useChainSynced(VERICOIN);
   const syncedRef = useRef(synced);
   syncedRef.current = synced;
@@ -57,7 +62,7 @@ export function useStakeRewardWatcher(): void {
   const initialized = useRef(false);
 
   const txs = useWalletTransactions(VERICOIN, {
-    enabled: status?.connected === true,
+    enabled: watchEnabled && status?.connected === true,
   });
 
   useEffect(() => {

@@ -50,7 +50,7 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
     enabled: explorerEnabled.data === true,
-    refetchInterval: visible ? 60_000 : false,
+    refetchInterval: false,
     retry: 0,
   });
   const mining = useQuery({

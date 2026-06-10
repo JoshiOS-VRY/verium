@@ -109,7 +109,7 @@ export function PoolMiningPanel({
     if (last && localHashrate === last.hr && now - last.t < 4000) return;
     lastSampleRef.current = { t: now, hr: localHashrate };
     setSamples((prev) =>
-      [...prev, { t: now, hashrate: localHashrate }].slice(-720),
+      [...prev, { t: now, hashrate: localHashrate }].slice(-60),
     );
   }, [localHashrate, localPoolMining]);
 

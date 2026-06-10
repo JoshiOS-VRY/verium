@@ -1,9 +1,16 @@
-import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { CoinProvider } from "@/lib/coin/context";
 import { useActiveCoin } from "@/lib/coin/context";
+import type { CoinId } from "@/lib/coin/profile";
 import { BINARYTEST_ENABLED } from "@/lib/features";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { useWebAudioGestureUnlock } from "@/lib/web-audio";
@@ -13,6 +20,7 @@ import { useMiningPollCoordinator } from "@/hooks/useMiningPollCoordinator";
 import { useAdaptiveMiningThreads } from "@/hooks/useAdaptiveMiningThreads";
 import { useWalletInfoPollCoordinator } from "@/hooks/useWalletInfoPollCoordinator";
 import { useBlockchainInfoPollCoordinator } from "@/hooks/useBlockchainInfoPollCoordinator";
+import { useExplorerStatsPollCoordinator } from "@/hooks/useExplorerStatsPollCoordinator";
 import { useVericoinEarnPollCoordinator } from "@/hooks/useVericoinEarnPollCoordinator";
 import { useAutoMine } from "@/hooks/useAutoMine";
 import { useAutoStake } from "@/hooks/useAutoStake";
@@ -28,18 +36,12 @@ import { useIncomingVrmWatcher } from "@/hooks/useIncomingVrmWatcher";
 import { useIncomingVrcNotifications } from "@/hooks/useIncomingVrcNotifications";
 import { useIncomingVrcWatcher } from "@/hooks/useIncomingVrcWatcher";
 import { FullNodeOnlyRoute } from "@/components/FullNodeOnlyRoute";
-import { useQuery } from "@tanstack/react-query";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { lightWalletExists } from "@/lib/light-wallet/client";
-import { tauriWalletFileStatus } from "@/lib/rpc/client";
-import { fullNodeWalletExists, isCoinWalletReady } from "@/lib/setup";
+import { useWalletProfile } from "@/hooks/useWalletProfile";
+import { isProfileReady } from "@/lib/wallet-profile";
+import { isProfileOpenable } from "@/lib/setup";
 import { useTheme } from "@/hooks/useTheme";
 import { useDeepLinkHandler } from "@/hooks/useDeepLinkHandler";
 import { ToastHost } from "@/components/ToastHost";
-import { MemoryDiagnosticsPanel } from "@/components/MemoryDiagnosticsPanel";
-
 const Setup = lazy(() =>
   import("@/pages/Setup").then((m) => ({ default: m.Setup })),
 );
@@ -95,52 +97,37 @@ function SetupRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
   const coin = useActiveCoin();
-  const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
-  const { isLight } = useWalletMode();
-  const { isLoading: daemonLoading } = useDaemonStatus(coin);
-  const storedLightWallet = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
-    queryFn: () => lightWalletExists(coin),
-    enabled: loaded,
-    staleTime: 10_000,
-  });
-  const walletFile = useQuery({
-    queryKey: coinQueryKey(coin, "wallet-file-status"),
-    queryFn: () => tauriWalletFileStatus(coin),
-    enabled: loaded && !isLight,
-    staleTime: 10_000,
-  });
+  /** Sticky per-coin ready — avoids setup bounce while profile refetches on switch. */
+  const confirmedReady = useRef<Set<CoinId>>(new Set());
+  const { data: profile, isLoading: profileLoading } = useWalletProfile(
+    coin,
+    loaded,
+  );
 
   useEffect(() => {
-    if (!loaded || storedLightWallet.isLoading) return;
-    if (!isLight && walletFile.isLoading) return;
-    const hasLightWallet = storedLightWallet.data === true;
-    const hasFullNodeWallet = fullNodeWalletExists(walletFile.data);
-    const ready = isCoinWalletReady(coin, prefs, {
-      walletMode: isLight ? "light" : "full_node",
-      hasLightWallet,
-      hasFullNodeWallet,
-    });
-    if (ready) return;
+    if (!loaded) return;
+    if (profile && (isProfileReady(profile) || isProfileOpenable(profile))) {
+      confirmedReady.current.add(coin);
+    }
+    if (profileLoading && confirmedReady.current.has(coin)) return;
+    if (!profile) {
+      if (confirmedReady.current.has(coin)) return;
+      return;
+    }
+    if (isProfileReady(profile)) return;
+    if (isProfileOpenable(profile)) return;
     // Full-node mode with only a light wallet: don't trap the user in setup.
-    if (!isLight && hasLightWallet && !hasFullNodeWallet) return;
+    if (
+      profile.mode === "full_node" &&
+      profile.keys_present.light &&
+      !profile.keys_present.full_node
+    ) {
+      return;
+    }
     if (location.pathname === "/setup") return;
-    if (!isLight && daemonLoading) return;
     navigate("/setup", { replace: true, state: { setupHub: true } });
-  }, [
-    loaded,
-    isLight,
-    daemonLoading,
-    coin,
-    prefs,
-    storedLightWallet.isLoading,
-    storedLightWallet.data,
-    walletFile.isLoading,
-    walletFile.data,
-    location.pathname,
-    navigate,
-  ]);
+  }, [loaded, profileLoading, profile, coin, location.pathname, navigate]);
 
   return null;
 }
@@ -151,6 +138,7 @@ function AppHooks() {
   useMiningPollCoordinator();
   useWalletInfoPollCoordinator();
   useBlockchainInfoPollCoordinator();
+  useExplorerStatsPollCoordinator();
   useVericoinEarnPollCoordinator();
   useAdaptiveMiningThreads();
   useAutoStake();
@@ -190,14 +178,17 @@ function AppRoutes() {
       <AppHooks />
       <SetupRedirect />
       <ToastHost />
-      <MemoryDiagnosticsPanel />
+      {/* <MemoryDiagnosticsPanel /> */}
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/setup" element={<Setup />} />
           <Route element={<AppShell />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/wallet" element={<Navigate to="/dashboard" replace />} />
+            <Route
+              path="/wallet"
+              element={<Navigate to="/dashboard" replace />}
+            />
             <Route element={<FullNodeOnlyRoute />}>
               <Route path="/mining" element={<Mining />} />
               <Route path="/staking" element={<Staking />} />

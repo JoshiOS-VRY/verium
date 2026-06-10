@@ -29,9 +29,8 @@ import { coinQueryKey, COIN_PROFILES, type CoinId } from "@/lib/coin/profile";
 import {
   anyEnabledCoinSetupIncomplete,
   coinSetupCompletePatch,
-  fullNodeWalletExists,
   isCoinWalletReady,
-  resolveEffectiveWalletMode,
+  needsLightWalletRecovery,
 } from "@/lib/setup";
 import {
   rpcGetConfig,
@@ -64,7 +63,7 @@ import { useDaemonStatus } from "@/hooks/useDaemonStatus";
 import { isNodeReady, nodeStatusLabel } from "@/lib/node/status";
 import { useIsTestNetwork } from "@/lib/network-mode";
 import { LIGHT_WALLET_ENABLED } from "@/lib/features";
-import { lightWalletExists, walletModeSet } from "@/lib/light-wallet/client";
+import { walletModeSet, walletModeSetForCoin } from "@/lib/light-wallet/client";
 import { LightWalletSetupForm } from "@/components/LightWalletSetupForm";
 import { SetupWalletHub } from "@/components/SetupWalletHub";
 import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
@@ -72,7 +71,12 @@ import { lightWalletCopy } from "@/lib/light-wallet/copy";
 import {
   onboardingCheckpointSet,
   onboardingMarkComplete,
+  tauriWalletProfile,
 } from "@/lib/wallet-profile";
+import {
+  profileWalletPresence,
+  useSetupHubProfile,
+} from "@/hooks/useSetupHubProfiles";
 import { FeatureTile } from "@/components/onboarding/FeatureTile";
 import { SetupStepIndicator } from "@/components/onboarding/SetupStepIndicator";
 import { LegacyUpgradeWizard } from "@/components/onboarding/LegacyUpgradeWizard";
@@ -130,12 +134,7 @@ export function Setup() {
     "full_node",
   );
   const [showAdvancedLightMode, setShowAdvancedLightMode] = useState(false);
-  const effectiveSetupWalletMode = resolveEffectiveWalletMode(
-    persistedWalletMode === "light" ? "light" : "full_node",
-    setupWalletMode,
-  );
-  const lightSetupActive = effectiveSetupWalletMode === "light";
-  const activeSteps = lightSetupActive ? LIGHT_STEPS : FULL_STEPS;
+  const lightSetupActive = setupWalletMode === "light";
   const [step, setStep] = useState<Step>("hub");
   const [bootstrapOpen, setBootstrapOpen] = useState(false);
   const [datadirDraft, setDatadirDraft] = useState<string>("");
@@ -152,6 +151,17 @@ export function Setup() {
 
   const updatePrefs = useUserPreferences((s) => s.update);
   const prefs = useUserPreferences((s) => s.prefs);
+  const prefsLoaded = useUserPreferences((s) => s.loaded);
+  const hubModeInitialized = useRef(false);
+
+  useEffect(() => {
+    if (!prefsLoaded || hubModeInitialized.current) return;
+    hubModeInitialized.current = true;
+    if (prefs.wallet_mode === "light") {
+      setSetupWalletMode("light");
+      setShowAdvancedLightMode(true);
+    }
+  }, [prefsLoaded, prefs.wallet_mode]);
 
   const resetCoinOnboarding = useCallback(() => {
     setWalletAction("choose");
@@ -164,10 +174,14 @@ export function Setup() {
   const goToHub = useCallback(() => {
     resetCoinOnboarding();
     setStep("hub");
-  }, [resetCoinOnboarding]);
+    void queryClient.invalidateQueries({
+      predicate: (q) =>
+        Array.isArray(q.queryKey) && q.queryKey[1] === "wallet-profile",
+    });
+  }, [resetCoinOnboarding, queryClient]);
 
   const openReadyCoinDashboard = useCallback(
-    async (targetCoin: CoinId) => {
+    async (targetCoin: CoinId, openMode: "light" | "full_node") => {
       await updatePrefs({
         ...coinSetupCompletePatch(targetCoin, prefs),
         active_coin: targetCoin,
@@ -175,12 +189,15 @@ export function Setup() {
       await onboardingMarkComplete(targetCoin).catch(() => undefined);
       if (LIGHT_WALLET_ENABLED) {
         try {
-          await walletModeSet(effectiveSetupWalletMode);
+          await walletModeSetForCoin(targetCoin, openMode);
           invalidateWalletMode();
         } catch {
           /* prefs may reconcile on next load */
         }
       }
+      void queryClient.invalidateQueries({
+        queryKey: coinQueryKey(targetCoin, "wallet-profile"),
+      });
       navigate("/dashboard", { replace: true });
     },
     [
@@ -188,50 +205,66 @@ export function Setup() {
       updatePrefs,
       invalidateWalletMode,
       navigate,
-      effectiveSetupWalletMode,
+      queryClient,
     ],
   );
 
   const startCoinSetup = useCallback(
     async (targetCoin: CoinId) => {
-      const hasLightWallet = await lightWalletExists(targetCoin).catch(
-        () => false,
+      const walletProfile = await tauriWalletProfile(targetCoin).catch(
+        () => null,
       );
-      const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
-      const hasFullNodeWallet = fullNodeWalletExists(status);
-      if (
-        isCoinWalletReady(targetCoin, prefs, {
-          walletMode: effectiveSetupWalletMode,
-          hasLightWallet,
-          hasFullNodeWallet,
-        })
-      ) {
-        await openReadyCoinDashboard(targetCoin);
-        return;
-      }
-      // Don't restart onboarding when a light wallet already exists and the hub
-      // is only showing "Not set up" because full-node mode is selected.
-      if (
-        hasLightWallet &&
-        !hasFullNodeWallet &&
-        effectiveSetupWalletMode === "full_node"
-      ) {
+      const presence = profileWalletPresence(walletProfile ?? undefined);
+
+      if (walletProfile && needsLightWalletRecovery(walletProfile, setupWalletMode)) {
+        setActiveCoin(targetCoin);
+        resetCoinOnboarding();
         if (LIGHT_WALLET_ENABLED) {
           try {
-            await walletModeSet("light");
+            await walletModeSetForCoin(targetCoin, "light");
             invalidateWalletMode();
           } catch {
-            /* open with existing light keys */
+            /* continue */
           }
         }
-        await openReadyCoinDashboard(targetCoin);
+        setWalletAction("restore_phrase");
+        setStep("wallet");
+        return;
+      }
+
+      if (
+        walletProfile?.ready ||
+        isCoinWalletReady(targetCoin, prefs, {
+          walletMode: setupWalletMode,
+          ...presence,
+          lightKeystoreHealth: walletProfile?.light_keystore_health,
+        })
+      ) {
+        const openMode =
+          walletProfile?.ready && walletProfile.mode === "light"
+            ? "light"
+            : walletProfile?.ready && walletProfile.mode === "full_node"
+              ? "full_node"
+              : setupWalletMode;
+        await openReadyCoinDashboard(targetCoin, openMode);
+        return;
+      }
+      // Full-node hub + decryptable light-only wallet on disk.
+      if (
+        setupWalletMode === "full_node" &&
+        !presence.hasFullNodeWallet &&
+        presence.hasLightWallet &&
+        walletProfile?.light_keystore_health === "ok"
+      ) {
+        await openReadyCoinDashboard(targetCoin, "light");
         return;
       }
       setActiveCoin(targetCoin);
       resetCoinOnboarding();
       if (LIGHT_WALLET_ENABLED) {
+        const setupMode = setupWalletMode;
         try {
-          await walletModeSet(effectiveSetupWalletMode);
+          await walletModeSetForCoin(targetCoin, setupMode);
           invalidateWalletMode();
         } catch {
           /* continue with local mode choice */
@@ -243,7 +276,7 @@ export function Setup() {
       prefs,
       setActiveCoin,
       resetCoinOnboarding,
-      effectiveSetupWalletMode,
+      setupWalletMode,
       invalidateWalletMode,
       openReadyCoinDashboard,
     ],
@@ -277,20 +310,36 @@ export function Setup() {
   const walletFile = useQuery({
     queryKey: coinQueryKey(coin, "wallet-file-status"),
     queryFn: () => tauriWalletFileStatus(coin),
-    refetchInterval: 4_000,
-    enabled: step === "wallet" || step === "daemon" || step === "welcome",
+    refetchInterval: step === "daemon" ? 4_000 : false,
+    enabled:
+      !lightSetupActive &&
+      (step === "wallet" || step === "daemon" || step === "welcome"),
   });
-  const setupCoinLightWallet = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
-    queryFn: () => lightWalletExists(coin),
-    staleTime: 0,
-    refetchOnMount: "always",
-  });
-  const setupCoinHasLightWallet = setupCoinLightWallet.data === true;
+  const setupCoinProfile = useSetupHubProfile(
+    coin,
+    step !== "hub" && step !== "advanced",
+  );
+  const setupCoinPresence = profileWalletPresence(setupCoinProfile.data);
+  const setupCoinHasLightWallet = setupCoinPresence.hasLightWallet;
+  const setupCoinKeystoreUnreadable = needsLightWalletRecovery(
+    setupCoinProfile.data,
+    setupWalletMode,
+  );
+  /** Light setup UI when hub chose light or prefs already use light without full-node wallet. */
+  const lightWalletFlow =
+    setupWalletMode === "light" ||
+    (isLight && !setupCoinPresence.hasFullNodeWallet);
+  const activeSteps = lightWalletFlow ? LIGHT_STEPS : FULL_STEPS;
 
-  const hasFullNodeWallet =
-    walletFile.data?.exists === true ||
-    walletFile.data?.legacy_wallet_detected === true;
+  useEffect(() => {
+    if (step !== "wallet" || !setupCoinKeystoreUnreadable) return;
+    setWalletAction("restore_phrase");
+  }, [step, setupCoinKeystoreUnreadable]);
+
+  const hasFullNodeWallet = lightSetupActive
+    ? setupCoinPresence.hasFullNodeWallet
+    : walletFile.data?.exists === true ||
+      walletFile.data?.legacy_wallet_detected === true;
   const showFullNodeMigrationHint =
     lightSetupActive && hasFullNodeWallet && !setupCoinHasLightWallet;
 
@@ -344,10 +393,10 @@ export function Setup() {
 
   useEffect(() => {
     if (!lightSetupActive || step !== "wallet" || isLight) return;
-    void walletModeSet("light")
+    void walletModeSetForCoin(coin, "light")
       .then(() => invalidateWalletMode())
       .catch(() => undefined);
-  }, [lightSetupActive, step, isLight, invalidateWalletMode]);
+  }, [lightSetupActive, step, isLight, coin, invalidateWalletMode]);
 
   const walletSetupMode = resolveWalletSetupMode(
     coin,
@@ -362,12 +411,12 @@ export function Setup() {
     walletFile.data?.exists === true;
 
   useEffect(() => {
-    if (walletModeLoading) return;
-    if (persistedWalletMode === "light") {
+    if (walletModeLoading || step === "hub") return;
+    if (persistedWalletMode === "light" && setupWalletMode !== "full_node") {
       setSetupWalletMode("light");
       setShowAdvancedLightMode(true);
     }
-  }, [persistedWalletMode, walletModeLoading]);
+  }, [persistedWalletMode, walletModeLoading, step, setupWalletMode]);
 
   const handleSetupWalletModeChange = useCallback(
     async (mode: "light" | "full_node") => {
@@ -375,15 +424,8 @@ export function Setup() {
       if (mode === "light") {
         setShowAdvancedLightMode(true);
       }
-      if (!LIGHT_WALLET_ENABLED) return;
-      try {
-        await walletModeSet(mode);
-        invalidateWalletMode();
-      } catch {
-        /* hub still reflects local choice */
-      }
     },
-    [invalidateWalletMode],
+    [],
   );
 
   useEffect(() => {
@@ -431,7 +473,7 @@ export function Setup() {
       queryClient.getQueryData<Awaited<ReturnType<typeof twoFactorStatus>>>([
         "two-factor",
       ])?.enabled ?? twoFa.data?.enabled;
-    if (lightSetupActive) {
+    if (lightWalletFlow) {
       setStep(twoFaEnabled ? "done" : "twofa");
       return;
     }
@@ -459,7 +501,9 @@ export function Setup() {
   }, [step, twoFa.data?.enabled, lightSetupActive]);
 
   useEffect(() => {
-    if (step !== "wallet" || lightSetupActive) return;
+    if (step !== "wallet" || lightSetupActive || isLight || setupCoinKeystoreUnreadable) {
+      return;
+    }
     if (walletSetupMode === "ready" && walletIsHd.data === true) {
       if (twoFa.isLoading) return;
       advanceAfterChainWalletReady();
@@ -481,6 +525,8 @@ export function Setup() {
     twoFa.data?.enabled,
     twoFa.isLoading,
     lightSetupActive,
+    isLight,
+    setupCoinKeystoreUnreadable,
   ]);
 
   const saveConfig = useMutation({
@@ -526,6 +572,13 @@ export function Setup() {
     };
     await updatePrefs(coinSetupCompletePatch(coin, prefs));
     await onboardingMarkComplete(coin).catch(() => undefined);
+    if (LIGHT_WALLET_ENABLED && lightSetupActive) {
+      await walletModeSetForCoin(coin, "light").catch(() => undefined);
+      invalidateWalletMode();
+    }
+    void queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, "wallet-profile"),
+    });
     if (anyEnabledCoinSetupIncomplete(enabledCoins, nextPrefs)) {
       goToHub();
       return;
@@ -536,19 +589,40 @@ export function Setup() {
   const openDashboardFromHub = async () => {
     let patch = { ...prefs };
     for (const targetCoin of enabledCoins) {
-      const hasLightWallet = await lightWalletExists(targetCoin).catch(
-        () => false,
+      const walletProfile = await tauriWalletProfile(targetCoin).catch(
+        () => null,
       );
-      const status = await tauriWalletFileStatus(targetCoin).catch(() => null);
-      const hasFullNodeWallet = fullNodeWalletExists(status);
+      if (walletProfile && needsLightWalletRecovery(walletProfile, setupWalletMode)) {
+        continue;
+      }
+      const presence = profileWalletPresence(walletProfile ?? undefined);
+      let openMode: "light" | "full_node" | null = null;
       if (
+        walletProfile?.ready ||
         isCoinWalletReady(targetCoin, patch, {
-          walletMode: effectiveSetupWalletMode,
-          hasLightWallet,
-          hasFullNodeWallet,
+          walletMode: setupWalletMode,
+          ...presence,
+          lightKeystoreHealth: walletProfile?.light_keystore_health,
         })
       ) {
+        openMode = walletProfile?.ready
+          ? (walletProfile.mode as "light" | "full_node")
+          : setupWalletMode;
+      } else if (
+        setupWalletMode === "full_node" &&
+        !presence.hasFullNodeWallet &&
+        presence.hasLightWallet &&
+        walletProfile?.light_keystore_health === "ok"
+      ) {
+        openMode = "light";
+      }
+      if (openMode) {
         patch = { ...patch, ...coinSetupCompletePatch(targetCoin, patch) };
+        if (LIGHT_WALLET_ENABLED) {
+          await walletModeSetForCoin(targetCoin, openMode).catch(
+            () => undefined,
+          );
+        }
       }
     }
     await updatePrefs({
@@ -556,14 +630,7 @@ export function Setup() {
       setup_completed_by_coin: patch.setup_completed_by_coin,
       active_coin: coin,
     });
-    if (LIGHT_WALLET_ENABLED) {
-      try {
-        await walletModeSet(effectiveSetupWalletMode);
-        invalidateWalletMode();
-      } catch {
-        /* continue */
-      }
-    }
+    invalidateWalletMode();
     navigate("/dashboard", { replace: true });
   };
 
@@ -579,7 +646,7 @@ export function Setup() {
           <CardDescription>
             {step === "hub"
               ? "Pick Verium or Vericoin, choose light or full-node mode, then walk through setup for each chain."
-              : lightSetupActive
+              : lightWalletFlow
                 ? `Set up your ${profile.symbol} light wallet, save your recovery phrase, and enable app-wide 2FA. No local node or blockchain sync required.`
                 : `Start the bundled ${profile.binaryName} node, set up your ${profile.symbol} wallet and recovery phrase, enable app-wide 2FA, then optionally import a chain bootstrap.`}
           </CardDescription>
@@ -781,8 +848,30 @@ export function Setup() {
             </div>
           )}
 
-          {step === "wallet" && (isLight || setupWalletMode === "light") && (
+          {step === "wallet" && lightWalletFlow && (
             <div className="flex flex-col gap-4">
+              {setupCoinKeystoreUnreadable ? (
+                <>
+                  <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-xs text-fg-muted">
+                    <p className="font-medium text-fg">
+                      Recovery phrase required
+                    </p>
+                    <p className="mt-1">
+                      Wallet files are on this device but the saved keys need to
+                      be rebuilt. Passphrase unlock will not work — import your
+                      24-word recovery phrase (or HD master key) below. Seeds
+                      stay encrypted with your new passphrase; no Windows
+                      Credential Manager entry is required.
+                    </p>
+                  </div>
+                  <LightWalletSetupForm
+                    mode="import"
+                    onDone={() => setStep("twofa")}
+                    onBack={goToHub}
+                  />
+                </>
+              ) : (
+                <>
               <div className="rounded-md border border-border bg-bg-subtle p-3 text-xs text-fg-muted">
                 <p>
                   Light wallet — your keys are encrypted on this device. Balance
@@ -881,6 +970,8 @@ export function Setup() {
                   Back to wallet menu
                 </Button>
               )}
+                </>
+              )}
             </div>
           )}
 
@@ -899,8 +990,7 @@ export function Setup() {
           )}
 
           {step === "wallet" &&
-            !isLight &&
-            setupWalletMode !== "light" &&
+            !lightWalletFlow &&
             !legacyWizardActive && (
             <div className="flex flex-col gap-4">
               <div className="rounded-md border border-border bg-bg-subtle p-3 text-xs text-fg-muted">

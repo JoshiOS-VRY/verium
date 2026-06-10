@@ -88,12 +88,35 @@ struct RpcPoolMinerDetect {
     backend: Option<String>,
 }
 
-fn pool_cpu_thread_ceiling() -> u32 {
+/// Logical CPUs left for OS, WebView, veriumd, and Tauri while mining.
+const UI_RESERVE_LOGICAL_CPUS: u32 = 2;
+
+fn logical_cpu_count() -> u32 {
     std::thread::available_parallelism()
         .map(|n| n.get() as u32)
         .unwrap_or(2)
-        .saturating_sub(1)
         .max(1)
+}
+
+fn ui_reserve_logical_cpus(logical: u32) -> u32 {
+    UI_RESERVE_LOGICAL_CPUS.max((logical / 10).min(4))
+}
+
+fn pool_cpu_thread_ceiling() -> u32 {
+    let logical = logical_cpu_count();
+    logical
+        .saturating_sub(ui_reserve_logical_cpus(logical))
+        .max(1)
+}
+
+fn apply_ui_thread_reserve(threads: u32) -> u32 {
+    threads.min(pool_cpu_thread_ceiling()).max(1)
+}
+
+async fn cpuminer_recommended_threads_async(binary: Option<std::path::PathBuf>) -> u32 {
+    tokio::task::spawn_blocking(move || cpuminer_recommended_threads(binary.as_deref()))
+        .await
+        .unwrap_or(1)
 }
 
 fn probe_system_memory_mib() -> (u64, u64) {
@@ -266,14 +289,18 @@ pub async fn pool_miner_memory_limits_rpc(_state: &AppState) -> AppResult<PoolMi
     if uses_sidecar {
         let scratchpad_mib = cpuminer_scratchpad_mib(true);
         let binary = mining_supervisor::resolve_cpuminer_binary();
-        let max_safe_threads = cpuminer_recommended_threads(binary.as_deref());
+        let max_safe_threads = apply_ui_thread_reserve(
+            cpuminer_recommended_threads_async(binary).await,
+        );
         let topo = probe_topo();
-        let max_manual_threads = if topo.performance_cpus > 0 {
-            topo.performance_cpus
-        } else {
-            pool_cpu_thread_ceiling()
-        }
-        .max(max_safe_threads);
+        let max_manual_threads = apply_ui_thread_reserve(
+            if topo.performance_cpus > 0 {
+                topo.performance_cpus
+            } else {
+                pool_cpu_thread_ceiling()
+            }
+            .max(max_safe_threads),
+        );
         return Ok(PoolMinerMemoryLimits {
             max_safe_threads,
             max_manual_threads,
@@ -287,7 +314,7 @@ pub async fn pool_miner_memory_limits_rpc(_state: &AppState) -> AppResult<PoolMi
     let scratchpad_mib: u32 = 128;
     let cpu_ceiling = pool_cpu_thread_ceiling();
     let ram_ceiling = (available_ram_mib / scratchpad_mib.max(1) as u64).max(1) as u32;
-    let max_safe_threads = cpu_ceiling.min(ram_ceiling).max(1);
+    let max_safe_threads = apply_ui_thread_reserve(cpu_ceiling.min(ram_ceiling).max(1));
     Ok(PoolMinerMemoryLimits {
         max_safe_threads,
         max_manual_threads: max_safe_threads,
@@ -349,15 +376,19 @@ pub async fn pool_miner_start(
     assert_verium(CoinId::Verium)?;
     let password = config.password.as_deref().unwrap_or("x");
     let sidecar_binary = mining_supervisor::resolve_cpuminer_binary();
-    let (auto_ceiling, manual_ceiling) = if let Some(ref binary) = sidecar_binary {
-        let recommended = cpuminer_recommended_threads(Some(binary.as_path()));
+    let (auto_ceiling, manual_ceiling) = if let Some(binary) = sidecar_binary.clone() {
+        let recommended = apply_ui_thread_reserve(
+            cpuminer_recommended_threads_async(Some(binary)).await,
+        );
         let topo = probe_topo();
-        let manual = if topo.performance_cpus > 0 {
-            topo.performance_cpus
-        } else {
-            pool_cpu_thread_ceiling()
-        }
-        .max(recommended);
+        let manual = apply_ui_thread_reserve(
+            if topo.performance_cpus > 0 {
+                topo.performance_cpus
+            } else {
+                pool_cpu_thread_ceiling()
+            }
+            .max(recommended),
+        );
         (recommended, manual)
     } else {
         let cap = pool_cpu_thread_ceiling();

@@ -39,10 +39,7 @@ pub fn cpuminer_scratchpad_mib(avx2: bool) -> u32 {
 fn detect_x86_avx2() -> bool {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        unsafe {
-            let leaf7 = std::arch::x86_64::__cpuid(7);
-            leaf7.ebx & (1 << 5) != 0
-        }
+        std::arch::is_x86_feature_detected!("avx2")
     }
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {
@@ -171,7 +168,7 @@ pub fn recommended_threads(scratchpad_bytes: u64, topo: &TopoSnapshot) -> u32 {
     }
 
     // AArch64 SBCs (e.g. Raspberry Pi): shared DRAM bus — one worker saturates it.
-    #[cfg(any(target_arch = "aarch64", target_arch = "arm64"))]
+    #[cfg(target_arch = "aarch64")]
     {
         let single_lane_sp = 136 * 1024 * 1024;
         if scratchpad_bytes <= single_lane_sp

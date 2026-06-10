@@ -6,8 +6,7 @@ use crate::coin_profile::CoinId;
 use crate::config;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-
-const RECOVERY_UNLOCK_SECONDS: i64 = 600;
+use crate::wallet::full_node_unlock::{ensure_full_wallet_unlock, RECOVERY_EXPORT_UNLOCK_SECONDS};
 
 pub fn parse_xprv_from_dump(content: &str) -> AppResult<String> {
     for line in content.lines() {
@@ -37,20 +36,13 @@ pub async fn dump_hd_master_xprv(
     }
     let cfg = state.config_fresh(coin).await?;
     let client = state.rpc_client(coin).await?;
-    let info: serde_json::Value = client.call("getwalletinfo", json!([])).await?;
-    let locked = info
-        .get("unlocked_until")
-        .and_then(|v| v.as_i64())
-        .map(|until| until == 0)
-        .unwrap_or(false);
-    if locked {
-        client
-            .call_no_result(
-                "walletpassphrase",
-                json!([unlock_passphrase, RECOVERY_UNLOCK_SECONDS]),
-            )
-            .await?;
-    }
+    ensure_full_wallet_unlock(
+        &client,
+        coin,
+        unlock_passphrase,
+        RECOVERY_EXPORT_UNLOCK_SECONDS,
+    )
+    .await?;
 
     let backups_dir = config::wallet_backup_dir(coin, &cfg)?;
     std::fs::create_dir_all(&backups_dir)?;
@@ -66,7 +58,9 @@ pub async fn dump_hd_master_xprv(
     }
 
     let filename = dump_path.to_string_lossy().to_string();
-    client.call::<serde_json::Value>("dumpwallet", json!([filename])).await?;
+    client
+        .call::<serde_json::Value>("dumpwallet", json!([filename]))
+        .await?;
 
     let content = std::fs::read_to_string(&dump_path).map_err(|e| {
         let _ = std::fs::remove_file(&dump_path);

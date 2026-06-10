@@ -365,13 +365,21 @@ pub async fn fetch_explorer_blocks_for_feed(
     Ok(rows)
 }
 
+/// Upper bound the recent-blocks UI can request (matches the per-call clamp).
+/// We fetch exactly this many from the explorer rather than 100, since the
+/// per-coin cache is shared across all callers whose limit is <= this ceiling.
+const BLOCKS_FETCH_CEILING: u32 = 10;
+
 pub async fn fetch_blocks(coin: CoinId, limit: u32) -> AppResult<Vec<ExplorerBlock>> {
-    let limit = limit.clamp(1, 10);
+    let limit = limit.clamp(1, BLOCKS_FETCH_CEILING);
     let blocks = if let Some(cached) = read_blocks_cache(coin).await {
         cached
     } else {
         let client = http_client()?;
-        let url = explorer_chain_api_url(coin, "blocks/latest?limit=100");
+        let url = explorer_chain_api_url(
+            coin,
+            &format!("blocks/latest?limit={BLOCKS_FETCH_CEILING}"),
+        );
         let value = get_json(&client, &url).await?;
         let arr = value
             .as_array()

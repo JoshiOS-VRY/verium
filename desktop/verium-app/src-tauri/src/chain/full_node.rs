@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use crate::chain::types::*;
 use crate::chain::ChainBackend;
 use crate::coin_profile::CoinId;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::rpc::RpcClient;
 
 const COIN_SATS: f64 = 100_000_000.0;

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -13,8 +13,53 @@ use crate::error::{AppError, AppResult};
 
 const KEYSTORE_LABEL: &str = "light-wallet-keystore";
 
+pub const LIGHT_WALLET_RECOVERY_REQUIRED_MSG: &str = "Light wallet metadata is on this device but wallet keys are missing from the local store. Import your recovery phrase from Setup to restore access.";
+
+pub fn light_wallet_usable(coin: CoinId) -> bool {
+    light_keystore_health(coin) == LightKeystoreHealth::Ok
+}
+
+/// Quarantine orphaned CM-only encrypted blobs so optional mirrors and prefs can recover.
+pub fn prepare_keystore_for_write() -> AppResult<()> {
+    if crate::secret_store::encrypted_data_orphaned() {
+        let _ = crate::secret_store::quarantine_orphaned_encrypted_data()?;
+        invalidate_keystore_cache();
+    }
+    Ok(())
+}
+
+pub fn json_keystore_on_disk() -> bool {
+    keystore_path().exists()
+}
+
 static SESSION_MNEMONICS: Lazy<Mutex<HashMap<String, Zeroizing<String>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// In-memory cache of the decrypted-at-rest keystore *envelope*. The cached
+/// struct only ever holds ciphertext (`encrypted_mnemonic`) + metadata — the
+/// plaintext seed lives solely in `SESSION_MNEMONICS` — so this is safe to keep
+/// in memory. It removes the per-read decrypt that hot paths (wallet-info polls,
+/// sync, signing-session checks) otherwise pay. Invalidated on every save.
+const KEYSTORE_CACHE_TTL: Duration = Duration::from_secs(3);
+
+static KEYSTORE_CACHE: Lazy<Mutex<Option<(Instant, LightKeystore)>>> =
+    Lazy::new(|| Mutex::new(None));
+
+fn cached_keystore() -> Option<LightKeystore> {
+    let guard = KEYSTORE_CACHE.lock().ok()?;
+    let (at, store) = guard.as_ref()?;
+    if at.elapsed() < KEYSTORE_CACHE_TTL {
+        Some(store.clone())
+    } else {
+        None
+    }
+}
+
+fn store_keystore_cache(store: &LightKeystore) {
+    if let Ok(mut guard) = KEYSTORE_CACHE.lock() {
+        *guard = Some((Instant::now(), store.clone()));
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LightWalletRecord {
@@ -75,7 +120,64 @@ fn encrypted_keystore_backup_path() -> std::path::PathBuf {
         .join(format!("{KEYSTORE_LABEL}.enc.bak"))
 }
 
-/// Windows Credential Manager resets can orphan encrypted blobs; restore the last backup.
+fn manifest_path() -> std::path::PathBuf {
+    crate::config::app_config_base().join("light-wallet-manifest.json")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct LightKeystoreManifest {
+    /// coin id → created_at (unix seconds)
+    wallets: HashMap<String, u64>,
+    updated_at: u64,
+}
+
+fn write_manifest(store: &LightKeystore) -> AppResult<()> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let manifest = LightKeystoreManifest {
+        wallets: store
+            .wallets
+            .iter()
+            .map(|(coin, record)| (coin.clone(), record.created_at))
+            .collect(),
+        updated_at: now,
+    };
+    let path = manifest_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let tmp = path.with_extension("json.new");
+    std::fs::write(&tmp, serde_json::to_string_pretty(&manifest)?)?;
+    std::fs::rename(&tmp, &path)?;
+    Ok(())
+}
+
+fn manifest_lists_coin(coin: CoinId) -> bool {
+    let path = manifest_path();
+    if !path.exists() {
+        return false;
+    }
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return false;
+    };
+    serde_json::from_str::<LightKeystoreManifest>(&raw)
+        .ok()
+        .is_some_and(|m| m.wallets.contains_key(coin.as_str()))
+}
+
+fn encrypted_keystore_on_disk() -> bool {
+    encrypted_keystore_path().exists()
+}
+
+pub fn invalidate_keystore_cache() {
+    if let Ok(mut guard) = KEYSTORE_CACHE.lock() {
+        *guard = None;
+    }
+}
+
+/// If the primary encrypted blob is missing, restore from `.enc.bak`.
 fn try_restore_encrypted_keystore_backup() {
     let enc = encrypted_keystore_path();
     if enc.exists() {
@@ -94,6 +196,35 @@ fn try_restore_encrypted_keystore_backup() {
     }
 }
 
+/// When the primary blob exists but cannot be decrypted, try the backup copy.
+fn try_swap_keystore_from_backup_on_decrypt_failure() {
+    let enc = encrypted_keystore_path();
+    let bak = encrypted_keystore_backup_path();
+    if !enc.exists() || !bak.exists() {
+        return;
+    }
+    if crate::secret_store::blob_readable(KEYSTORE_LABEL) {
+        return;
+    }
+    if !crate::secret_store::blob_backup_readable(KEYSTORE_LABEL) {
+        return;
+    }
+    let corrupt = enc.with_extension("enc.corrupt");
+    let _ = std::fs::rename(&enc, &corrupt);
+    match std::fs::copy(&bak, &enc) {
+        Ok(_) => {
+            tracing::warn!(
+                "light-wallet-keystore primary blob unreadable; restored from backup"
+            );
+            invalidate_keystore_cache();
+        }
+        Err(e) => {
+            tracing::warn!("could not restore light-wallet-keystore from backup: {e}");
+            let _ = std::fs::rename(&corrupt, &enc);
+        }
+    }
+}
+
 fn load_keystore_from_plaintext(path: &std::path::Path) -> AppResult<Option<LightKeystore>> {
     if !path.exists() {
         return Ok(None);
@@ -108,36 +239,130 @@ fn load_keystore_from_plaintext(path: &std::path::Path) -> AppResult<Option<Ligh
         .map_err(|e| AppError::other(format!("light keystore JSON is invalid: {e}")))
 }
 
-pub fn load_keystore() -> AppResult<LightKeystore> {
+fn try_load_keystore_from_secret_store() -> AppResult<Option<LightKeystore>> {
+    if !encrypted_keystore_on_disk() {
+        return Ok(None);
+    }
+    if !crate::secret_store::blob_readable(KEYSTORE_LABEL) {
+        return Ok(None);
+    }
+    let store = crate::secret_store::load_json_strict::<LightKeystore>(KEYSTORE_LABEL)?;
+    if store.wallets.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(store))
+    }
+}
+
+fn save_keystore_to_json(store: &LightKeystore) -> AppResult<()> {
     let path = keystore_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension("json.new");
+    std::fs::write(&tmp, serde_json::to_string_pretty(store)?).map_err(|e| {
+        AppError::other(format!("could not write light keystore: {e}"))
+    })?;
+    let read_back = std::fs::read_to_string(&tmp).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        AppError::other(format!("could not read back light keystore: {e}"))
+    })?;
+    let parsed: LightKeystore = serde_json::from_str(&read_back).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        AppError::other(format!("light keystore post-write JSON invalid: {e}"))
+    })?;
+    if parsed.wallets.len() != store.wallets.len() {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(AppError::other(
+            "light keystore post-write verification failed (wallet count mismatch)",
+        ));
+    }
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        AppError::other(format!("could not finalize light keystore: {e}"))
+    })?;
+    Ok(())
+}
+
+fn archive_legacy_encrypted_keystore() {
+    let enc = encrypted_keystore_path();
+    if !enc.exists() {
+        return;
+    }
+    let legacy = enc.with_extension("enc.legacy");
+    if legacy.exists() {
+        let _ = std::fs::remove_file(&legacy);
+    }
+    match std::fs::rename(&enc, &legacy) {
+        Ok(_) => tracing::info!(
+            "archived CM-wrapped light-wallet-keystore to {}",
+            legacy.display()
+        ),
+        Err(e) => tracing::warn!("could not archive legacy encrypted keystore: {e}"),
+    }
+    let bak = encrypted_keystore_backup_path();
+    if bak.exists() {
+        let _ = std::fs::remove_file(bak);
+    }
+}
+
+pub fn keystore_data_readable() -> bool {
+    if let Ok(Some(store)) = load_keystore_from_plaintext(&keystore_path()) {
+        if !store.wallets.is_empty() {
+            return true;
+        }
+    }
+    crate::secret_store::blob_readable(KEYSTORE_LABEL)
+}
+
+pub fn load_keystore() -> AppResult<LightKeystore> {
+    if let Some(store) = cached_keystore() {
+        return Ok(store);
+    }
+    let store = load_keystore_uncached()?;
+    store_keystore_cache(&store);
+    Ok(store)
+}
+
+fn load_keystore_uncached() -> AppResult<LightKeystore> {
     try_restore_encrypted_keystore_backup();
-    let encrypted = crate::secret_store::load_json(
-        KEYSTORE_LABEL,
-        &path,
-        LightKeystore::default(),
-    )?;
-    if !encrypted.wallets.is_empty() {
-        return Ok(encrypted);
+    try_swap_keystore_from_backup_on_decrypt_failure();
+
+    // Primary: light-keystore.json (mnemonics are passphrase-encrypted inside).
+    if let Some(store) = load_keystore_from_plaintext(&keystore_path())? {
+        if !store.wallets.is_empty() {
+            return Ok(store);
+        }
     }
-    if let Some(legacy) = load_keystore_from_plaintext(&path)? {
-        tracing::info!("migrating legacy plaintext light-keystore.json to encrypted store");
-        save_keystore(&legacy)?;
-        let _ = std::fs::remove_file(&path);
-        return Ok(legacy);
+
+    // One-time migration from legacy CM-wrapped blob.
+    if let Some(store) = try_load_keystore_from_secret_store()? {
+        tracing::info!("migrating light-wallet-keystore from CM blob to light-keystore.json");
+        save_keystore_to_json(&store)?;
+        archive_legacy_encrypted_keystore();
+        return Ok(store);
     }
-    Ok(encrypted)
+
+    if encrypted_keystore_on_disk() {
+        tracing::warn!(
+            "legacy CM-wrapped light keystore exists but cannot be decrypted — \
+             import recovery phrase to rebuild light-keystore.json"
+        );
+    }
+    Ok(LightKeystore::default())
 }
 
 pub fn save_keystore(store: &LightKeystore) -> AppResult<()> {
-    if let Some(parent) = encrypted_keystore_path().parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    crate::secret_store::save_json(KEYSTORE_LABEL, store)?;
-    let path = keystore_path();
-    if path.exists() {
-        let _ = std::fs::remove_file(path);
-    }
+    save_keystore_to_json(store)?;
     verify_keystore_persisted(store)?;
+    write_manifest(store)?;
+    // Optional CM mirror for upgrades from older builds; wallet does not depend on it.
+    if !crate::secret_store::encrypted_data_orphaned() {
+        if let Err(e) = crate::secret_store::save_json(KEYSTORE_LABEL, store) {
+            tracing::debug!("optional CM keystore mirror skipped: {e}");
+        }
+    }
+    store_keystore_cache(store);
     Ok(())
 }
 
@@ -145,20 +370,113 @@ fn verify_keystore_persisted(expected: &LightKeystore) -> AppResult<()> {
     if expected.wallets.is_empty() {
         return Ok(());
     }
-    let loaded = crate::secret_store::load_json_strict::<LightKeystore>(KEYSTORE_LABEL)?;
+    let loaded = load_keystore_from_plaintext(&keystore_path())?
+        .ok_or_else(|| AppError::other("light keystore did not persist to disk"))?;
     for coin in expected.wallets.keys() {
         if !loaded.wallets.contains_key(coin) {
             return Err(AppError::other(format!(
-                "light wallet file did not persist for {coin} — check disk space and Windows Credential Manager (service: com.vericonomy.wallet.desktop), then retry"
+                "light wallet file did not persist for {coin} — check disk space, then retry"
             )));
         }
     }
     Ok(())
 }
 
+fn light_wallet_cache_exists(coin: CoinId) -> bool {
+    crate::config::app_config_base()
+        .join(format!("light-cache-{}.sqlite", coin.as_str()))
+        .exists()
+}
+
+/// Whether a light wallet for this coin is recorded on disk (no CM decrypt).
+pub fn light_wallet_on_disk(coin: CoinId) -> bool {
+    manifest_lists_coin(coin) || light_wallet_cache_exists(coin)
+}
+
+pub fn manifest_lists_coin_for_diagnostics(coin: CoinId) -> bool {
+    manifest_lists_coin(coin)
+}
+
+pub fn light_cache_exists_for_diagnostics(coin: CoinId) -> bool {
+    light_wallet_cache_exists(coin)
+}
+
+pub fn encrypted_blob_exists_for_diagnostics() -> bool {
+    encrypted_keystore_on_disk()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LightKeystoreHealth {
+    Ok,
+    Unreadable,
+    Missing,
+}
+
+impl LightKeystoreHealth {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Unreadable => "unreadable",
+            Self::Missing => "missing",
+        }
+    }
+}
+
+/// Decrypt health for a coin's light keystore (presence uses [`light_wallet_on_disk`]).
+pub fn light_keystore_health(coin: CoinId) -> LightKeystoreHealth {
+    if !light_wallet_on_disk(coin) {
+        return LightKeystoreHealth::Missing;
+    }
+    match load_keystore() {
+        Ok(store) if store.wallets.contains_key(coin.as_str()) => LightKeystoreHealth::Ok,
+        Ok(_) | Err(_) => LightKeystoreHealth::Unreadable,
+    }
+}
+
 pub fn wallet_exists(coin: CoinId) -> AppResult<bool> {
     let store = load_keystore()?;
     Ok(store.wallets.contains_key(coin.as_str()))
+}
+
+/// Refresh the plaintext manifest from a readable encrypted keystore (startup / migration).
+pub fn sync_manifest_from_keystore() {
+    invalidate_keystore_cache();
+    if let Ok(store) = load_keystore() {
+        if !store.wallets.is_empty() {
+            let _ = write_manifest(&store);
+            return;
+        }
+    }
+    if manifest_path().exists() {
+        return;
+    }
+    let mut manifest = LightKeystoreManifest::default();
+    for coin in CoinId::all() {
+        if light_wallet_cache_exists(*coin) {
+            manifest.wallets.insert(coin.as_str().to_string(), 0);
+        }
+    }
+    if manifest.wallets.is_empty() {
+        return;
+    }
+    manifest.updated_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    if let Ok(json) = serde_json::to_string_pretty(&manifest) {
+        let path = manifest_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let tmp = path.with_extension("json.new");
+        if std::fs::write(&tmp, json).is_ok() {
+            let _ = std::fs::rename(&tmp, &path);
+            tracing::info!(
+                "backfilled light-wallet-manifest.json from existing light wallet caches"
+            );
+        }
+    }
 }
 
 pub fn cached_script_hexes(coin: CoinId) -> AppResult<Vec<String>> {
@@ -274,6 +592,16 @@ pub fn set_indexing_progress(coin: CoinId, progress: IndexingProgress) -> AppRes
         .wallets
         .get_mut(coin.as_str())
         .ok_or_else(|| AppError::other("light wallet not found"))?;
+    // Skip the encrypt+persist if nothing actually changed — gap-scan slices can
+    // re-report the same cursor, and each save_keystore is an encrypt + verify.
+    if record.index_precache_offset == progress.precache_offset
+        && record.index_gap_external == progress.gap_external
+        && record.index_gap_external_done == progress.gap_external_done
+        && record.index_gap_internal == progress.gap_internal
+        && record.index_gap_internal_done == progress.gap_internal_done
+    {
+        return Ok(());
+    }
     record.index_precache_offset = progress.precache_offset;
     record.index_gap_external = progress.gap_external;
     record.index_gap_external_done = progress.gap_external_done;
@@ -398,8 +726,9 @@ pub fn create_wallet(
     passphrase: &str,
     label: Option<&str>,
 ) -> AppResult<()> {
+    prepare_keystore_for_write()?;
     let mut store = load_keystore()?;
-    if store.wallets.contains_key(coin.as_str()) {
+    if store.wallets.contains_key(coin.as_str()) || light_wallet_on_disk(coin) {
         return Err(AppError::other(format!(
             "{} light wallet already exists",
             coin.display_name()
@@ -420,6 +749,7 @@ pub fn import_wallet(
     passphrase: &str,
     label: Option<&str>,
 ) -> AppResult<()> {
+    prepare_keystore_for_write()?;
     clear_unlock_session(coin);
     let mut store = load_keystore()?;
     store.unlocked_until_by_coin.remove(coin.as_str());
@@ -441,7 +771,13 @@ pub fn unlock_wallet(coin: CoinId, passphrase: &str, seconds: u32) -> AppResult<
     let record = store
         .wallets
         .get(coin.as_str())
-        .ok_or_else(|| AppError::other("light wallet not found"))?;
+        .ok_or_else(|| {
+            if light_wallet_on_disk(coin) {
+                AppError::other(LIGHT_WALLET_RECOVERY_REQUIRED_MSG)
+            } else {
+                AppError::other("light wallet not found")
+            }
+        })?;
     let phrase = decrypt_mnemonic(record, passphrase)?;
     persist_unlock_in_store(&mut store, coin, &phrase, seconds)?;
     save_keystore(&store)?;
@@ -535,7 +871,7 @@ fn decrypt_mnemonic(record: &LightWalletRecord, passphrase: &str) -> AppResult<S
     let nonce = hex::decode(record.nonce.trim())
         .map_err(|e| AppError::other(format!("keystore corrupt: {e}")))?;
     let plain = crate::secret_store::decrypt_with_passphrase(&encrypted, &salt, &nonce, passphrase)?;
-    let mut phrase = String::from_utf8(plain)
+    let phrase = String::from_utf8(plain)
         .map_err(|e| AppError::other(format!("mnemonic utf8: {e}")))?;
     Ok(phrase)
 }
@@ -559,4 +895,83 @@ pub fn peek_receive_index(coin: CoinId) -> AppResult<u32> {
         .get(coin.as_str())
         .map(|r| r.next_receive_index)
         .ok_or_else(|| AppError::other("light wallet not found"))
+}
+
+#[cfg(test)]
+mod presence_tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+
+    fn write_manifest(coins: &[&str]) {
+        let path = manifest_path();
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let mut wallets = HashMap::new();
+        for coin in coins {
+            wallets.insert((*coin).to_string(), 1_u64);
+        }
+        let manifest = LightKeystoreManifest {
+            wallets,
+            updated_at: 1,
+        };
+        let tmp = path.with_extension("json.test");
+        let mut f = fs::File::create(&tmp).unwrap();
+        write!(f, "{}", serde_json::to_string(&manifest).unwrap()).unwrap();
+        drop(f);
+        let _ = fs::rename(&tmp, &path);
+    }
+
+    fn cleanup_manifest() {
+        let _ = fs::remove_file(manifest_path());
+    }
+
+    #[test]
+    fn light_wallet_on_disk_true_from_manifest_without_decrypt() {
+        write_manifest(&["verium"]);
+        assert!(manifest_lists_coin(CoinId::Verium));
+        assert!(light_wallet_on_disk(CoinId::Verium));
+        assert_eq!(
+            light_keystore_health(CoinId::Verium),
+            LightKeystoreHealth::Unreadable
+        );
+        cleanup_manifest();
+    }
+
+    #[test]
+    fn light_keystore_health_ok_from_json_without_cm() {
+        write_manifest(&["verium"]);
+        let store = LightKeystore {
+            wallets: HashMap::from([(
+                "verium".to_string(),
+                LightWalletRecord {
+                    coin: "verium".to_string(),
+                    encrypted_mnemonic: "deadbeef".into(),
+                    salt: "00".into(),
+                    nonce: "00".into(),
+                    created_at: 1,
+                    next_receive_index: 0,
+                    label: String::new(),
+                    cached_script_hexes: vec![],
+                    addresses_scan_complete: false,
+                    funded_script_hexes: vec![],
+                    index_precache_offset: 0,
+                    index_gap_external: 0,
+                    index_gap_external_done: false,
+                    index_gap_internal: 0,
+                    index_gap_internal_done: false,
+                },
+            )]),
+            unlocked_until_by_coin: HashMap::new(),
+        };
+        save_keystore_to_json(&store).unwrap();
+        invalidate_keystore_cache();
+        assert_eq!(
+            light_keystore_health(CoinId::Verium),
+            LightKeystoreHealth::Ok
+        );
+        let _ = fs::remove_file(keystore_path());
+        cleanup_manifest();
+    }
 }

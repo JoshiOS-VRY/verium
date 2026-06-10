@@ -2,7 +2,7 @@
 
 use rusqlite::{params, Connection};
 
-use crate::chain::types::Utxo;
+use crate::chain::types::{Utxo, WalletTx};
 use crate::coin_profile::CoinId;
 use crate::error::{AppError, AppResult};
 
@@ -35,6 +35,13 @@ impl LightWalletCache {
                 height INTEGER NOT NULL,
                 fetched_at INTEGER NOT NULL,
                 PRIMARY KEY (txid, vout)
+            );
+            CREATE TABLE IF NOT EXISTS tx_history (
+                txid TEXT NOT NULL,
+                category TEXT NOT NULL,
+                sort_time INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                PRIMARY KEY (txid, category)
             );",
         )
         .map_err(|e| AppError::other(format!("sqlite schema: {e}")))?;
@@ -143,35 +150,163 @@ impl LightWalletCache {
         Ok(out)
     }
 
+    /// Reconcile the cached UTXO set to `utxos` using an incremental diff:
+    /// only changed/new rows are upserted and only vanished rows are deleted.
+    /// When the set is unchanged (the steady-state case) this performs **zero**
+    /// writes, avoiding the previous DELETE-all + INSERT-all write amplification
+    /// on every sync.
     pub fn replace_utxos(&self, utxos: &[Utxo]) -> AppResult<()> {
+        use std::collections::{HashMap, HashSet};
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64;
+
+        // Snapshot existing rows keyed by (txid, vout).
+        let mut existing: HashMap<(String, u32), (i64, String, u32)> = HashMap::new();
+        {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT txid, vout, value_sats, script_hex, height FROM utxo_cache")
+                .map_err(|e| AppError::other(format!("sqlite prepare: {e}")))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((
+                        (row.get::<_, String>(0)?, row.get::<_, u32>(1)?),
+                        (
+                            row.get::<_, i64>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, u32>(4)?,
+                        ),
+                    ))
+                })
+                .map_err(|e| AppError::other(format!("sqlite query: {e}")))?;
+            for row in rows {
+                let (k, v) = row.map_err(|e| AppError::other(format!("sqlite row: {e}")))?;
+                existing.insert(k, v);
+            }
+        }
+
+        let incoming_keys: HashSet<(String, u32)> =
+            utxos.iter().map(|u| (u.txid.clone(), u.vout)).collect();
+
         let tx = self
             .conn
             .unchecked_transaction()
             .map_err(|e| AppError::other(format!("sqlite tx: {e}")))?;
-        tx.execute("DELETE FROM utxo_cache", [])
-            .map_err(|e| AppError::other(format!("sqlite clear utxos: {e}")))?;
-        for u in utxos {
-            tx.execute(
-                "INSERT INTO utxo_cache(txid, vout, value_sats, script_hex, height, fetched_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    u.txid,
-                    u.vout,
-                    u.value_sats,
-                    u.script_hex,
-                    u.height,
-                    now
-                ],
-            )
-            .map_err(|e| AppError::other(format!("sqlite utxo insert: {e}")))?;
+
+        // Upsert only new or changed rows.
+        {
+            let mut upsert = tx
+                .prepare(
+                    "INSERT INTO utxo_cache(txid, vout, value_sats, script_hex, height, fetched_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                     ON CONFLICT(txid, vout) DO UPDATE SET
+                       value_sats = excluded.value_sats,
+                       script_hex = excluded.script_hex,
+                       height = excluded.height,
+                       fetched_at = excluded.fetched_at",
+                )
+                .map_err(|e| AppError::other(format!("sqlite prepare upsert: {e}")))?;
+            for u in utxos {
+                let unchanged = matches!(
+                    existing.get(&(u.txid.clone(), u.vout)),
+                    Some((value, script, height))
+                        if *value == u.value_sats && script == &u.script_hex && *height == u.height
+                );
+                if unchanged {
+                    continue;
+                }
+                upsert
+                    .execute(params![
+                        u.txid,
+                        u.vout,
+                        u.value_sats,
+                        u.script_hex,
+                        u.height,
+                        now
+                    ])
+                    .map_err(|e| AppError::other(format!("sqlite utxo upsert: {e}")))?;
+            }
+        }
+
+        // Delete rows that are no longer present.
+        {
+            let mut delete = tx
+                .prepare("DELETE FROM utxo_cache WHERE txid = ?1 AND vout = ?2")
+                .map_err(|e| AppError::other(format!("sqlite prepare delete: {e}")))?;
+            for (txid, vout) in existing.keys() {
+                if !incoming_keys.contains(&(txid.clone(), *vout)) {
+                    delete
+                        .execute(params![txid, vout])
+                        .map_err(|e| AppError::other(format!("sqlite utxo delete: {e}")))?;
+                }
+            }
+        }
+
+        tx.commit()
+            .map_err(|e| AppError::other(format!("sqlite commit: {e}")))?;
+        Ok(())
+    }
+
+    /// Replace the cached transaction history with `txs` (full set, newest first
+    /// determined by `time`). Serialized as JSON per row so the read path is a
+    /// pure local SQLite query — no Electrum `get_history` calls.
+    pub fn replace_tx_history(&self, txs: &[WalletTx]) -> AppResult<()> {
+        let tx = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|e| AppError::other(format!("sqlite tx: {e}")))?;
+        tx.execute("DELETE FROM tx_history", [])
+            .map_err(|e| AppError::other(format!("sqlite clear history: {e}")))?;
+        {
+            let mut stmt = tx
+                .prepare(
+                    "INSERT OR REPLACE INTO tx_history(txid, category, sort_time, payload)
+                     VALUES (?1, ?2, ?3, ?4)",
+                )
+                .map_err(|e| AppError::other(format!("sqlite prepare history: {e}")))?;
+            for t in txs {
+                let payload = serde_json::to_string(t)
+                    .map_err(|e| AppError::other(format!("history encode: {e}")))?;
+                let sort_time = t.time.unwrap_or(0) as i64;
+                stmt.execute(params![t.txid, t.category, sort_time, payload])
+                    .map_err(|e| AppError::other(format!("sqlite history insert: {e}")))?;
+            }
         }
         tx.commit()
             .map_err(|e| AppError::other(format!("sqlite commit: {e}")))?;
         Ok(())
+    }
+
+    pub fn list_tx_history(&self, limit: usize) -> AppResult<Vec<WalletTx>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT payload FROM tx_history ORDER BY sort_time DESC LIMIT ?1")
+            .map_err(|e| AppError::other(format!("sqlite prepare: {e}")))?;
+        let rows = stmt
+            .query_map(params![limit as i64], |row| row.get::<_, String>(0))
+            .map_err(|e| AppError::other(format!("sqlite query: {e}")))?;
+        let mut out = Vec::new();
+        for row in rows {
+            let payload = row.map_err(|e| AppError::other(format!("sqlite row: {e}")))?;
+            if let Ok(tx) = serde_json::from_str::<WalletTx>(&payload) {
+                out.push(tx);
+            }
+        }
+        Ok(out)
+    }
+
+    pub fn tx_history_count(&self) -> AppResult<usize> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT COUNT(*) FROM tx_history")
+            .map_err(|e| AppError::other(format!("sqlite prepare: {e}")))?;
+        let n: i64 = stmt
+            .query_row([], |row| row.get(0))
+            .map_err(|e| AppError::other(format!("sqlite count: {e}")))?;
+        Ok(n.max(0) as usize)
     }
 }
 

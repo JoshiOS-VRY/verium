@@ -32,6 +32,8 @@ interface ConsoleEntry {
 
 const HISTORY_KEY = "verium-rpc-console-history";
 const MAX_HISTORY = 100;
+const MAX_CONSOLE_ENTRIES = 50;
+const MAX_RESULT_CHARS = 48_000;
 
 const SENSITIVE_RPC_METHODS = new Set([
   "dumpprivkey",
@@ -125,7 +127,7 @@ export function RpcConsole() {
     },
     onSuccess: ({ command, result }) => {
       setEntries((prev) => [
-        ...prev,
+        ...prev.slice(-(MAX_CONSOLE_ENTRIES - 1)),
         { id: crypto.randomUUID(), command, result },
       ]);
       if (!isSensitiveCommand(command)) {
@@ -138,7 +140,7 @@ export function RpcConsole() {
     },
     onError: (err) => {
       setEntries((prev) => [
-        ...prev,
+        ...prev.slice(-(MAX_CONSOLE_ENTRIES - 1)),
         {
           id: crypto.randomUUID(),
           command: draft,
@@ -198,8 +200,8 @@ export function RpcConsole() {
               http://{daemonConfig.data?.rpc_host ?? "127.0.0.1"}:
               {daemonConfig.data?.rpc_port ?? profile.defaultRpcPort}
             </span>
-            . Production builds omit unrestricted RPC; dev builds block sensitive
-            methods. History never stores dumpprivkey, sendtoaddress, or similar.
+            . Sensitive methods (dumpprivkey, sendtoaddress, and similar) are
+            blocked in the wallet. History never stores those commands.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -327,7 +329,9 @@ function parseArg(raw: string): unknown {
 function formatResult(value: unknown): string {
   if (value === undefined) return "(no result)";
   try {
-    return JSON.stringify(value, null, 2);
+    const text = JSON.stringify(value, null, 2);
+    if (text.length <= MAX_RESULT_CHARS) return text;
+    return `${text.slice(0, MAX_RESULT_CHARS)}\n… [truncated ${text.length - MAX_RESULT_CHARS} chars]`;
   } catch {
     return String(value);
   }

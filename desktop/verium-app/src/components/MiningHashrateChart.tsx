@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Area,
@@ -34,7 +35,7 @@ interface MiningHashrateChartProps {
   emptyWhenIdle?: boolean;
 }
 
-export function MiningHashrateChart({
+function MiningHashrateChartImpl({
   samples,
   sessionAvg,
   sessionStartedAt,
@@ -167,3 +168,10 @@ export function MiningHashrateChart({
     </Card>
   );
 }
+
+/**
+ * Memoized: the recharts area chart is expensive to re-render. Parents tick
+ * (session timers, sibling state) more often than the chart inputs change, so
+ * skip re-rendering unless the actual chart props change.
+ */
+export const MiningHashrateChart = memo(MiningHashrateChartImpl);

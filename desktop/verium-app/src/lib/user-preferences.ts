@@ -91,6 +91,51 @@ const DEFAULT_PREFS: UserPreferences = {
   },
 };
 
+/** Serialize disk writes so concurrent partial updates cannot clobber each other. */
+let prefsWriteQueue: Promise<void> = Promise.resolve();
+/** Ignore superseded disk responses so fast typing cannot revert optimistic UI. */
+let prefsWriteGeneration = 0;
+
+function mergePrefs(
+  current: UserPreferences,
+  partial: Partial<UserPreferences>,
+): UserPreferences {
+  return {
+    ...current,
+    ...partial,
+    wallet_unlock_duration_by_coin: partial.wallet_unlock_duration_by_coin
+      ? {
+          ...current.wallet_unlock_duration_by_coin,
+          ...partial.wallet_unlock_duration_by_coin,
+        }
+      : current.wallet_unlock_duration_by_coin,
+    bootstrap_imported_at_by_coin: partial.bootstrap_imported_at_by_coin
+      ? {
+          ...current.bootstrap_imported_at_by_coin,
+          ...partial.bootstrap_imported_at_by_coin,
+        }
+      : current.bootstrap_imported_at_by_coin,
+    setup_completed_by_coin: partial.setup_completed_by_coin
+      ? {
+          ...current.setup_completed_by_coin,
+          ...partial.setup_completed_by_coin,
+        }
+      : current.setup_completed_by_coin,
+    wallet_mode_by_coin: partial.wallet_mode_by_coin
+      ? {
+          ...current.wallet_mode_by_coin,
+          ...partial.wallet_mode_by_coin,
+        }
+      : current.wallet_mode_by_coin,
+    onboarding_by_coin: partial.onboarding_by_coin
+      ? {
+          ...current.onboarding_by_coin,
+          ...partial.onboarding_by_coin,
+        }
+      : current.onboarding_by_coin,
+  };
+}
+
 export const useUserPreferences = create<PrefsState>((set, get) => ({
   prefs: DEFAULT_PREFS,
   loaded: false,
@@ -111,9 +156,13 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
       const explorerMigration = migrateExplorerPrefs(merged);
       if (explorerMigration) {
         Object.assign(merged, explorerMigration);
-        await invoke<UserPreferences>("set_user_preferences", {
-          partial: explorerMigration,
-        });
+        try {
+          await invoke<UserPreferences>("set_user_preferences", {
+            partial: explorerMigration,
+          });
+        } catch (e) {
+          console.warn("explorer prefs migration save failed", e);
+        }
       }
       set({
         prefs: merged,
@@ -124,42 +173,23 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
     }
   },
   update: async (partial) => {
-    const current = get().prefs;
-    const next: UserPreferences = {
-      ...current,
-      ...partial,
-      wallet_unlock_duration_by_coin: partial.wallet_unlock_duration_by_coin
-        ? {
-            ...current.wallet_unlock_duration_by_coin,
-            ...partial.wallet_unlock_duration_by_coin,
-          }
-        : current.wallet_unlock_duration_by_coin,
-      bootstrap_imported_at_by_coin: partial.bootstrap_imported_at_by_coin
-        ? {
-            ...current.bootstrap_imported_at_by_coin,
-            ...partial.bootstrap_imported_at_by_coin,
-          }
-        : current.bootstrap_imported_at_by_coin,
-      setup_completed_by_coin: partial.setup_completed_by_coin
-        ? {
-            ...current.setup_completed_by_coin,
-            ...partial.setup_completed_by_coin,
-          }
-        : current.setup_completed_by_coin,
-      wallet_mode_by_coin: partial.wallet_mode_by_coin
-        ? {
-            ...current.wallet_mode_by_coin,
-            ...partial.wallet_mode_by_coin,
-          }
-        : current.wallet_mode_by_coin,
-      onboarding_by_coin: partial.onboarding_by_coin
-        ? {
-            ...current.onboarding_by_coin,
-            ...partial.onboarding_by_coin,
-          }
-        : current.onboarding_by_coin,
-    };
-    set({ prefs: next });
-    await invoke<UserPreferences>("set_user_preferences", { partial });
+    // Apply immediately so sidebar coin label flips on click; disk write stays queued.
+    const generation = ++prefsWriteGeneration;
+    const optimistic = mergePrefs(get().prefs, partial);
+    set({ prefs: optimistic });
+
+    const task = prefsWriteQueue.then(async () => {
+      try {
+        const saved = await invoke<UserPreferences>("set_user_preferences", {
+          partial,
+        });
+        if (generation !== prefsWriteGeneration) return;
+        set({ prefs: { ...DEFAULT_PREFS, ...saved } });
+      } catch (e) {
+        console.warn("set_user_preferences failed", e);
+      }
+    });
+    prefsWriteQueue = task.catch(() => undefined);
+    await prefsWriteQueue;
   },
 }));

@@ -1,5 +1,7 @@
 //! Append-only Ed25519-signed audit log of sensitive operations.
 
+use std::sync::OnceLock;
+
 use ed25519_dalek::{Signer, Verifier};
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +38,12 @@ fn signing_key() -> AppResult<ed25519_dalek::SigningKey> {
             return Ok(ed25519_dalek::SigningKey::from_bytes(&arr));
         }
     }
+    if secret_store::encrypted_data_orphaned() {
+        static EPHEMERAL: OnceLock<ed25519_dalek::SigningKey> = OnceLock::new();
+        return Ok(EPHEMERAL
+            .get_or_init(|| ed25519_dalek::SigningKey::generate(&mut rand::thread_rng()))
+            .clone());
+    }
     let key = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
     secret_store::seal(KEY_LABEL, key.to_bytes().as_slice())?;
     Ok(key)
@@ -46,6 +54,10 @@ fn load_file() -> AppResult<AuditLogFile> {
 }
 
 fn save_file(file: &AuditLogFile) -> AppResult<()> {
+    if secret_store::encrypted_data_orphaned() {
+        tracing::warn!("audit log not persisted: Windows Credential Manager entry missing");
+        return Ok(());
+    }
     secret_store::save_json(STORE_LABEL, file)
 }
 

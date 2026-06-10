@@ -1,6 +1,6 @@
-import { ArrowRight, CheckCircle2, Circle, Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   ALL_COINS,
   COIN_LOGO_URLS,
@@ -9,23 +9,27 @@ import {
   type CoinId,
 } from "@/lib/coin/profile";
 import { useEnabledCoins } from "@/lib/coin/context";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { lightWalletExists } from "@/lib/light-wallet/client";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { tauriWalletFileStatus } from "@/lib/rpc/client";
 import {
-  fullNodeWalletExists,
-  isCoinWalletReady,
-  resolveEffectiveWalletMode,
+  getHubCardState,
+  needsLightWalletRecovery,
+  isProfileOpenable,
   type WalletModeChoice,
 } from "@/lib/setup";
 import { LIGHT_WALLET_ENABLED } from "@/lib/features";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import {
+  profileWalletPresence,
+  useSetupHubProfile,
+} from "@/hooks/useSetupHubProfiles";
 import { ThemeSegmented } from "@/components/ThemeSegmented";
 import { Button } from "@/components/ui/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
-import type { UserPreferences } from "@/lib/user-preferences";
+import {
+  secretStoreQuarantineOrphaned,
+  secretStoreStatus,
+  type WalletProfile,
+} from "@/lib/wallet-profile";
 
 interface SetupWalletHubProps {
   walletMode: WalletModeChoice;
@@ -41,56 +45,29 @@ interface SetupWalletHubProps {
 
 function CoinHubCard({
   coin,
-  prefs,
   walletMode,
+  checking,
+  profile,
+  errorMessage,
   onSelect,
   opening,
 }: {
   coin: CoinId;
-  prefs: UserPreferences;
   walletMode: WalletModeChoice;
+  checking: boolean;
+  profile?: WalletProfile;
+  errorMessage?: string | null;
   onSelect: (coin: CoinId) => void | Promise<void>;
   opening: boolean;
 }) {
-  const profile = COIN_PROFILES[coin];
-  const light = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
-    queryFn: () => lightWalletExists(coin),
-    staleTime: 0,
-    refetchOnMount: "always",
+  const coinProfile = COIN_PROFILES[coin];
+  const presence = profileWalletPresence(profile);
+  const { statusLabel, actionLabel, ready } = getHubCardState({
+    checking,
+    walletMode,
+    presence,
+    profile,
   });
-  const walletFile = useQuery({
-    queryKey: coinQueryKey(coin, "wallet-file-status"),
-    queryFn: () => tauriWalletFileStatus(coin),
-    enabled: walletMode === "full_node",
-  });
-  const modeForReady = walletMode;
-  const hasLightWallet = light.data === true;
-  const hasFullNodeWallet = fullNodeWalletExists(walletFile.data);
-  const checking =
-    modeForReady === "light" && (light.isLoading || light.isFetching);
-  const ready =
-    !checking &&
-    isCoinWalletReady(coin, prefs, {
-      walletMode: modeForReady,
-      hasLightWallet,
-      hasFullNodeWallet,
-    });
-  const storedElsewhere =
-    !ready &&
-    !checking &&
-    (modeForReady === "light"
-      ? hasFullNodeWallet
-      : hasLightWallet);
-  const statusLabel = checking
-    ? "Checking…"
-    : ready
-      ? "Ready"
-      : storedElsewhere
-        ? modeForReady === "light"
-          ? "Full node on device"
-          : "Light wallet on device"
-        : "Not set up";
 
   return (
     <button
@@ -107,19 +84,25 @@ function CoinHubCard({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-fg">{profile.displayName}</span>
+            <span className="font-semibold text-fg">{coinProfile.displayName}</span>
             <span
               className={cn(
                 "rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                profile.accentClass,
+                coinProfile.accentClass,
               )}
             >
-              {profile.symbol}
+              {coinProfile.symbol}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-fg-subtle">{profile.tagline}</p>
+          <p className="mt-0.5 text-xs text-fg-subtle">{coinProfile.tagline}</p>
         </div>
       </div>
+      {errorMessage && (
+        <p className="flex items-start gap-1.5 text-[11px] text-danger">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          {errorMessage}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2 text-xs">
         <span
           className={cn(
@@ -142,7 +125,7 @@ function CoinHubCard({
             </>
           ) : (
             <>
-              {ready || storedElsewhere ? "Open" : "Set up"}
+              {actionLabel}
               <ArrowRight className="h-3.5 w-3.5" />
             </>
           )}
@@ -159,65 +142,80 @@ export function SetupWalletHub({
   onOpenDashboard,
   openingCoin = null,
 }: SetupWalletHubProps) {
-  const enabledCoins = useEnabledCoins();
-  const prefs = useUserPreferences((s) => s.prefs);
-  const { mode: persistedMode } = useWalletMode();
   const queryClient = useQueryClient();
+  const [quarantining, setQuarantining] = useState(false);
+  const secretStore = useQuery({
+    queryKey: ["secret-store-status"],
+    queryFn: secretStoreStatus,
+    staleTime: 30_000,
+  });
+  const enabledCoins = useEnabledCoins();
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const options = ALL_COINS.filter((coin) => enabledCoins.includes(coin));
-  const effectiveWalletMode = resolveEffectiveWalletMode(
-    persistedMode === "light" ? "light" : "full_node",
-    walletMode,
+
+  const veriumProfile = useSetupHubProfile(
+    "verium",
+    options.includes("verium"),
+  );
+  const vericoinProfile = useSetupHubProfile(
+    "vericoin",
+    options.includes("vericoin"),
   );
 
-  useEffect(() => {
-    for (const targetCoin of options) {
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(targetCoin, "light-wallet-exists"),
-      });
+  const profileByCoin: Record<
+    CoinId,
+    ReturnType<typeof useSetupHubProfile>
+  > = {
+    verium: veriumProfile,
+    vericoin: vericoinProfile,
+  };
+
+  const profileLoadError = options.some((coin) => profileByCoin[coin].isError);
+
+  const anyComplete = options.some(
+    (coin) =>
+      profileByCoin[coin].data &&
+      isProfileOpenable(profileByCoin[coin].data) &&
+      !needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
+  );
+  const allComplete = options.every(
+    (coin) =>
+      profileByCoin[coin].data &&
+      isProfileOpenable(profileByCoin[coin].data) &&
+      !needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
+  );
+
+  const profileErrorMessage =
+    "Could not read wallet status. Check Windows Credential Manager (service: com.vericonomy.wallet.desktop) and restart the app.";
+
+  const anyNeedsLightRecovery = options.some((coin) =>
+    needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
+  );
+
+  async function handleQuarantineOrphaned() {
+    const confirmed = window.confirm(
+      "This moves encrypted wallet files aside and creates a new Windows Credential Manager key. " +
+        "Existing light wallets will not unlock until you import your recovery phrase. Continue?",
+    );
+    if (!confirmed) return;
+    setQuarantining(true);
+    try {
+      await secretStoreQuarantineOrphaned();
+      await secretStore.refetch();
+      for (const coin of options) {
+        await queryClient.invalidateQueries({
+          queryKey: coinQueryKey(coin, "wallet-profile"),
+        });
+      }
+    } catch (e) {
+      console.warn("secret store quarantine failed", e);
+      window.alert(
+        e instanceof Error ? e.message : "Could not reset encrypted storage.",
+      );
+    } finally {
+      setQuarantining(false);
     }
-  }, [options, queryClient]);
-
-  const veriumLight = useQuery({
-    queryKey: coinQueryKey("verium", "light-wallet-exists"),
-    queryFn: () => lightWalletExists("verium"),
-    enabled: options.includes("verium"),
-    staleTime: 0,
-    refetchOnMount: "always",
-  });
-  const vericoinLight = useQuery({
-    queryKey: coinQueryKey("vericoin", "light-wallet-exists"),
-    queryFn: () => lightWalletExists("vericoin"),
-    enabled: options.includes("vericoin"),
-    staleTime: 0,
-    refetchOnMount: "always",
-  });
-
-  const veriumWalletFile = useQuery({
-    queryKey: coinQueryKey("verium", "wallet-file-status"),
-    queryFn: () => tauriWalletFileStatus("verium"),
-    enabled: options.includes("verium") && effectiveWalletMode === "full_node",
-  });
-  const vericoinWalletFile = useQuery({
-    queryKey: coinQueryKey("vericoin", "wallet-file-status"),
-    queryFn: () => tauriWalletFileStatus("vericoin"),
-    enabled: options.includes("vericoin") && effectiveWalletMode === "full_node",
-  });
-
-  const readyOptions = (coin: CoinId) => ({
-    walletMode: effectiveWalletMode,
-    hasLightWallet: coin === "verium" ? veriumLight.data : vericoinLight.data,
-    hasFullNodeWallet: fullNodeWalletExists(
-      coin === "verium" ? veriumWalletFile.data : vericoinWalletFile.data,
-    ),
-  });
-
-  const anyComplete = options.some((coin) =>
-    isCoinWalletReady(coin, prefs, readyOptions(coin)),
-  );
-  const allComplete = options.every((coin) =>
-    isCoinWalletReady(coin, prefs, readyOptions(coin)),
-  );
+  }
 
   return (
     <div className="flex flex-col gap-5 text-sm">
@@ -225,6 +223,42 @@ export function SetupWalletHub({
         Choose Verium or Vericoin to set up or continue onboarding. You can
         return here anytime from setup to switch chains or open the dashboard.
       </p>
+
+      {profileLoadError && (
+        <div className="flex items-start gap-2 rounded-md border border-danger/40 bg-danger/10 p-3 text-xs text-fg-muted">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+          <p>{profileErrorMessage}</p>
+        </div>
+      )}
+
+      {(secretStore.data?.orphaned || anyNeedsLightRecovery) && (
+        <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-fg-muted">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <div className="flex flex-col gap-1.5">
+              <p className="font-medium text-fg">
+                Encrypted wallet data cannot be unlocked
+              </p>
+              <p>
+                Windows Credential Manager cannot decrypt older app settings.
+                Your light wallet is stored separately and is not affected once
+                you import your recovery phrase below.
+              </p>
+            </div>
+          </div>
+          {secretStore.data?.orphaned && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="self-start"
+              disabled={quarantining}
+              onClick={() => void handleQuarantineOrphaned()}
+            >
+              {quarantining ? "Resetting…" : "Reset encrypted storage (advanced)"}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2 rounded-md border border-border bg-bg-subtle p-3">
         <p className="text-xs font-medium text-fg">Appearance</p>
@@ -280,16 +314,28 @@ export function SetupWalletHub({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {options.map((coin) => (
-          <CoinHubCard
-            key={coin}
-            coin={coin}
-            prefs={prefs}
-            walletMode={effectiveWalletMode}
-            onSelect={onSelectCoin}
-            opening={openingCoin === coin}
-          />
-        ))}
+        {options.map((coin) => {
+          const query = profileByCoin[coin];
+          return (
+            <CoinHubCard
+              key={coin}
+              coin={coin}
+              walletMode={walletMode}
+              checking={query.isLoading}
+              profile={query.data}
+              errorMessage={
+                query.isError
+                  ? profileErrorMessage
+                  : query.data &&
+                      needsLightWalletRecovery(query.data, walletMode)
+                    ? "Encrypted keys unreadable — import recovery phrase."
+                    : null
+              }
+              onSelect={onSelectCoin}
+              opening={openingCoin === coin}
+            />
+          );
+        })}
       </div>
 
       {anyComplete && (

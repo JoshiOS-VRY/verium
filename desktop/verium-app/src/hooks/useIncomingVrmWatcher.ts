@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
+import { useUserPreferences } from "@/lib/user-preferences";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { type TransactionItem } from "@/lib/rpc/client";
 
@@ -88,14 +89,17 @@ function mergeReceiveEvent(
 }
 
 export function useIncomingVrmWatcher(): void {
-  const { data: status } = useDaemonStatus(VERIUM);
+  const notify = useUserPreferences(
+    (s) => s.prefs.notify_on_vrm_received !== false,
+  );
+  const { data: status } = useDaemonStatus(VERIUM, { enabled: notify });
   const seen = useRef<Set<string>>(loadSeenTxids());
   const initialized = useRef(false);
   const pending = useRef<IncomingVrmEvent[]>([]);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const txs = useWalletTransactions(VERIUM, {
-    enabled: status?.connected === true,
+    enabled: notify && status?.connected === true,
   });
 
   useEffect(() => {

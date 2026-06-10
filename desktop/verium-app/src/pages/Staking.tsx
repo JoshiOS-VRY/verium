@@ -112,7 +112,7 @@ export function Staking() {
     queryKey: coinQueryKey(VERICOIN, "explorer-stats"),
     queryFn: () => fetchExplorerStats(VERICOIN),
     enabled: explorerEnabled,
-    refetchInterval: visible ? 30_000 : false,
+    refetchInterval: false,
     retry: 0,
   });
 

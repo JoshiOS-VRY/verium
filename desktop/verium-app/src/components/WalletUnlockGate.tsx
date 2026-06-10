@@ -23,6 +23,8 @@ interface WalletUnlockGateProps {
   title?: string;
   description?: string;
   mintingOnly?: boolean;
+  /** Allow children when full-node mode has only a light wallet (e.g. pool mining). */
+  allowPoolWithoutFullNodeWallet?: boolean;
 }
 
 export function WalletUnlockGate({
@@ -30,6 +32,7 @@ export function WalletUnlockGate({
   title,
   description,
   mintingOnly,
+  allowPoolWithoutFullNodeWallet = false,
 }: WalletUnlockGateProps) {
   const coin = useActiveCoin();
   const profile = COIN_PROFILES[coin];
@@ -57,6 +60,37 @@ export function WalletUnlockGate({
   if (!wallet.data) {
     const hasStoredLightWallet = storedLightWallet.data === true;
     const modeMismatch = !isLight && hasStoredLightWallet;
+
+    if (modeMismatch && allowPoolWithoutFullNodeWallet) {
+      return (
+        <>
+          <Card className="border-warning/40 bg-warning/10">
+            <CardHeader>
+              <CardTitle>{lightWalletCopy.modeMismatchMiningTitle}</CardTitle>
+              <CardDescription>
+                {lightWalletCopy.modeMismatchMiningDescription.replace(
+                  "{coin}",
+                  profile.displayName,
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 pt-0">
+              <p className="text-xs text-fg-muted">
+                {lightWalletCopy.modeMismatchMiningPoolHint}
+              </p>
+              <Link
+                to="/settings"
+                className="text-sm text-accent underline"
+              >
+                {lightWalletCopy.modeMismatchCta}
+              </Link>
+            </CardContent>
+          </Card>
+          {children}
+        </>
+      );
+    }
+
     return (
       <Card>
         <CardHeader>

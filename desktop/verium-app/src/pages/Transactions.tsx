@@ -2,12 +2,18 @@ import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { useState, useEffect, useMemo } from "react";
 import { useMinerPayoutsQuery } from "@/hooks/usePoolQueries";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import { resolvePoolDashboardAddress } from "@/lib/pool-dashboard-address";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { rpcListAddressGroupings } from "@/lib/rpc/client";
 import { useQuery } from "@tanstack/react-query";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { ChevronLeft, ChevronRight, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Loader2,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -23,15 +29,9 @@ import { ReceivePanel } from "@/components/ReceivePanel";
 import { SendPanel } from "@/components/SendPanel";
 import { WalletBalanceSummary } from "@/components/WalletBalanceSummary";
 import { WalletUnlockGate } from "@/components/WalletUnlockGate";
-import {
-  fetchExplorerTransactions,
-  isExplorerApiEnabled,
-  type ExplorerTransaction,
-} from "@/lib/explorer-api";
 import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from "@/lib/rpc/client";
 import {
   listTransactionsFetchParams,
-  paginateItems,
   paginateTransactions,
   sortTransactionsNewestFirst,
   TRANSACTIONS_LIST_CAP,
@@ -45,9 +45,6 @@ import {
 } from "@/lib/transaction-category";
 import { cn, formatNumber } from "@/lib/utils";
 import { consumePendingPaymentUri } from "@/lib/payment-uri-pending";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useLightServerConnected } from "@/hooks/useLightServerConnected";
-import { isWalletLocked } from "@/lib/wallet-unlock";
 
 type TransferMode = "send" | "receive";
 
@@ -106,7 +103,6 @@ export function Transactions() {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
   const { isLight } = useWalletMode();
-  const lightServer = useLightServerConnected();
   const prefs = useUserPreferences((s) => s.prefs);
   const [mode, setMode] = useState<TransferMode>("send");
   const [prefill, setPrefill] = useState<{
@@ -128,7 +124,6 @@ export function Transactions() {
       label: pending.label ?? undefined,
     });
   }, []);
-  const visible = useWindowVisible();
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -178,56 +173,29 @@ export function Transactions() {
       return sortTransactionsNewestFirst(rows);
     },
     enabled: wallet.isSuccess,
-    refetchInterval: visible ? 10_000 : false,
+    // Heavy payload (up to 500 rows) — refresh on chain-tip invalidation only.
+    refetchInterval: false,
     retry: 0,
   });
 
   const sortedTxs = txs.data ?? [];
+  const isHistoryLoading =
+    wallet.isPending || (wallet.isSuccess && txs.isPending);
+  const showEmptyHistory =
+    !isHistoryLoading && !txs.isError && sortedTxs.length === 0;
 
-  const explorerEnabled = useQuery({
-    queryKey: ["explorer-api-enabled"],
-    queryFn: isExplorerApiEnabled,
-    staleTime: Infinity,
-  });
-
-  const explorerTxs = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-transactions"),
-    queryFn: () => fetchExplorerTransactions(coin, 25),
-    enabled:
-      explorerEnabled.data === true &&
-      (txs.isError || !txs.data || txs.data.length === 0),
-    refetchInterval: visible ? 60_000 : false,
-    retry: 0,
-  });
-
-  const showExplorerFallback =
-    explorerEnabled.data === true &&
-    (txs.isError || sortedTxs.length === 0) &&
-    explorerTxs.data &&
-    explorerTxs.data.length > 0;
-
-  const explorerSorted = useMemo(
-    () => [...(explorerTxs.data ?? [])].sort((a, b) => b.time - a.time),
-    [explorerTxs.data],
-  );
-
-  const activeTotalItems = showExplorerFallback
-    ? explorerSorted.length
-    : sortedTxs.length;
-  const activeTotalPages = transactionPageCount(activeTotalItems);
-  const effectivePage = Math.min(page, Math.max(0, activeTotalPages - 1));
+  const totalPages = transactionPageCount(sortedTxs.length);
+  const effectivePage = Math.min(page, Math.max(0, totalPages - 1));
   const pageRows = useMemo(
     () => paginateTransactions(sortedTxs, effectivePage),
     [sortedTxs, effectivePage],
   );
-  const explorerPageRows = useMemo(
-    () => paginateItems(explorerSorted, effectivePage),
-    [explorerSorted, effectivePage],
-  );
   const rangeFrom =
-    activeTotalItems === 0 ? 0 : effectivePage * TRANSACTIONS_PAGE_SIZE + 1;
+    sortedTxs.length === 0
+      ? 0
+      : effectivePage * TRANSACTIONS_PAGE_SIZE + 1;
   const rangeTo = Math.min(
-    activeTotalItems,
+    sortedTxs.length,
     (effectivePage + 1) * TRANSACTIONS_PAGE_SIZE,
   );
 
@@ -322,22 +290,28 @@ export function Transactions() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent transactions</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Recent transactions
+              {isHistoryLoading ? (
+                <Loader2
+                  className="h-4 w-4 animate-spin text-accent"
+                  aria-hidden
+                />
+              ) : null}
+            </CardTitle>
             <CardDescription>
-              {showExplorerFallback
-                ? isLight
-                  ? wallet.data && isWalletLocked(wallet.data)
-                    ? "Unlock your light wallet to load transaction history."
-                    : !lightServer.connected
-                      ? "Light wallet server offline — showing recent network transactions from the explorer."
-                      : "No wallet transactions yet — showing recent network activity from the explorer."
-                  : "Wallet RPC unavailable or empty — showing recent network transactions from the explorer."
-                : "Newest first."}
+              {isHistoryLoading
+                ? "Loading your wallet transaction history…"
+                : txs.isError
+                  ? "Could not load transaction history from the wallet."
+                  : showEmptyHistory
+                    ? "Transactions you send or receive will appear here."
+                    : "Newest first."}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <div className="max-h-[480px] overflow-auto">
-              {showExplorerFallback ? (
+              {isHistoryLoading ? (
                 <table className="w-full border-collapse text-sm">
                   <thead className={stickyTableHeadClass}>
                     <tr>
@@ -355,7 +329,15 @@ export function Transactions() {
                           "text-left",
                         )}
                       >
-                        Txid
+                        Type
+                      </th>
+                      <th
+                        className={cn(
+                          stickyTableHeadCellClass,
+                          "text-left",
+                        )}
+                      >
+                        Address
                       </th>
                       <th
                         className={cn(
@@ -371,7 +353,7 @@ export function Transactions() {
                           "text-right",
                         )}
                       >
-                        Block
+                        Confs
                       </th>
                       <th
                         className={cn(
@@ -384,36 +366,46 @@ export function Transactions() {
                     </tr>
                   </thead>
                   <tbody>
-                    {explorerPageRows.map((tx: ExplorerTransaction) => (
-                      <tr
-                        key={tx.txid}
-                        className="border-t border-border odd:bg-bg-subtle/30"
-                      >
-                        <td className="px-4 py-2 text-xs text-fg-muted">
-                          {new Date(tx.time * 1000).toLocaleString()}
-                        </td>
-                        <td className="truncate px-4 py-2 text-xs">
-                          {tx.txid.slice(0, 16)}…
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums">
-                          {tx.output_total ?? "—"}
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums">
-                          {tx.block_height !== undefined
-                            ? formatNumber(tx.block_height)
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <ExplorerLink
-                            coin={coin}
-                            target={{ kind: "tx", txid: tx.txid }}
-                            label="View"
-                          />
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={`loading-${i}`} className="border-t border-border">
+                        <td colSpan={6} className="px-4 py-2">
+                          <div className="h-4 animate-pulse rounded bg-bg-subtle" />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              ) : showEmptyHistory ? (
+                <div className="px-4 py-10">
+                  <div className="mx-auto max-w-md space-y-5 text-center">
+                    <div
+                      className="space-y-2.5 opacity-50"
+                      aria-hidden
+                    >
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div
+                          key={`empty-skeleton-${i}`}
+                          className="flex items-center gap-3"
+                        >
+                          <div className="h-3 w-24 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                          <div className="h-3 w-16 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                          <div className="h-3 min-w-0 flex-1 animate-pulse rounded bg-bg-subtle" />
+                          <div className="h-3 w-14 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-medium text-fg-muted">
+                        This wallet has not made any transactions yet.
+                      </p>
+                      <p className="text-xs text-fg-subtle">
+                        Use Send or Receive above to move {profile.symbol}. Your
+                        history will show up here once activity is recorded in
+                        the wallet.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <table className="w-full border-collapse text-sm">
                   <thead className={stickyTableHeadClass}>
@@ -511,36 +503,21 @@ export function Transactions() {
                         </td>
                       </tr>
                     ))}
-                    {!txs.isLoading && sortedTxs.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-4 py-6 text-center text-sm text-fg-subtle"
-                        >
-                          No transactions yet.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               )}
             </div>
-            {showExplorerFallback
+            {!isHistoryLoading && !showEmptyHistory && !txs.isError
               ? renderPagination({
-                  totalItems: explorerSorted.length,
-                  totalPages: activeTotalPages,
-                  rangeFrom,
-                  rangeTo,
-                })
-              : renderPagination({
                   totalItems: sortedTxs.length,
-                  totalPages: activeTotalPages,
+                  totalPages,
                   rangeFrom,
                   rangeTo,
                   cappedNote: historyCapped
                     ? `Showing the ${formatNumber(TRANSACTIONS_LIST_CAP)} most recent wallet entries.`
                     : undefined,
-                })}
+                })
+              : null}
           </CardContent>
         </Card>
       </div>

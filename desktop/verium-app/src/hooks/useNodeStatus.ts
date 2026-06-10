@@ -8,18 +8,29 @@ import {
 import { subscribeNodeStateChanged } from "@/lib/node-state-listener";
 import { nodeStateFromStatus } from "@/lib/node/status";
 import { rpcGetNodeStatus, type NodeStatus } from "@/lib/rpc/client";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 
 /** How long to treat unreachable RPC as "still starting" after app open. */
 const STARTUP_GRACE_MS = 120_000;
 
-export function useNodeStatus(coin: CoinId) {
+export function useNodeStatus(
+  coin: CoinId,
+  options?: { enabled?: boolean },
+) {
+  const pollEnabled = options?.enabled ?? true;
   const mountedAt = useRef(Date.now());
   const queryClient = useQueryClient();
+  const visible = useWindowVisible();
 
   const query = useQuery<NodeStatus>({
     queryKey: coinQueryKey(coin, "daemon-status"),
     queryFn: () => rpcGetNodeStatus(coin),
+    enabled: pollEnabled,
     refetchInterval: (q) => {
+      if (!pollEnabled) return false;
+      // Pause polling while hidden/idle; node-state-changed events still
+      // invalidate this query so a real state change wakes it immediately.
+      if (!visible) return false;
       const d = q.state.data;
       if (isBinaryUnavailableError(d?.error)) return false;
       if (d?.warming_up || d?.reindex_in_progress || d?.sync_stalled) return 10_000;

@@ -20,10 +20,13 @@ import {
   rpcMinerStart,
 } from "@/lib/rpc/client";
 import { isWalletUnlocked } from "@/lib/wallet-unlock";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import { useCoinWalletMode } from "@/hooks/useWalletMode";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { wasMiningStoppedByUser } from "@/lib/mining-session";
 
 const RETRY_MS = 10_000;
+/** Slow retry cadence while the window is hidden/idle (auto-start still happens, just less aggressively). */
+const RETRY_MS_HIDDEN = 60_000;
 const VERIUM = "verium" as const;
 
 /**
@@ -32,11 +35,14 @@ const VERIUM = "verium" as const;
  * Thread count follows auto-adjust preference or manual override.
  */
 export function useAutoMine() {
-  const { isLight } = useWalletMode();
+  const { isLight } = useCoinWalletMode("verium");
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
-  const { data: status } = useDaemonStatus(VERIUM);
+  const autoMine =
+    loaded && !isLight && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false;
+  const { data: status } = useDaemonStatus(VERIUM, { enabled: autoMine });
+  const visible = useWindowVisible();
   const lastErrorRef = useRef<string | null>(null);
 
   const topology = useQuery({
@@ -54,7 +60,7 @@ export function useAutoMine() {
   const explorer = useQuery({
     queryKey: coinQueryKey(VERIUM, "explorer-stats"),
     queryFn: () => fetchExplorerStats(VERIUM),
-    refetchInterval: 30_000,
+    refetchInterval: false,
     enabled:
       !isLight &&
       loaded &&
@@ -148,11 +154,15 @@ export function useAutoMine() {
     };
 
     void tryStart();
-    const id = window.setInterval(() => void tryStart(), RETRY_MS);
+    const id = window.setInterval(
+      () => void tryStart(),
+      visible ? RETRY_MS : RETRY_MS_HIDDEN,
+    );
     return () => window.clearInterval(id);
   }, [
     isLight,
     loaded,
+    visible,
     prefs.auto_mine_on_open,
     prefs.verium_enabled,
     prefs.auto_adjust_mine_threads,

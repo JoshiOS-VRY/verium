@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { CoinId } from "@/lib/coin/profile";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { useNodeStatus } from "@/hooks/useNodeStatus";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { fetchExplorerStats } from "@/lib/explorer-api";
 import { deriveDashboardActivity } from "@/lib/node/dashboard-activity";
 import { useExplorerQueriesEnabled } from "@/lib/network-mode";
@@ -13,7 +12,6 @@ import { rpcGetBlockchainInfo } from "@/lib/rpc/client";
  * polls so the mining page does not stack hashrate RPC on every route.
  */
 export function useDashboardActivity(coin: CoinId) {
-  const visible = useWindowVisible();
   const explorerEnabled = useExplorerQueriesEnabled();
   const node = useNodeStatus(coin);
 
@@ -27,7 +25,7 @@ export function useDashboardActivity(coin: CoinId) {
   const explorer = useQuery({
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
-    refetchInterval: visible ? 60_000 : false,
+    refetchInterval: false,
     enabled: explorerEnabled && node.data?.connected === true,
     retry: 0,
   });

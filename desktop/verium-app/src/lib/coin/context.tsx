@@ -24,19 +24,24 @@ interface CoinContextValue {
 const CoinContext = createContext<CoinContextValue | null>(null);
 
 export function CoinProvider({ children }: { children: ReactNode }) {
-  const prefs = useUserPreferences((s) => s.prefs);
+  // Subscribe only to the three prefs fields this provider uses, not the whole
+  // prefs object, so unrelated pref changes (theme, mining settings, …) don't
+  // re-render the provider.
+  const activeCoinPref = useUserPreferences((s) => s.prefs.active_coin);
+  const veriumEnabled = useUserPreferences((s) => s.prefs.verium_enabled);
+  const vericoinEnabled = useUserPreferences((s) => s.prefs.vericoin_enabled);
   const update = useUserPreferences((s) => s.update);
 
   const activeCoin: CoinId =
-    prefs.active_coin === "vericoin" ? "vericoin" : "verium";
+    activeCoinPref === "vericoin" ? "vericoin" : "verium";
 
   const enabledCoins = useMemo(
     () =>
       ALL_COINS.filter((coin) => {
-        if (coin === "verium") return prefs.verium_enabled !== false;
-        return prefs.vericoin_enabled !== false;
+        if (coin === "verium") return veriumEnabled !== false;
+        return vericoinEnabled !== false;
       }),
-    [prefs.verium_enabled, prefs.vericoin_enabled],
+    [veriumEnabled, vericoinEnabled],
   );
 
   const setActiveCoin = useCallback(

@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::fs as async_fs;
 
 use crate::coin_profile::{CoinId, NetworkMode};
 use crate::config::{load_config_for_network, resolve_legacy_wallet_outside_cfg, wallet_dat_exists};
@@ -323,13 +325,46 @@ pub fn wallet_unlock_duration_for(prefs: &UserPreferences, coin: CoinId) -> u32 
 
 const PREFS_STORE_LABEL: &str = "user-preferences";
 
+/// How long a loaded `UserPreferences` is reused before re-reading from disk.
+/// `load()` is called on nearly every wallet-service call and every
+/// supervisor/heal/watcher tick; decrypting + parsing + keystore reconciliation
+/// each time is wasteful. The cache is invalidated on every save so writes are
+/// always reflected immediately.
+const PREFS_CACHE_TTL: Duration = Duration::from_secs(3);
+
+static PREFS_CACHE: Lazy<Mutex<Option<(Instant, UserPreferences)>>> =
+    Lazy::new(|| Mutex::new(None));
+
+fn cached_prefs() -> Option<UserPreferences> {
+    let guard = PREFS_CACHE.lock().ok()?;
+    let (at, prefs) = guard.as_ref()?;
+    if at.elapsed() < PREFS_CACHE_TTL {
+        Some(prefs.clone())
+    } else {
+        None
+    }
+}
+
+fn store_prefs_cache(prefs: &UserPreferences) {
+    if let Ok(mut guard) = PREFS_CACHE.lock() {
+        *guard = Some((Instant::now(), prefs.clone()));
+    }
+}
+
+/// Drop the cached preferences so the next `load()` re-reads from disk.
+pub fn invalidate_prefs_cache() {
+    if let Ok(mut guard) = PREFS_CACHE.lock() {
+        *guard = None;
+    }
+}
+
 /// Mark setup complete for chains that already have a persisted light keystore.
 pub fn reconcile_setup_flags_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool> {
     let mut changed = false;
     let mut setup = prefs.setup_completed_by_coin.clone().unwrap_or_default();
 
     for coin in [CoinId::Verium, CoinId::Vericoin] {
-        if keystore::wallet_exists(coin).unwrap_or(false)
+        if keystore::light_wallet_on_disk(coin)
             && setup.get(coin.as_str()) != Some(&true)
         {
             setup.insert(coin.as_str().to_string(), true);
@@ -366,7 +401,7 @@ fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool>
         if has_explicit_override {
             continue;
         }
-        if !keystore::wallet_exists(coin).unwrap_or(false) {
+        if !keystore::light_wallet_on_disk(coin) {
             continue;
         }
         if let Ok(cfg) = load_config_for_network(coin, prefs.network_mode) {
@@ -383,18 +418,58 @@ fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool>
         }
     }
 
+    // Inherited app-wide light default: flip to full_node when only wallet.dat
+    // exists. Skip coins with an explicit per-coin light override (mid-setup or
+    // completed light wallet on a chain that also has a full node).
+    for coin in [CoinId::Verium, CoinId::Vericoin] {
+        if !wallet_mode_for(prefs, coin).is_light() {
+            continue;
+        }
+        let explicit_light = prefs
+            .wallet_mode_by_coin
+            .as_ref()
+            .and_then(|m| m.get(coin.as_str()))
+            .map(|m| m.is_light())
+            .unwrap_or(false);
+        if explicit_light {
+            continue;
+        }
+        if keystore::light_wallet_on_disk(coin) {
+            continue;
+        }
+        if let Ok(cfg) = load_config_for_network(coin, prefs.network_mode) {
+            let has_full_node_wallet = wallet_dat_exists(coin, &cfg)
+                || resolve_legacy_wallet_outside_cfg(coin, &cfg).is_some();
+            if has_full_node_wallet {
+                set_wallet_mode_for(prefs, coin, WalletMode::FullNode);
+                changed = true;
+                tracing::info!(
+                    "wallet_mode[{}] set to full_node: inherited light default but only wallet.dat exists",
+                    coin.as_str()
+                );
+            }
+        }
+    }
+
     Ok(changed)
 }
 
 /// Load preferences without blocking on the async runtime (safe from Tauri setup and sync commands).
 pub fn load_sync() -> AppResult<UserPreferences> {
+    if let Some(prefs) = cached_prefs() {
+        return Ok(prefs);
+    }
     let legacy = legacy_prefs_path();
     let path = prefs_path();
     if legacy.exists() && !crate::secret_store::blob_exists(PREFS_STORE_LABEL) {
         let raw = fs::read_to_string(&legacy)?;
         if let Ok(prefs) = serde_json::from_str::<UserPreferences>(&raw) {
-            save_sync(&prefs)?;
-            let _ = fs::remove_file(&legacy);
+            if let Err(e) = save_sync(&prefs) {
+                tracing::warn!("could not persist migrated legacy prefs: {e}");
+            } else {
+                let _ = fs::remove_file(&legacy);
+            }
+            store_prefs_cache(&prefs);
             return Ok(prefs);
         }
     }
@@ -402,7 +477,10 @@ pub fn load_sync() -> AppResult<UserPreferences> {
     if path.exists() && !crate::secret_store::blob_readable(PREFS_STORE_LABEL) {
         let raw = fs::read_to_string(&path)?;
         if let Ok(prefs) = serde_json::from_str::<UserPreferences>(&raw) {
-            save_sync(&prefs)?;
+            if let Err(e) = save_sync(&prefs) {
+                tracing::warn!("could not re-seal prefs from plaintext: {e}");
+            }
+            store_prefs_cache(&prefs);
             return Ok(prefs);
         }
     }
@@ -431,9 +509,14 @@ pub fn load_sync() -> AppResult<UserPreferences> {
     }
 
     if reconcile_prefs_with_keystore(&mut prefs)? {
-        save_sync(&prefs)?;
+        if let Err(e) = save_sync(&prefs) {
+            tracing::warn!(
+                "prefs reconcile changed flags but could not persist (continuing with in-memory prefs): {e}"
+            );
+        }
     }
 
+    store_prefs_cache(&prefs);
     Ok(prefs)
 }
 
@@ -442,9 +525,14 @@ fn save_sync(prefs: &UserPreferences) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    crate::secret_store::save_json(PREFS_STORE_LABEL, prefs)?;
     let json = serde_json::to_string_pretty(prefs)?;
     fs::write(&path, json)?;
+    if crate::secret_store::encrypted_data_orphaned() {
+        tracing::warn!("prefs saved to plaintext only: Windows Credential Manager entry missing");
+    } else if let Err(e) = crate::secret_store::save_json(PREFS_STORE_LABEL, prefs) {
+        tracing::warn!("could not save encrypted prefs: {e}");
+    }
+    store_prefs_cache(prefs);
     Ok(())
 }
 
@@ -453,14 +541,7 @@ pub async fn load() -> AppResult<UserPreferences> {
 }
 
 pub async fn save(prefs: &UserPreferences) -> AppResult<()> {
-    let path = prefs_path();
-    if let Some(parent) = path.parent() {
-        async_fs::create_dir_all(parent).await?;
-    }
-    crate::secret_store::save_json(PREFS_STORE_LABEL, prefs)?;
-    let json = serde_json::to_string_pretty(prefs)?;
-    async_fs::write(&path, json).await?;
-    Ok(())
+    save_sync(prefs)
 }
 
 #[cfg(test)]
@@ -495,6 +576,21 @@ mod mode_tests {
         assert_eq!(
             onboarding_for(&prefs, CoinId::Verium).step.as_deref(),
             Some("wallet")
+        );
+    }
+
+    #[test]
+    fn reconcile_setup_flags_unchanged_without_keystore_wallets() {
+        let mut prefs = UserPreferences::default();
+        assert!(
+            !reconcile_setup_flags_with_keystore(&mut prefs).expect("reconcile")
+        );
+        assert!(
+            prefs
+                .setup_completed_by_coin
+                .unwrap_or_default()
+                .get(CoinId::Verium.as_str())
+                .is_none()
         );
     }
 }

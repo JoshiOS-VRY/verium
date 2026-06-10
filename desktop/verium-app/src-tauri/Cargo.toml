@@ -65,5 +65,3 @@ webpki-roots = "0.26"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
-# Internal QA only — exposes unrestricted JSON-RPC console in the UI.
-dev-rpc-console = []

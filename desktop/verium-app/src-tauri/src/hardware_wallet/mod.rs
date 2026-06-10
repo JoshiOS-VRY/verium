@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::coin_profile::CoinId;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::rpc::RpcClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -82,7 +82,7 @@ pub async fn import_address_range(
 ) -> AppResult<u32> {
     let mut requests = Vec::new();
     for i in start..start + count {
-        let path = format!("m/44'/{coin_type}'/0'/0/{i}");
+        let _path = format!("m/44'/{coin_type}'/0'/0/{i}");
         requests.push(json!({
             "scriptPubKey": {
                 "address": "" // placeholder — veriumd deriveaddresses handles xpub

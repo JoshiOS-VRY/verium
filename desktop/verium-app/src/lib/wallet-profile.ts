@@ -27,6 +27,8 @@ export interface OnboardingCheckpoint {
   legacy_path?: string | null;
 }
 
+export type LightKeystoreHealth = "ok" | "unreadable" | "missing";
+
 export interface WalletProfile {
   coin: CoinId;
   mode: WalletMode;
@@ -45,6 +47,9 @@ export interface WalletProfile {
   intent: OnboardingIntent;
   /** True when keys exist for the active mode — the only gate for the dashboard. */
   ready: boolean;
+  /** True when any persisted wallet keys exist for this coin (either mode). */
+  openable: boolean;
+  light_keystore_health: LightKeystoreHealth;
 }
 
 export async function tauriWalletProfile(coin: CoinId): Promise<WalletProfile> {
@@ -78,6 +83,44 @@ export async function legacyDatadirCandidate(
 /** Request a one-shot `-upgradewallet` and restart so `sethdseed` can run. */
 export async function legacyRequestHdUpgrade(coin: CoinId): Promise<void> {
   return invoke("legacy_request_hd_upgrade", { coin });
+}
+
+export interface CoinStorageDiagnostic {
+  coin: string;
+  manifest: boolean;
+  light_cache: boolean;
+  enc_blob: boolean;
+  decrypted_keystore: boolean;
+  wallet_dat: boolean;
+  legacy_wallet: boolean;
+  light_on_disk: boolean;
+  light_keystore_health: LightKeystoreHealth;
+}
+
+export interface WalletStorageDiagnostics {
+  app_config_base: string;
+  secret_store_orphaned: boolean;
+  prefs_enc_readable: boolean;
+  keystore_enc_readable: boolean;
+  coins: CoinStorageDiagnostic[];
+}
+
+export interface SecretStoreStatus {
+  orphaned: boolean;
+  message?: string | null;
+}
+
+export async function secretStoreStatus(): Promise<SecretStoreStatus> {
+  return invoke<SecretStoreStatus>("secret_store_status");
+}
+
+/** Quarantine unreadable encrypted blobs and create a fresh CM master key. */
+export async function secretStoreQuarantineOrphaned(): Promise<string> {
+  return invoke<string>("secret_store_quarantine_orphaned");
+}
+
+export async function walletStorageDiagnostics(): Promise<WalletStorageDiagnostics> {
+  return invoke<WalletStorageDiagnostics>("wallet_storage_diagnostics");
 }
 
 /** A coin is ready iff keys exist for its active wallet mode. */

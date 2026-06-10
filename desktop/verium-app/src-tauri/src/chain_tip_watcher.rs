@@ -60,6 +60,13 @@ async fn watch_loop(app: AppHandle, state: AppState, coin: CoinId) {
             sleep(DISABLED_BACKOFF).await;
             continue;
         }
+        // Light-mode coins have no managed local node to long-poll; the Electrum
+        // backend drives their tip. Skip the watcher so it does not retry RPC
+        // against an absent daemon every few seconds.
+        if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
+            sleep(DISABLED_BACKOFF).await;
+            continue;
+        }
 
         let cfg = match state.config_fresh(coin).await {
             Ok(c) => c,

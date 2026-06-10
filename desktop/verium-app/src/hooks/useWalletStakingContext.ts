@@ -1,18 +1,17 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { coinQueryKey } from "@/lib/coin/profile";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { rpcListAddressGroupings } from "@/lib/rpc/client";
 
 const VERICOIN = "vericoin" as const;
 
 export function useWalletStakingContext(enabled = true) {
-  const visible = useWindowVisible();
   const addresses = useQuery({
     queryKey: coinQueryKey(VERICOIN, "listaddressgroupings"),
     queryFn: () => rpcListAddressGroupings(VERICOIN),
-    refetchInterval: visible ? 10_000 : false,
+    staleTime: 60_000,
+    refetchInterval: false,
     retry: 0,
     enabled,
   });

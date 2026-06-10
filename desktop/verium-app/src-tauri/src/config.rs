@@ -540,11 +540,6 @@ pub fn promote_subdir_chain_data_for_legacy(coin: CoinId, cfg: &DaemonConfig) ->
         return Ok(false);
     }
 
-    let root_blocks = root.join("blocks");
-    let root_chainstate = root.join("chainstate");
-    let sub_blocks = sub.join("blocks");
-    let sub_chainstate = sub.join("chainstate");
-
     if !legacy_subdir_chain_ahead(coin, cfg) {
         return Ok(false);
     }

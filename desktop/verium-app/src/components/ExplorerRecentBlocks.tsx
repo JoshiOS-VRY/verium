@@ -47,7 +47,6 @@ import { useBlockRowEnterAnimation } from "@/hooks/useBlockRowEnterAnimation";
 import { useChainSynced } from "@/hooks/useChainSynced";
 
 import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
-import { useChainSwitchTransition } from "@/hooks/useChainSwitchTransition";
 import { useEffectiveLocalChainTip } from "@/hooks/useEffectiveLocalChainTip";
 
 import { fetchExplorerBlocks, isExplorerApiEnabled } from "@/lib/explorer-api";
@@ -59,6 +58,7 @@ import {
   enrichBlocksFromExplorer,
   enrichBlocksFromRpc,
   isIndexingBlockRow,
+  MAX_PENDING_BLOCKS_ABOVE,
   mergeRecentBlocks,
 } from "@/lib/local-recent-block";
 import { useWalletMode } from "@/hooks/useWalletMode";
@@ -222,8 +222,10 @@ export function ExplorerRecentBlocks({
     const heights = new Set<number>();
 
     if (localTipHeight != null && localTipHeight > explorerTop) {
-      for (let height = localTipHeight; height > explorerTop; height -= 1) {
-        heights.add(height);
+      const gap = localTipHeight - explorerTop;
+      const cap = Math.min(gap, MAX_PENDING_BLOCKS_ABOVE);
+      for (let i = 0; i < cap; i += 1) {
+        heights.add(localTipHeight - i);
       }
     }
 
@@ -348,10 +350,6 @@ export function ExplorerRecentBlocks({
   }, [celebration]);
 
   const loading = enabled.isLoading || blocks.isLoading;
-  const switchingChains = useChainSwitchTransition(coin, {
-    enabled: isDashboard,
-    isReady: !blocks.isLoading && !blocks.isFetching,
-  });
 
   const feedLimit = 10;
   const explorerBlocks = blocks.data ?? [];
@@ -482,23 +480,6 @@ export function ExplorerRecentBlocks({
               isDashboard ? "flex-1" : "max-h-[360px]",
             )}
           >
-            {switchingChains && (
-              <div
-                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-panel/85 backdrop-blur-[1px]"
-                role="status"
-                aria-live="polite"
-                aria-busy="true"
-                aria-label="Switching chains"
-              >
-                <Loader2
-                  className="h-6 w-6 animate-spin text-accent"
-                  aria-hidden
-                />
-                <span className="text-sm font-medium text-fg">
-                  Switching chains
-                </span>
-              </div>
-            )}
             <table className="w-full border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-bg-panel text-xs uppercase text-fg-subtle">
                 <tr>

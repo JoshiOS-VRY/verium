@@ -1,13 +1,7 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import {
-  Clock3,
-  Coins,
-  Loader2,
-  TrendingUp,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { Coins, Loader2, TrendingUp, Users, Wallet } from "lucide-react";
+import { BlockAgeLabel } from "@/components/BlockAgeLabel";
 import { ExplorerLink } from "@/components/ExplorerLink";
 import { AnimatedBlockNumber } from "@/components/AnimatedBlockNumber";
 import { MiningPickaxeAnimation } from "@/components/MiningPickaxeAnimation";
@@ -273,7 +267,7 @@ function HeroPanel({
   tipHeight,
   tipHash,
   localBlocks,
-  blockAge,
+  tipTime,
   activity,
   connected,
   synced,
@@ -288,7 +282,7 @@ function HeroPanel({
   tipHeight?: number;
   tipHash?: string;
   localBlocks?: number;
-  blockAge: string;
+  tipTime?: number | null;
   activity: DashboardData["activity"];
   connected: boolean;
   synced: boolean;
@@ -350,14 +344,7 @@ function HeroPanel({
               />
             </div>
 
-            {blockAge !== "—" && (
-              <p className="mt-3 inline-flex min-w-0 items-center gap-1.5 text-sm text-fg-muted xl:mt-2">
-                <Clock3 className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-                <span>
-                  Mined <span className="font-medium text-fg">{blockAge}</span> ago
-                </span>
-              </p>
-            )}
+            <BlockAgeLabel tipTime={tipTime} />
 
             {activity.kind !== "ready" && (
               <p className="mt-2 text-xs leading-relaxed text-fg-muted">
@@ -394,10 +381,7 @@ function HeroPanel({
   );
 }
 
-function buildHeroStatusRow(
-  data: DashboardData,
-  explorerEnabled: boolean,
-): ReactNode {
+function buildHeroStatusRow(data: DashboardData): ReactNode {
   if (data.isLight) {
     const online = data.connected;
     return (
@@ -413,12 +397,8 @@ function buildHeroStatusRow(
     );
   }
 
-  const { activity, synced, blockchain, localBlocks, networkTip } = data;
-  const heightDelta =
-    localBlocks != null && networkTip != null
-      ? localBlocks - networkTip
-      : undefined;
-  const matchesExplorer = heightDelta != null && Math.abs(heightDelta) <= 1;
+  const { activity, synced, blockchain } = data;
+
   const pillLoading = heroStatusPillShowsPulse(activity);
   const pillTone = synced && activity.kind === "ready" ? "success" : "accent";
 
@@ -433,12 +413,6 @@ function buildHeroStatusRow(
       <StatusPill tone="neutral">
         {blockchain.data?.chain === "test" ? "Testnet" : "Mainnet"}
       </StatusPill>
-      {explorerEnabled && heightDelta != null && !matchesExplorer && (
-        <StatusPill tone="neutral">
-          {heightDelta >= 0 ? "+" : ""}
-          {formatNumber(heightDelta, 0)} vs explorer
-        </StatusPill>
-      )}
     </>
   );
 }
@@ -576,9 +550,7 @@ function buildActivitySection(
         />
         <MiniStat
           label="Chain tip"
-          value={
-            data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"
-          }
+          value={data.tipHeight != null ? formatNumber(data.tipHeight, 0) : "—"}
         />
         <MiniStat
           label="Sync"
@@ -590,10 +562,7 @@ function buildActivitySection(
                 : "—"
           }
         />
-        <MiniStat
-          label="Mode"
-          value="Light wallet"
-        />
+        <MiniStat label="Mode" value="Light wallet" />
       </HeroSection>
     );
   }
@@ -663,11 +632,7 @@ function buildActivitySection(
         />
         <MiniStat
           label="Est. daily"
-          value={
-            daily
-              ? `${formatNumber(daily.vrmPerDay, 3)} VRM`
-              : "—"
-          }
+          value={daily ? `${formatNumber(daily.vrmPerDay, 3)} VRM` : "—"}
         />
       </HeroSection>
     );
@@ -752,7 +717,9 @@ function buildDetailColumns(
   data: DashboardData,
   explorerEnabled: boolean,
 ): ReactNode {
-  const activitySpan = explorerEnabled ? "lg:col-span-2 xl:col-span-1" : undefined;
+  const activitySpan = explorerEnabled
+    ? "lg:col-span-2 xl:col-span-1"
+    : undefined;
 
   return (
     <>
@@ -763,10 +730,7 @@ function buildDetailColumns(
   );
 }
 
-function buildNetworkMetrics(
-  coin: CoinId,
-  data: DashboardData,
-): ReactNode {
+function buildNetworkMetrics(coin: CoinId, data: DashboardData): ReactNode {
   const peerLabel =
     data.connections > 0
       ? formatNumber(data.connections, 0)
@@ -774,11 +738,7 @@ function buildNetworkMetrics(
         ? "0"
         : "—";
   const peerSub =
-    data.connections > 0
-      ? "Online"
-      : data.connected
-        ? "No peers"
-        : "Offline";
+    data.connections > 0 ? "Online" : data.connected ? "No peers" : "Offline";
 
   if (coin === "verium") {
     const networkHashKhm =
@@ -795,8 +755,7 @@ function buildNetworkMetrics(
       data.explorer.data,
       data.mining.data,
     );
-    const mempool =
-      data.mining.data?.pooledtx ?? data.explorer.data?.pooled_tx;
+    const mempool = data.mining.data?.pooledtx ?? data.explorer.data?.pooled_tx;
 
     return (
       <>
@@ -821,9 +780,7 @@ function buildNetworkMetrics(
         <NetworkMetric
           label="Avg. block time"
           value={
-            blockTimeMin != null
-              ? `${formatNumber(blockTimeMin, 1)} min`
-              : "—"
+            blockTimeMin != null ? `${formatNumber(blockTimeMin, 1)} min` : "—"
           }
         />
         <NetworkMetric
@@ -861,17 +818,13 @@ function buildNetworkMetrics(
       <NetworkMetric
         label="Network staked"
         value={
-          networkStakePct != null
-            ? `${formatNumber(networkStakePct, 2)}%`
-            : "—"
+          networkStakePct != null ? `${formatNumber(networkStakePct, 2)}%` : "—"
         }
       />
       <NetworkMetric
         label="Block time"
         value={
-          blockTimeMin != null
-            ? `${formatNumber(blockTimeMin, 1)} min`
-            : "—"
+          blockTimeMin != null ? `${formatNumber(blockTimeMin, 1)} min` : "—"
         }
       />
       <NetworkMetric
@@ -892,11 +845,11 @@ export function DashboardHero({ coin }: { coin: CoinId }) {
     <HeroPanel
       coin={coin}
       profile={profile}
-      statusRow={buildHeroStatusRow(data, explorerEnabled)}
+      statusRow={buildHeroStatusRow(data)}
       tipHeight={data.tipHeight}
       tipHash={data.tipHash}
       localBlocks={data.localBlocks}
-      blockAge={data.blockAge}
+      tipTime={data.tipTime}
       activity={data.activity}
       connected={data.connected}
       synced={data.synced}

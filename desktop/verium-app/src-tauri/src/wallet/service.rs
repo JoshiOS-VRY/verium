@@ -1,5 +1,10 @@
 //! Wallet service facade routing full-node vs light backends.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 
 use crate::chain::types::*;
@@ -55,6 +60,83 @@ pub async fn fetch_utxos_with_addresses(
     Ok(utxos)
 }
 
+/// Minimum gap between steady-state (scan-complete) light-wallet UTXO refetches.
+/// `get_wallet_info` is polled every ~30s; without this throttle each poll would
+/// trigger a full Electrum UTXO refetch + SQLite table rewrite. Initial-scan
+/// syncs (`light_syncing`) are NOT throttled so they keep making progress.
+const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(90);
+
+static LAST_STEADY_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Returns true if a steady-state background sync should run now (and records the
+/// attempt). Throttled per coin to `STEADY_SYNC_MIN_INTERVAL`.
+fn steady_sync_due(coin: CoinId) -> bool {
+    let mut map = match LAST_STEADY_SYNC.lock() {
+        Ok(m) => m,
+        Err(_) => return true,
+    };
+    let now = Instant::now();
+    match map.get(&coin) {
+        Some(last) if now.duration_since(*last) < STEADY_SYNC_MIN_INTERVAL => false,
+        _ => {
+            map.insert(coin, now);
+            true
+        }
+    }
+}
+
+/// Clear the steady-sync throttle so the next poll resyncs immediately (used on
+/// unlock/import/rescan and when funded scripts change).
+pub fn reset_steady_sync_throttle(coin: CoinId) {
+    if let Ok(mut map) = LAST_STEADY_SYNC.lock() {
+        map.remove(&coin);
+    }
+}
+
+/// Last Electrum tip height we reacted to per coin (for event-driven sync).
+static LAST_TIP_SYNCED: Lazy<Mutex<HashMap<CoinId, u32>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Event-driven steady-state sync: when the light server's chain tip advances,
+/// refresh the wallet (deduped + rate-limited by the steady-sync throttle)
+/// instead of waiting out the fixed fallback timer. Only fires once initial
+/// address scanning is complete; the initial scan is driven by `get_wallet_info`.
+fn maybe_sync_on_tip_advance(state: &AppState, coin: CoinId, tip: u32) {
+    if keystore::needs_full_address_scan(coin).unwrap_or(true) {
+        return;
+    }
+    let advanced = {
+        match LAST_TIP_SYNCED.lock() {
+            Ok(mut map) => {
+                let advanced = map.get(&coin).map(|&last| tip > last).unwrap_or(true);
+                if advanced {
+                    map.insert(coin, tip);
+                }
+                advanced
+            }
+            Err(_) => false,
+        }
+    };
+    if !advanced {
+        return;
+    }
+    // Rate-limit (and unify with the get_wallet_info fallback throttle).
+    if !steady_sync_due(coin) {
+        return;
+    }
+    let funded = keystore::funded_script_hexes(coin).unwrap_or_default();
+    if funded.is_empty() {
+        return;
+    }
+    let sync_state = state.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = sync_light_wallet(&sync_state, coin).await {
+            tracing::debug!("tip-advance light sync failed for {}: {e}", coin.as_str());
+        }
+    });
+}
+
 pub fn wallet_mode_for(prefs: &UserPreferences, coin: CoinId) -> WalletMode {
     prefs::wallet_mode_for(prefs, coin)
 }
@@ -79,8 +161,11 @@ pub async fn get_wallet_info_json(
     let scan_complete = !keystore::needs_full_address_scan(coin).unwrap_or(true);
     let light_syncing = session_unlocked && !scan_complete;
     let funded_scripts = keystore::funded_script_hexes(coin).unwrap_or_default();
-    let should_background_sync =
-        light_syncing || (scan_complete && !funded_scripts.is_empty());
+    let steady_state = scan_complete && !funded_scripts.is_empty();
+    // Initial-scan syncs always run (and coalesce via SYNC_IN_FLIGHT). Steady-state
+    // UTXO refetches are throttled so polling getwalletinfo every ~30s does not
+    // refetch the full UTXO set + rewrite SQLite on every poll.
+    let should_background_sync = light_syncing || (steady_state && steady_sync_due(coin));
 
     if should_background_sync {
         let sync_state = state.clone();
@@ -135,28 +220,63 @@ pub async fn list_transactions(
         return Ok(vec![]);
     }
     let _ = passphrase;
+
+    // Fast path: serve from the local SQLite history cache (refreshed by sync),
+    // recomputing confirmations from the cached chain tip. This avoids issuing N
+    // Electrum get_history calls on every UI poll.
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        if cache.tx_history_count().unwrap_or(0) > 0 {
+            let tip = cached_tip_height(&cache);
+            let rows = cache.list_tx_history(count).unwrap_or_default();
+            return Ok(rows.iter().map(|t| wallet_tx_to_json(t, tip)).collect());
+        }
+    }
+
+    // Cold cache (e.g. immediately after import, before first sync): fetch live
+    // once and populate the cache so subsequent polls hit the fast path.
     let backend = resolve_backend(state, coin).await?;
     let scripts = scripts_for_history(coin)?;
     if scripts.is_empty() {
         return Ok(vec![]);
     }
     let txs = backend.get_history_for_scripts(&scripts, count).await?;
-    Ok(txs
-        .into_iter()
-        .map(|t| {
-            json!({
-                "txid": t.txid,
-                "category": t.category,
-                "amount": t.amount,
-                "confirmations": t.confirmations,
-                "address": t.address,
-                "blockheight": t.blockheight,
-                "blockhash": t.blockhash,
-                "time": t.time,
-                "fee": t.fee_sats.map(|f| sats_to_coins(f)),
-            })
-        })
-        .collect())
+    let tip = if let Ok(cache) = LightWalletCache::open(coin) {
+        let _ = cache.replace_tx_history(&txs);
+        cached_tip_height(&cache)
+    } else {
+        None
+    };
+    Ok(txs.iter().map(|t| wallet_tx_to_json(t, tip)).collect())
+}
+
+fn cached_tip_height(cache: &LightWalletCache) -> Option<u32> {
+    cache
+        .get_meta("tip_height")
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<u32>().ok())
+}
+
+/// Serialize a cached `WalletTx` to the wallet JSON shape, recomputing
+/// confirmations from the current chain tip so cached rows stay accurate
+/// between history refreshes.
+fn wallet_tx_to_json(t: &WalletTx, tip: Option<u32>) -> Value {
+    let confirmations = match (tip, t.blockheight) {
+        (Some(tip), Some(bh)) if tip >= bh => (tip - bh + 1) as i64,
+        (_, Some(_)) => t.confirmations as i64,
+        _ => 0,
+    };
+    json!({
+        "txid": t.txid,
+        "category": t.category,
+        "amount": t.amount,
+        "confirmations": confirmations,
+        "address": t.address,
+        "blockheight": t.blockheight,
+        "blockhash": t.blockhash,
+        "time": t.time,
+        "fee": t.fee_sats.map(sats_to_coins),
+    })
 }
 
 pub async fn get_new_address(
@@ -219,7 +339,10 @@ pub async fn send_to_address(
         &signed.hex,
         &[(address.to_string(), amount_sats)],
     )?;
-    backend.broadcast_tx(&signed.hex).await
+    let txid = backend.broadcast_tx(&signed.hex).await?;
+    // Spent UTXOs are now stale; let the next poll resync without waiting out the throttle.
+    reset_steady_sync_throttle(coin);
+    Ok(txid)
 }
 
 pub async fn list_unspent_json(
@@ -319,7 +442,9 @@ pub async fn send_with_inputs(
     )?;
     crate::wallet::verify::verify_send_outputs(coin, &signed.hex, &output_pairs)?;
     let backend = resolve_backend(state, coin).await?;
-    backend.broadcast_tx(&signed.hex).await
+    let txid = backend.broadcast_tx(&signed.hex).await?;
+    reset_steady_sync_throttle(coin);
+    Ok(txid)
 }
 
 pub async fn light_server_status(state: &AppState, coin: CoinId) -> AppResult<Option<LightServerStatus>> {
@@ -328,5 +453,11 @@ pub async fn light_server_status(state: &AppState, coin: CoinId) -> AppResult<Op
         return Ok(None);
     }
     let backend = resolve_backend(state, coin).await?;
-    Ok(backend.light_server_status().await)
+    let status = backend.light_server_status().await;
+    if let Some(s) = &status {
+        if let Some(tip) = s.tip_height {
+            maybe_sync_on_tip_advance(state, coin, tip);
+        }
+    }
+    Ok(status)
 }

@@ -16,6 +16,11 @@ export const lightWalletCopy = {
   modeMismatchTitle: "Light wallet found — switch mode",
   modeMismatchDescription:
     "Your {coin} light wallet is saved on this device, but the app is in full-node mode. Switch to Light wallet in Settings to use it.",
+  modeMismatchMiningTitle: "Full-node wallet not loaded",
+  modeMismatchMiningDescription:
+    "Solo mining needs a full-node wallet (wallet.dat) unlocked on veriumd. This device only has a {coin} light wallet saved. Switch to Light wallet mode for pool mining with that wallet, or set up a full-node wallet in Setup to solo mine.",
+  modeMismatchMiningPoolHint:
+    "You can still pool mine below — enter your VRM payout address manually if it is not filled in automatically.",
   modeMismatchCta: "Open Settings → Wallet mode",
   fullNodeOnlyToast:
     "This page requires a local full node. Switch to Full node mode in Settings.",

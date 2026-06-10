@@ -4,15 +4,17 @@ import { AlertTriangle, CheckCircle2, HardDrive } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useWalletMode } from "@/hooks/useWalletMode";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { backupHealth } from "@/lib/security/client";
 import { BACKUP_HEALTH_REFETCH_MS } from "@/hooks/useScheduledBackup";
 
 export function BackupHealthCard() {
   const { isLight } = useWalletMode();
+  const visible = useWindowVisible();
   const health = useQuery({
     queryKey: ["backup-health"],
     queryFn: backupHealth,
-    refetchInterval: BACKUP_HEALTH_REFETCH_MS,
+    refetchInterval: visible ? BACKUP_HEALTH_REFETCH_MS : false,
   });
 
   if (isLight || !health.data) return null;

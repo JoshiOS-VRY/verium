@@ -1,25 +1,40 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Check, ChevronDown } from "lucide-react";
-import { ALL_COINS, COIN_LOGO_URLS, COIN_PROFILES } from "@/lib/coin/profile";
+import { Check, ChevronDown, Loader2 } from "lucide-react";
+import { useAppCoinSwitchTransition } from "@/hooks/useAppCoinSwitchTransition";
+import {
+  ALL_COINS,
+  COIN_LOGO_URLS,
+  COIN_PROFILES,
+  coinQueryKey,
+} from "@/lib/coin/profile";
 import {
   useActiveCoin,
   useEnabledCoins,
   useSetActiveCoin,
 } from "@/lib/coin/context";
 import { cn } from "@/lib/utils";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { isCoinSetupComplete } from "@/lib/setup";
+import { tauriWalletProfile } from "@/lib/wallet-profile";
+import {
+  isProfileOpenable,
+  profileWalletPresenceFromProfile,
+  resolveCoinOpenMode,
+} from "@/lib/setup";
+import { walletModeSetForCoin } from "@/lib/light-wallet/client";
+import { useInvalidateWalletMode } from "@/hooks/useWalletMode";
 
 export function CoinSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const activeCoin = useActiveCoin();
   const setActiveCoin = useSetActiveCoin();
   const enabledCoins = useEnabledCoins();
-  const prefs = useUserPreferences((s) => s.prefs);
+  const invalidateWalletMode = useInvalidateWalletMode();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const switching = useAppCoinSwitchTransition();
 
   const active = COIN_PROFILES[activeCoin];
   const options = ALL_COINS.filter((coin) => enabledCoins.includes(coin));
@@ -80,13 +95,20 @@ export function CoinSwitcher() {
             {active.tagline}
           </div>
         </div>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 text-fg-subtle transition-transform",
-            open && "rotate-180",
-          )}
-          aria-hidden
-        />
+        {switching ? (
+          <Loader2
+            className="h-4 w-4 shrink-0 animate-spin text-accent"
+            aria-hidden
+          />
+        ) : (
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-fg-subtle transition-transform",
+              open && "rotate-180",
+            )}
+            aria-hidden
+          />
+        )}
       </button>
 
       {open && (
@@ -107,21 +129,47 @@ export function CoinSwitcher() {
                 onClick={() => {
                   setActiveCoin(coin);
                   setOpen(false);
-                  if (!isCoinSetupComplete(coin, prefs)) {
-                    navigate("/setup", { state: { setupHub: true } });
-                    return;
-                  }
-                  if (
-                    location.pathname === "/staking" &&
-                    coin === "verium"
-                  ) {
-                    navigate("/mining");
-                  } else if (
-                    location.pathname === "/mining" &&
-                    coin === "vericoin"
-                  ) {
-                    navigate("/staking");
-                  }
+                  void (async () => {
+                    const cached = queryClient.getQueryData<Awaited<
+                      ReturnType<typeof tauriWalletProfile>
+                    >>(coinQueryKey(coin, "wallet-profile"));
+                    const profile =
+                      cached ??
+                      (await queryClient.fetchQuery({
+                        queryKey: coinQueryKey(coin, "wallet-profile"),
+                        queryFn: () => tauriWalletProfile(coin),
+                        staleTime: 60_000,
+                      }));
+                    if (!isProfileOpenable(profile)) {
+                      navigate("/setup", { state: { setupHub: true } });
+                      return;
+                    }
+                    const openMode = resolveCoinOpenMode(
+                      profile.mode,
+                      profileWalletPresenceFromProfile(profile),
+                      { allowCrossModeFallback: true },
+                    );
+                    if (openMode && openMode !== profile.mode) {
+                      await walletModeSetForCoin(coin, openMode).catch(
+                        () => undefined,
+                      );
+                      invalidateWalletMode();
+                      void queryClient.invalidateQueries({
+                        queryKey: coinQueryKey(coin, "wallet-profile"),
+                      });
+                    }
+                    if (
+                      location.pathname === "/staking" &&
+                      coin === "verium"
+                    ) {
+                      navigate("/mining");
+                    } else if (
+                      location.pathname === "/mining" &&
+                      coin === "vericoin"
+                    ) {
+                      navigate("/staking");
+                    }
+                  })();
                 }}
                 className={cn(
                   "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",

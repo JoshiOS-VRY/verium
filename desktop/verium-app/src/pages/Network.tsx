@@ -70,7 +70,7 @@ export function Network() {
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
     enabled: explorerEnabled,
-    refetchInterval: visible ? 60_000 : false,
+    refetchInterval: false,
     retry: 0,
   });
 

@@ -311,6 +311,8 @@ fn spawn_miner(cfg: &RunConfig) -> std::io::Result<tokio::process::Child> {
         .arg(cfg.threads.to_string())
         .arg("-b")
         .arg(format!("{API_HOST}:{API_PORT}"))
+        .arg("--profile")
+        .arg("background")
         .arg("--no-color")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -324,9 +326,14 @@ fn spawn_miner(cfg: &RunConfig) -> std::io::Result<tokio::process::Child> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        // CREATE_NO_WINDOW — keep cpuminer headless under the wallet.
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        std_cmd.creation_flags(CREATE_NO_WINDOW);
+        const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+        std_cmd.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        std_cmd.nice(10);
     }
 
     let mut cmd = Command::from(std_cmd);

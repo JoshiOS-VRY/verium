@@ -19,6 +19,7 @@ use crate::slip39_recovery::{self, ShamirSplitResult};
 use crate::spending_controls::{self, SpendingControlsConfig, SpendCheckResult};
 use crate::state::AppState;
 use crate::two_factor::{self, TwoFactorConfig, TwoFactorEnrollment};
+use crate::wallet::full_node_unlock::{ensure_full_wallet_unlock, wallet_needs_full_unlock};
 
 // ── Recovery phrase ──────────────────────────────────────────────────────────
 
@@ -46,18 +47,7 @@ pub fn recovery_verify_words(
     Ok(recovery::verify_words_at_indices(&phrase, &indices, &answers))
 }
 
-const RECOVERY_UNLOCK_SECONDS: i64 = 600;
-
-fn wallet_info_is_locked(info: &serde_json::Value) -> bool {
-    let Some(until) = info.get("unlocked_until").and_then(|v| v.as_i64()) else {
-        return false;
-    };
-    if until == 0 {
-        return true;
-    }
-    let now = chrono::Utc::now().timestamp();
-    until <= now
-}
+const RECOVERY_UNLOCK_SECONDS: i64 = crate::wallet::full_node_unlock::RECOVERY_EXPORT_UNLOCK_SECONDS;
 
 #[tauri::command]
 pub async fn recovery_apply_hd_seed(
@@ -73,22 +63,16 @@ pub async fn recovery_apply_hd_seed(
     let wif = recovery::master_xpriv_to_wif(coin, &phrase, bip39_passphrase.as_deref())?;
     let client = state.rpc_client(coin).await?;
     let info: serde_json::Value = client.call("getwalletinfo", json!([])).await?;
-
-    if wallet_info_is_locked(&info) {
+    if wallet_needs_full_unlock(&info) {
         let pass = unlock_passphrase
             .as_deref()
             .filter(|p| !p.is_empty())
             .ok_or_else(|| {
                 AppError::other(
-                    "Wallet is locked. Enter your wallet passphrase to apply the recovery phrase.",
+                    "Wallet is locked or unlocked for staking only. Enter your wallet passphrase to apply the recovery phrase.",
                 )
             })?;
-        client
-            .call_no_result(
-                "walletpassphrase",
-                json!([pass, RECOVERY_UNLOCK_SECONDS]),
-            )
-            .await?;
+        ensure_full_wallet_unlock(&client, coin, pass, RECOVERY_UNLOCK_SECONDS).await?;
     }
 
     client
@@ -163,7 +147,7 @@ pub async fn recovery_export_seed(
 
     let prefs = crate::prefs::load().await?;
     if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
-        if !crate::wallet::keystore::wallet_exists(coin)? {
+        if !crate::wallet::keystore::light_wallet_on_disk(coin) {
             return Err(AppError::other("No light wallet found for this chain."));
         }
         if !crate::wallet::keystore::is_unlocked(coin)? {

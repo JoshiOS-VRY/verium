@@ -327,6 +327,13 @@ export async function fetchLocalBlocksAbove(
   return rows;
 }
 
+/**
+ * Max placeholder rows when the wallet tip is ahead of the explorer index.
+ * Without a cap, a 100k+ height gap materializes one string per height in the
+ * WebView heap (see heap snapshot analysis).
+ */
+export const MAX_PENDING_BLOCKS_ABOVE = 24;
+
 /** Instant rows for heights above the explorer index (filled in via RPC after). */
 export function buildPendingBlocksAbove(
   aboveHeight: number,
@@ -334,11 +341,12 @@ export function buildPendingBlocksAbove(
   tipHash: string | undefined,
   tipTime: number,
   knownHeights: ReadonlySet<number>,
+  limit = MAX_PENDING_BLOCKS_ABOVE,
 ): ExplorerBlock[] {
   if (tipHeight <= aboveHeight) return [];
 
   const rows: ExplorerBlock[] = [];
-  for (let height = tipHeight; height > aboveHeight; height -= 1) {
+  for (let height = tipHeight; height > aboveHeight && rows.length < limit; height -= 1) {
     if (knownHeights.has(height)) continue;
     rows.push({
       id: height,

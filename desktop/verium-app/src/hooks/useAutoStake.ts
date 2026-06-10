@@ -9,10 +9,13 @@ import {
   rpcGetWalletInfo,
   rpcStakingStart,
 } from "@/lib/rpc/client";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import { useCoinWalletMode } from "@/hooks/useWalletMode";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { isWalletUnlocked } from "@/lib/wallet-unlock";
 
 const RETRY_MS = 10_000;
+/** Slow retry cadence while the window is hidden/idle. */
+const RETRY_MS_HIDDEN = 60_000;
 const VERICOIN = "vericoin" as const;
 
 let stoppedByUser = false;
@@ -34,11 +37,17 @@ export function wasStakingStoppedByUser(): boolean {
  * and the wallet is unlocked for minting.
  */
 export function useAutoStake() {
-  const { isLight } = useWalletMode();
+  const { isLight } = useCoinWalletMode("vericoin");
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
-  const { data: status } = useDaemonStatus(VERICOIN);
+  const autoStake =
+    loaded &&
+    !isLight &&
+    prefs.auto_stake_on_open === true &&
+    prefs.vericoin_enabled !== false;
+  const { data: status } = useDaemonStatus(VERICOIN, { enabled: autoStake });
+  const visible = useWindowVisible();
   const lastErrorRef = useRef<string | null>(null);
 
   const blockchain = useQuery({
@@ -99,11 +108,15 @@ export function useAutoStake() {
     };
 
     void tryStart();
-    const id = window.setInterval(() => void tryStart(), RETRY_MS);
+    const id = window.setInterval(
+      () => void tryStart(),
+      visible ? RETRY_MS : RETRY_MS_HIDDEN,
+    );
     return () => window.clearInterval(id);
   }, [
     isLight,
     loaded,
+    visible,
     prefs.auto_stake_on_open,
     prefs.vericoin_enabled,
     status?.connected,

@@ -50,16 +50,12 @@ pub struct ScryptBenchResult {
 fn detect_x86_features() -> (bool, bool, bool) {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        let mut avx2 = false;
-        let mut avx512 = false;
-        let mut shani = false;
-        unsafe {
-            let leaf7 = std::arch::x86_64::__cpuid(7);
-            avx2 = leaf7.ebx & (1 << 5) != 0;
-            avx512 = leaf7.ebx & (1 << 16) != 0 && leaf7.ebx & (1 << 30) != 0;
-            shani = leaf7.ebx & (1 << 29) != 0;
-        }
-        return (avx2, avx512, shani);
+        return (
+            std::arch::is_x86_feature_detected!("avx2"),
+            std::arch::is_x86_feature_detected!("avx512f")
+                && std::arch::is_x86_feature_detected!("avx512bw"),
+            std::arch::is_x86_feature_detected!("sha"),
+        );
     }
     #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
     {

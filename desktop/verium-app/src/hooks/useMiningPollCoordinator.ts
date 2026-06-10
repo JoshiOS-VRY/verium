@@ -10,7 +10,7 @@ import {
 import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { rpcGetMinerState, rpcGetMiningInfo } from "@/lib/rpc/client";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import { useCoinWalletMode } from "@/hooks/useWalletMode";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 
 const VERIUM = "verium" as const;
@@ -23,7 +23,7 @@ const VERIUM = "verium" as const;
  * components → WebView OOM while mining).
  */
 export function useMiningPollCoordinator(): void {
-  const { isLight } = useWalletMode();
+  const { isLight } = useCoinWalletMode("verium");
   const visible = useWindowVisible();
   const veriumEnabled = useUserPreferences((s) => s.prefs.verium_enabled !== false);
   const pollEnabled = veriumEnabled && !isLight;

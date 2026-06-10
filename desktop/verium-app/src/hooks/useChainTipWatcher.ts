@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
 import { pushChainTip } from "@/lib/chain-tip-store";
 import { useWalletMode } from "@/hooks/useWalletMode";
-import { walletTransactionsQueryKey } from "@/lib/wallet-transactions-query";
+import { walletTransactionsKeyPrefix } from "@/lib/wallet-transactions-query";
 
 interface ChainTipPayload {
   coin: CoinId;
@@ -45,8 +45,11 @@ export function useChainTipWatcher(): void {
         });
         // Wallet txs are heavy (listtransactions + header lookups) — refresh
         // on a slower cadence; block-found watchers also use chain-tip events.
+        // Prefix-invalidate so both the shared 80-row poll and the Transactions
+        // page "history" view refresh from this single event (neither needs an
+        // aggressive standalone poll).
         void queryClient.invalidateQueries({
-          queryKey: walletTransactionsQueryKey(coin),
+          queryKey: walletTransactionsKeyPrefix(coin),
         });
       }, INVALIDATE_DEBOUNCE_MS);
     };

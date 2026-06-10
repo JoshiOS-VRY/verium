@@ -103,7 +103,36 @@ async fn sync_light_wallet_inner(state: &AppState, coin: CoinId) -> AppResult<()
     if funded.is_empty() {
         return Ok(());
     }
-    refresh_utxos(coin, &funded, backend.as_ref(), None).await
+    refresh_utxos(coin, &funded, backend.as_ref(), None).await?;
+    // Refresh the persisted tx-history cache on the same (tip-driven) cadence so
+    // list_transactions reads from local SQLite instead of issuing N Electrum
+    // get_history calls on every UI poll. Best-effort: never fails the sync.
+    refresh_tx_history_cache(coin, &funded, backend.as_ref()).await;
+    Ok(())
+}
+
+/// Number of history rows kept in the local cache (matches UI list cap).
+pub const TX_HISTORY_CACHE_LIMIT: usize = 500;
+
+async fn refresh_tx_history_cache(coin: CoinId, funded: &[String], backend: &dyn ChainBackend) {
+    if funded.is_empty() {
+        return;
+    }
+    match backend
+        .get_history_for_scripts(funded, TX_HISTORY_CACHE_LIMIT)
+        .await
+    {
+        Ok(history) => {
+            if let Ok(cache) = LightWalletCache::open(coin) {
+                if let Err(e) = cache.replace_tx_history(&history) {
+                    tracing::debug!("tx history cache write failed for {}: {e}", coin.as_str());
+                }
+            }
+        }
+        Err(e) => {
+            tracing::debug!("tx history refresh failed for {}: {e}", coin.as_str());
+        }
+    }
 }
 
 async fn persist_funded_scripts(

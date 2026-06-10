@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
 import { lightWalletExists } from "@/lib/light-wallet/client";
-import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
 import { useLightServerConnected } from "@/hooks/useLightServerConnected";
 import { useNodeStatus } from "@/hooks/useNodeStatus";
 import { useWalletMode } from "@/hooks/useWalletMode";
@@ -30,7 +29,6 @@ import {
   rpcRaw,
 } from "@/lib/rpc/client";
 import { resolveTipBlockTime } from "@/lib/tip-block-time";
-import { formatBlockAge } from "@/lib/utils";
 import { walletInfoForMode } from "@/lib/wallet-unlock";
 
 /** Shared RPC polling for dashboard hero, middle row, and activity banners. */
@@ -48,7 +46,6 @@ export function useDashboardData(coin: CoinId) {
   const lightServer = useLightServerConnected();
   const node = useNodeStatus(coin);
   const chainTip = useChainTip(coin);
-  const ageTick = useBlockAgeTick(visible);
 
   const connected = isLight
     ? lightServer.connected
@@ -65,13 +62,11 @@ export function useDashboardData(coin: CoinId) {
     queryKey: coinQueryKey(coin, "getwalletinfo"),
     queryFn: () => rpcGetWalletInfo(coin),
     enabled: !isLight || lightExistsForCoin.data !== false,
-    refetchInterval: (q) => {
-      if (!isLight || !visible || !lightServer.connected) return false;
-      const effective = walletInfoForMode(true, q.state.data ?? undefined);
-      if (!effective) return false;
-      if (effective.light_syncing) return 5_000;
-      return 30_000;
-    },
+    // Single writer for getwalletinfo is useWalletInfoPollCoordinator (mounted
+    // app-wide). Defer to it here so this observer never schedules its own
+    // (previously 5s light) interval, which could force the backend light-wallet
+    // UTXO refetch far more often than the coordinator's cadence.
+    refetchInterval: false,
     retry: isLight ? 2 : 3,
   });
 
@@ -80,7 +75,7 @@ export function useDashboardData(coin: CoinId) {
   const explorer = useQuery({
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
-    refetchInterval: visible ? 30_000 : false,
+    refetchInterval: false,
     enabled: explorerEnabled && connected,
     retry: 0,
   });
@@ -90,7 +85,8 @@ export function useDashboardData(coin: CoinId) {
     queryFn: () => fetchExplorerBlocks(coin, 10),
     enabled: explorerEnabled && connected && visible,
     staleTime: isLight ? 5_000 : 60_000,
-    refetchInterval: visible ? (isLight ? 5_000 : 60_000) : false,
+    // ExplorerRecentBlocks is the single writer for this key on the dashboard.
+    refetchInterval: false,
     retry: 2,
   });
 
@@ -185,7 +181,6 @@ export function useDashboardData(coin: CoinId) {
     explorerBlocks: explorerBlocks.data,
     headerTime: tipHeaderTime.data,
   });
-  const blockAge = tipTime != null ? formatBlockAge(tipTime, ageTick) : "—";
   const connections = isLight ? 0 : (node.data?.connections ?? 0);
 
   const activity: DashboardActivity = isLight
@@ -232,7 +227,7 @@ export function useDashboardData(coin: CoinId) {
     syncTarget,
     behind,
     blockHash,
-    blockAge,
+    tipTime,
     connections,
     networkTip,
     minerActive,

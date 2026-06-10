@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use once_cell::sync::Lazy;
 use tauri::AppHandle;
 use tokio::sync::RwLock;
 
@@ -48,8 +49,17 @@ struct Inner {
 
 pub use crate::node::constants::{
     AUTH_RETRY_MAX, BOOTSTRAP_LOADING_GRACE, INVALID_CLEAR_COOLDOWN,
-    POST_BOOTSTRAP_REINDEX_GRACE, REPAIR_BACKOFF, SPAWN_COOLDOWN,
+    REPAIR_BACKOFF, SPAWN_COOLDOWN,
 };
+
+/// How long a refreshed `DaemonConfig` (with on-disk `.conf` parsed) is reused
+/// before `config_fresh` re-parses. Keeps bursts of RPC-client construction off
+/// the disk while staying responsive to credential/config changes.
+const CONFIG_REFRESH_TTL: Duration = Duration::from_secs(5);
+
+/// Per-coin timestamp of the last full `config_fresh` disk parse.
+static CONFIG_REFRESH_AT: Lazy<Mutex<HashMap<CoinId, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub struct CoinRuntime {
     pub coin: CoinId,
@@ -410,20 +420,58 @@ impl AppState {
     }
 
     pub async fn config_fresh(&self, coin: CoinId) -> AppResult<DaemonConfig> {
+        // `refresh_config_paths` re-parses/migrates the node `.conf` from disk.
+        // RPC client construction and status polling call this frequently, so we
+        // throttle the disk work: within the TTL return the already-refreshed
+        // stored config. Any explicit `replace_config` (e.g. credential change)
+        // clears the timestamp, forcing the next call to re-parse immediately.
+        //
+        // The guard is scoped to this block so it is fully released before the
+        // `.await` below (a std MutexGuard held across await is `!Send`).
+        let refresh_recent = {
+            match CONFIG_REFRESH_AT.lock() {
+                Ok(map) => map
+                    .get(&coin)
+                    .map(|at| at.elapsed() < CONFIG_REFRESH_TTL)
+                    .unwrap_or(false),
+                Err(_) => false,
+            }
+        };
+        if refresh_recent {
+            return self.config(coin).await;
+        }
         let rt = self.runtime(coin)?;
         let mut cfg = rt.config.read().await.clone();
         refresh_config_paths(coin, &mut cfg)?;
         self.replace_config(coin, cfg.clone()).await?;
+        if let Ok(mut map) = CONFIG_REFRESH_AT.lock() {
+            map.insert(coin, Instant::now());
+        }
         Ok(cfg)
     }
 
     pub async fn replace_config(&self, coin: CoinId, new_config: DaemonConfig) -> AppResult<()> {
         *self.runtime(coin)?.config.write().await = new_config;
+        // Invalidate the config-refresh throttle so the next config_fresh re-parses
+        // (covers credential rotation, .conf edits, network-mode switches, etc.).
+        if let Ok(mut map) = CONFIG_REFRESH_AT.lock() {
+            map.remove(&coin);
+        }
         Ok(())
     }
 
     pub async fn earn(&self, coin: CoinId) -> AppResult<EarnLocalState> {
         Ok(self.runtime(coin)?.earn.read().await.clone())
+    }
+
+    /// True when this coin has an active local-daemon earn task (solo mining or
+    /// staking). Such tasks require the managed daemon to stay running, so the
+    /// idle auto-stop watchdog treats this as live demand.
+    pub async fn earn_active(&self, coin: CoinId) -> bool {
+        match self.runtime(coin) {
+            Ok(rt) => rt.earn.read().await.active,
+            Err(_) => false,
+        }
     }
 
     pub async fn set_earn(&self, coin: CoinId, value: EarnLocalState) -> AppResult<()> {

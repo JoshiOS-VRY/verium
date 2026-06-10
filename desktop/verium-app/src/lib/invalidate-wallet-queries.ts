@@ -12,6 +12,9 @@ export async function invalidateWalletQueries(
       queryKey: coinQueryKey(coin, "wallet-file-status"),
     }),
     queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, "wallet-profile"),
+    }),
+    queryClient.invalidateQueries({
       queryKey: coinQueryKey(coin, "getwalletinfo"),
     }),
     queryClient.invalidateQueries({
@@ -39,11 +42,22 @@ export async function invalidateLightWalletQueries(
       queryKey: coinQueryKey(coin, "light-wallet-exists"),
     }),
     queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, "wallet-profile"),
+    }),
+    queryClient.invalidateQueries({
       queryKey: coinQueryKey(coin, "getwalletinfo"),
     }),
     queryClient.invalidateQueries({
       queryKey: coinQueryKey(coin, "light-server-status"),
     }),
     queryClient.invalidateQueries({ queryKey: ["wallet-mode-status"] }),
+  ]);
+  await Promise.all([
+    queryClient.refetchQueries({
+      queryKey: coinQueryKey(coin, "wallet-profile"),
+    }),
+    queryClient.refetchQueries({
+      queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    }),
   ]);
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -33,6 +34,16 @@ const MAX_INFLIGHT_PER_ENDPOINT: usize = 12;
 
 static RPC_GATES: Lazy<Mutex<HashMap<String, Arc<Semaphore>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Cumulative count of logical RPC calls issued by the backend (one per
+/// `RpcClient::call`, not per auth retry). Used by `get_memory_diagnostics`
+/// to measure idle/active RPC volume for benchmarking. Cheap relaxed atomic.
+static RPC_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Total RPC calls issued since process start.
+pub fn rpc_call_count() -> u64 {
+    RPC_CALL_COUNT.load(Ordering::Relaxed)
+}
 
 fn endpoint_gate(url: &str) -> Arc<Semaphore> {
     let mut gates = RPC_GATES.lock().expect("RPC gate map poisoned");
@@ -73,6 +84,14 @@ struct RpcRequest<'a> {
 
 #[derive(Deserialize)]
 struct RpcResponse {
+    result: Option<Value>,
+    error: Option<RpcErrorBody>,
+}
+
+#[derive(Deserialize)]
+struct RpcResponseWithId {
+    #[serde(default)]
+    id: Option<String>,
     result: Option<Value>,
     error: Option<RpcErrorBody>,
 }
@@ -122,6 +141,7 @@ impl RpcClient {
         method: &str,
         params: Value,
     ) -> AppResult<T> {
+        RPC_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
         // Bound concurrent requests to this endpoint so bursty callers wait here
         // rather than overflowing the daemon's HTTP work queue during warmup.
         let _permit = self
@@ -204,4 +224,107 @@ impl RpcClient {
         let _: Value = self.call(method, params).await?;
         Ok(())
     }
+
+    /// Issue several JSON-RPC methods in a single HTTP request (JSON-RPC batch).
+    /// `veriumd`/`vericoind` answer with an array of responses; results are
+    /// returned in request order. Saves a round-trip versus sequential `call`s
+    /// (e.g. status polling needs getblockchaininfo + getnetworkinfo together).
+    pub async fn call_batch(&self, calls: &[(&str, Value)]) -> AppResult<Vec<AppResult<Value>>> {
+        if calls.is_empty() {
+            return Ok(Vec::new());
+        }
+        RPC_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        let _permit = self
+            .gate
+            .acquire()
+            .await
+            .map_err(|_| AppError::other("RPC concurrency gate closed"))?;
+
+        let mut last_unauthorized = None;
+        let auth_methods: Vec<&RpcAuth> = if self.auth_methods.is_empty() {
+            vec![&RpcAuth::None]
+        } else {
+            self.auth_methods.iter().collect()
+        };
+        for auth in auth_methods {
+            match self.call_batch_with_auth(auth, calls).await {
+                Ok(v) => return Ok(v),
+                Err(AppError::DaemonUnreachable(msg)) if msg.contains("unauthorized") => {
+                    last_unauthorized = Some(msg);
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(AppError::DaemonUnreachable(last_unauthorized.unwrap_or_else(
+            || "unauthorized: missing or invalid RPC credentials".into(),
+        )))
+    }
+
+    async fn call_batch_with_auth(
+        &self,
+        auth: &RpcAuth,
+        calls: &[(&str, Value)],
+    ) -> AppResult<Vec<AppResult<Value>>> {
+        let body: Vec<RpcRequest> = calls
+            .iter()
+            .enumerate()
+            .map(|(i, (method, params))| RpcRequest {
+                jsonrpc: "1.0",
+                id: BATCH_IDS[i.min(BATCH_IDS.len() - 1)],
+                method,
+                params: params.clone(),
+            })
+            .collect();
+        let req = self.http.post(&self.url).json(&body);
+        let req = match auth {
+            RpcAuth::UserPass(u, p) => req.basic_auth(u, Some(p)),
+            RpcAuth::None => req,
+        };
+        let resp = req.send().await.map_err(|e| {
+            if e.is_connect() || e.is_timeout() {
+                AppError::DaemonUnreachable(e.to_string())
+            } else {
+                AppError::Http(e)
+            }
+        })?;
+        let status = resp.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(AppError::DaemonUnreachable(
+                "unauthorized: missing or invalid RPC credentials".into(),
+            ));
+        }
+        if !status.is_success() {
+            let txt = resp.text().await.unwrap_or_default();
+            return Err(AppError::Other(format!("rpc http {status}: {txt}")));
+        }
+        // Responses may arrive out of order; map by id back to request order.
+        let parsed: Vec<RpcResponseWithId> = resp.json().await?;
+        let mut by_id: HashMap<String, AppResult<Value>> = HashMap::new();
+        for r in parsed {
+            let id = r.id.unwrap_or_default();
+            let result = if let Some(err) = r.error {
+                Err(AppError::Rpc {
+                    code: err.code,
+                    message: err.message,
+                })
+            } else {
+                Ok(r.result.unwrap_or(Value::Null))
+            };
+            by_id.insert(id, result);
+        }
+        let mut out = Vec::with_capacity(calls.len());
+        for i in 0..calls.len() {
+            let id = BATCH_IDS[i.min(BATCH_IDS.len() - 1)];
+            out.push(
+                by_id
+                    .remove(id)
+                    .unwrap_or_else(|| Err(AppError::other("missing batch response"))),
+            );
+        }
+        Ok(out)
+    }
 }
+
+/// Stable string ids for batch positions (Bitcoin Core echoes the request id).
+const BATCH_IDS: [&str; 8] = ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7"];

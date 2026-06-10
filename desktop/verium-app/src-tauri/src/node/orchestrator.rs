@@ -1,22 +1,66 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use once_cell::sync::Lazy;
 use tauri::{AppHandle, Emitter};
 use tokio::time::sleep;
 
 use crate::coin_profile::CoinId;
 use crate::commands::{
-    ensure_daemon_running, startup_prepare_chain_data, wait_for_rpc,
+    daemon_boot_in_progress, ensure_daemon_running, reindex_running_live, startup_prepare_chain_data,
+    stop_inner,
 };
 use crate::commands::{heal_invalid_blocks_silently, rpc_reachable};
-use crate::node::constants::{INVALID_BLOCK_HEAL_TICK, STARTUP_RPC_WAIT, SUPERVISOR_TICK};
+use crate::node::constants::{INVALID_BLOCK_HEAL_TICK, SUPERVISOR_TICK};
 use crate::node::state::NodeSnapshot;
 use crate::network_mode_commands;
 use crate::prefs;
+use crate::rpc::RpcClient;
 use crate::state::AppState;
 
 static LAST_EMITTED: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+
+/// How long after the last demand signal the managed daemon is kept running.
+/// Demand is bumped by UI status polls and wallet activity; solo mining and
+/// staking count as continuous demand (checked separately). Once this elapses
+/// with no demand and the chain synced, the idle watchdog stops the daemon.
+const DAEMON_IDLE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+
+/// How often the idle watchdog evaluates whether to stop idle daemons.
+const AUTO_STOP_CHECK_TICK: Duration = Duration::from_secs(60);
+
+/// Grace period after launch before the idle watchdog may stop anything.
+const AUTO_STOP_STARTUP_GRACE: Duration = Duration::from_secs(120);
+
+/// Per-coin timestamp of the last "the daemon is needed" signal.
+static DAEMON_DEMAND_AT: Lazy<Mutex<HashMap<CoinId, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Record that something needs the managed daemon for `coin` right now. Called
+/// from UI status polls and wallet activity so the daemon is started on demand
+/// and kept alive while in use.
+pub fn note_daemon_demand(coin: CoinId) {
+    if let Ok(mut map) = DAEMON_DEMAND_AT.lock() {
+        map.insert(coin, Instant::now());
+    }
+}
+
+/// Drop demand for a coin (e.g. when the user switches to the other chain).
+pub fn clear_daemon_demand(coin: CoinId) {
+    if let Ok(mut map) = DAEMON_DEMAND_AT.lock() {
+        map.remove(&coin);
+    }
+}
+
+/// True when demand was registered within `DAEMON_IDLE_TIMEOUT`.
+fn daemon_demand_recent(coin: CoinId) -> bool {
+    DAEMON_DEMAND_AT
+        .lock()
+        .ok()
+        .and_then(|map| map.get(&coin).map(|at| at.elapsed() < DAEMON_IDLE_TIMEOUT))
+        .unwrap_or(false)
+}
 
 fn snapshot_key(coin: CoinId, snap: &NodeSnapshot) -> String {
     format!(
@@ -83,7 +127,7 @@ pub async fn startup(app: AppHandle, state: &AppState) {
         let sync_coins = light_coins.clone();
         tauri::async_runtime::spawn(async move {
             for coin in sync_coins {
-                if crate::wallet::keystore::wallet_exists(coin).unwrap_or(false) {
+                if crate::wallet::keystore::light_wallet_on_disk(coin) {
                     let _ = crate::wallet::sync::sync_light_wallet(&sync_state, coin).await;
                 }
             }
@@ -95,6 +139,11 @@ pub async fn startup(app: AppHandle, state: &AppState) {
         return;
     }
 
+    // Prepare chain data dirs/config up front (cheap, no process spawn) so a
+    // later on-demand start is fast. We intentionally do NOT eagerly start the
+    // daemon here: it is started lazily by the supervisor once demand appears
+    // (the UI registers demand via get_node_status as soon as a full-node view
+    // mounts), and stopped again by the idle watchdog when nothing needs it.
     for coin in &full_node_coins {
         if let Err(e) = startup_prepare_chain_data(state, *coin).await {
             tracing::warn!(
@@ -103,59 +152,9 @@ pub async fn startup(app: AppHandle, state: &AppState) {
             );
         }
     }
-
+    // Keep every enabled full-node daemon warm so coin switches do not stop peers.
     for coin in &full_node_coins {
-        let cfg = match state.config_fresh(*coin).await {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::warn!("startup ({}): config load failed: {e}", coin.as_str());
-                continue;
-            }
-        };
-        ensure_daemon_running(state, *coin, &cfg).await;
-    }
-
-    sleep(Duration::from_secs(2)).await;
-    let wait_secs = STARTUP_RPC_WAIT.as_secs() as u32;
-    let enabled: Vec<CoinId> = full_node_coins.clone();
-    let mut wait_tasks = Vec::new();
-    for coin in &enabled {
-        if !crate::daemon::detect_binary(*coin).manageable {
-            tracing::info!(
-                "startup ({}): skipping RPC wait — node binary not available",
-                coin.as_str()
-            );
-            continue;
-        }
-        let state = state.clone();
-        let coin = *coin;
-        wait_tasks.push(tokio::spawn(async move {
-            (coin, wait_for_rpc(&state, coin, wait_secs).await)
-        }));
-    }
-    for task in wait_tasks {
-        if let Ok((coin, ok)) = task.await {
-            if !ok {
-                let cfg = match state.config_fresh(coin).await {
-                    Ok(c) => c,
-                    Err(_) => continue,
-                };
-                if crate::daemon::native_daemon_image_running(coin)
-                    || crate::commands::daemon_boot_in_progress(&state, coin, &cfg).await
-                {
-                    tracing::info!(
-                        "startup ({}): still booting after {wait_secs}s — not spawning another",
-                        coin.as_str()
-                    );
-                    continue;
-                }
-                tracing::warn!(
-                    "startup ({}): daemon not reachable after {wait_secs}s — retrying spawn",
-                    coin.as_str()
-                );
-                ensure_daemon_running(&state, coin, &cfg).await;
-            }
-        }
+        note_daemon_demand(*coin);
     }
 
     let supervisor_state = state.clone();
@@ -169,7 +168,104 @@ pub async fn startup(app: AppHandle, state: &AppState) {
         invalid_block_heal_loop(&heal_state).await;
     });
 
+    let autostop_state = state.clone();
+    tauri::async_runtime::spawn(async move {
+        daemon_idle_autostop_loop(&autostop_state).await;
+    });
+
     crate::chain_tip_watcher::spawn_chain_tip_watchers(app, state.clone());
+}
+
+/// Stop managed daemons that have had no demand for `DAEMON_IDLE_TIMEOUT` and
+/// are safe to stop (chain synced, not mining/staking, not reindexing/booting).
+/// This reclaims the daemon's RAM/CPU when the wallet is idle or backgrounded;
+/// the supervisor restarts it on the next demand.
+async fn daemon_idle_autostop_loop(state: &AppState) {
+    sleep(AUTO_STOP_STARTUP_GRACE).await;
+    loop {
+        sleep(AUTO_STOP_CHECK_TICK).await;
+        let prefs = prefs::load().await.unwrap_or_default();
+        for coin in CoinId::all() {
+            let coin = *coin;
+            if !prefs::coin_enabled(&prefs, coin)
+                || prefs::wallet_mode_for(&prefs, coin).is_light()
+            {
+                continue;
+            }
+            if daemon_demand_recent(coin) || state.earn_active(coin).await {
+                continue;
+            }
+            let cfg = match state.config_fresh(coin).await {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            // Don't interfere with in-flight node work.
+            if state.bootstrap_session_active()
+                || reindex_running_live(state, coin, &cfg).await
+                || daemon_boot_in_progress(state, coin, &cfg).await
+            {
+                continue;
+            }
+            if !rpc_reachable(coin, &cfg).await {
+                continue; // already stopped / not running
+            }
+            // Never stop mid initial-block-download — that would strand sync.
+            if !chain_fully_synced(coin, &cfg).await {
+                continue;
+            }
+            tracing::info!(
+                "idle-autostop ({}): no demand for {}s — stopping managed daemon",
+                coin.as_str(),
+                DAEMON_IDLE_TIMEOUT.as_secs()
+            );
+            if let Err(e) = stop_inner(state, coin).await {
+                tracing::warn!("idle-autostop ({}): stop failed: {e}", coin.as_str());
+            } else {
+                state.set_daemon_phase(coin, "idle_stopped");
+            }
+        }
+    }
+}
+
+/// Cheap synced check used before idle-stop: connected, not in IBD.
+async fn chain_fully_synced(coin: CoinId, cfg: &crate::config::DaemonConfig) -> bool {
+    let Ok(client) = RpcClient::status_client_for_coin(coin, cfg) else {
+        return false;
+    };
+    let Ok(info) = client
+        .call::<serde_json::Value>("getblockchaininfo", serde_json::json!([]))
+        .await
+    else {
+        return false;
+    };
+    let ibd = info
+        .get("initialblockdownload")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let progress = info
+        .get("verificationprogress")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.0);
+    !ibd && progress >= 0.9999
+}
+
+/// When the user switches chains, refresh daemon demand for every enabled
+/// full-node coin so neither peer is stopped by a switch or the idle watchdog.
+pub async fn on_active_coin_changed(_state: &AppState, new_active: CoinId) {
+    let prefs = prefs::load().await.unwrap_or_default();
+    note_daemon_demand(new_active);
+    for coin in CoinId::all() {
+        if !prefs::coin_enabled(&prefs, *coin)
+            || prefs::wallet_mode_for(&prefs, *coin).is_light()
+        {
+            continue;
+        }
+        note_daemon_demand(*coin);
+    }
+    tracing::debug!(
+        "active coin → {}: keeping all enabled full-node daemons running",
+        new_active.as_str()
+    );
 }
 
 /// Proactively clear invalid block flags before status polling can surface a stall banner.
@@ -179,6 +275,11 @@ async fn invalid_block_heal_loop(state: &AppState) {
         let prefs = prefs::load().await.unwrap_or_default();
         for coin in CoinId::all() {
             if !prefs::coin_enabled(&prefs, *coin) {
+                continue;
+            }
+            // Light-mode coins run no managed daemon, so there is nothing to heal
+            // and no RPC endpoint to probe — skip them entirely.
+            if prefs::wallet_mode_for(&prefs, *coin).is_light() {
                 continue;
             }
             let cfg = match state.config_fresh(*coin).await {
@@ -197,6 +298,14 @@ async fn invalid_block_heal_loop(state: &AppState) {
 async fn supervisor_loop(app: &AppHandle, state: &AppState) {
     sleep(Duration::from_secs(5)).await;
     loop {
+        let prefs = prefs::load().await.unwrap_or_default();
+        for coin in CoinId::all() {
+            if prefs::coin_enabled(&prefs, *coin)
+                && !prefs::wallet_mode_for(&prefs, *coin).is_light()
+            {
+                note_daemon_demand(*coin);
+            }
+        }
         for coin in CoinId::all() {
             supervise_coin(app, state, *coin).await;
         }
@@ -246,6 +355,15 @@ async fn supervise_coin(_app: &AppHandle, state: &AppState, coin: CoinId) {
 
     if daemon_boot_in_progress(state, coin, &cfg).await {
         state.set_daemon_phase(coin, "starting");
+        return;
+    }
+
+    // Lazy start: only (re)start the managed daemon when something actually
+    // needs it — the UI registered demand recently, or solo mining/staking is
+    // active. Otherwise leave it stopped so it isn't started at launch or
+    // restarted right after the idle watchdog stops it.
+    if !daemon_demand_recent(coin) && !state.earn_active(coin).await {
+        state.set_daemon_phase(coin, "idle");
         return;
     }
 

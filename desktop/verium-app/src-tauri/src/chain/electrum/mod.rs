@@ -8,5 +8,4 @@ pub mod multi_server;
 pub mod protocol;
 pub mod scripthash;
 
-pub use connection::{ElectrumConnection, ElectrumServerEndpoint};
 pub use manager::ElectrumLightClient;

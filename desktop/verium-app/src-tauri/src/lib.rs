@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod block_height_cache;
 mod chain;
 mod node;
@@ -102,10 +104,31 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 node::orchestrator::startup(startup_app, &startup_state).await;
             });
+            tauri::async_runtime::spawn(async {
+                let _ = tauri::async_runtime::spawn_blocking(|| {
+                    crate::wallet::keystore::sync_manifest_from_keystore();
+                    crate::onboarding_commands::log_wallet_storage_diagnostics();
+                })
+                .await;
+            });
             // Reap any pool-miner sidecar orphaned by a previous (crashed) session
             // so it does not hold the API port or double-mine.
             tauri::async_runtime::spawn(async move {
                 mining_supervisor::kill_stray_miners().await;
+            });
+            // Prewarm cpuminer `--tune` cache so the Mining page / pool start do
+            // not block IPC. Deferred ~25s so it does not add a CPU/thread spike
+            // during launch (it spawns cpuminer and waits ~2.5s); the tune cache
+            // TTL is 300s, so this still warms before the user reaches mining.
+            tauri::async_runtime::spawn(async {
+                tokio::time::sleep(std::time::Duration::from_secs(25)).await;
+                let _ = tauri::async_runtime::spawn_blocking(|| {
+                    if let Some(binary) = mining_supervisor::resolve_cpuminer_binary() {
+                        let _ =
+                            cpuminer_topo::cpuminer_recommended_threads(Some(binary.as_path()));
+                    }
+                })
+                .await;
             });
             app.manage(state);
             Ok(())
@@ -146,7 +169,6 @@ pub fn run() {
             commands::wallet_set_tx_fee,
             commands::wallet_list_unspent,
             commands::wallet_send_with_inputs,
-            #[cfg(feature = "dev-rpc-console")]
             commands::rpc_raw_call,
             commands::send_to_address,
             commands::get_daemon_config,
@@ -294,6 +316,9 @@ pub fn run() {
             wallet_commands::wallet_mode_get_for_coin,
             wallet_commands::wallet_mode_set_for_coin,
             onboarding_commands::wallet_profile,
+            onboarding_commands::wallet_storage_diagnostics,
+            onboarding_commands::secret_store_status,
+            onboarding_commands::secret_store_quarantine_orphaned,
             onboarding_commands::onboarding_checkpoint_get,
             onboarding_commands::onboarding_checkpoint_set,
             onboarding_commands::onboarding_mark_complete,

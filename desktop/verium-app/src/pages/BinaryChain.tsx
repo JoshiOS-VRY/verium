@@ -20,6 +20,7 @@ import { useActiveCoin } from "@/lib/coin/context";
 import { getCoinProfile } from "@/lib/coin/profile";
 import { useNetworkMode } from "@/lib/network-mode";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 import type { CoinId } from "@/lib/coin/profile";
 
 const REFRESH_MS = 10_000;
@@ -115,15 +116,17 @@ export function BinaryChain() {
   const profile = getCoinProfile(coin);
   const networkMode = useNetworkMode();
   const { data: daemon, isConnecting } = useDaemonStatus(coin);
+  const visible = useWindowVisible();
   const mode = networkMode.data?.mode ?? "mainnet";
   const rpcReady =
     daemon?.connected === true && !daemon?.warming_up && !isConnecting;
+  const refreshInterval = visible ? REFRESH_MS : false;
 
   const status = useQuery({
     queryKey: ["binarychain_status", mode, coin],
     queryFn: () => rpcBinaryChainStatus(coin),
     enabled: rpcReady,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: refreshInterval,
     retry: daceQueryRetry,
     retryDelay: (attempt) => (attempt < 5 ? 2_000 : 5_000),
   });
@@ -132,7 +135,7 @@ export function BinaryChain() {
     queryKey: ["binarychain_metrics", mode, coin],
     queryFn: () => rpcBinaryChainMetrics(coin),
     enabled: rpcReady && status.isSuccess,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: refreshInterval,
     retry: daceQueryRetry,
   });
 
@@ -140,7 +143,7 @@ export function BinaryChain() {
     queryKey: ["binarychain_anchor", mode, coin],
     queryFn: () => rpcBinaryChainAnchor(coin),
     enabled: rpcReady && status.isSuccess,
-    refetchInterval: REFRESH_MS,
+    refetchInterval: refreshInterval,
     retry: daceQueryRetry,
   });
 

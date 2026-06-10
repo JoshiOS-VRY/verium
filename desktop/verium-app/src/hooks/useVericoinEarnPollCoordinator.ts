@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { useUserPreferences } from "@/lib/user-preferences";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import { useCoinWalletMode } from "@/hooks/useWalletMode";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { rpcGetStakingState, rpcGetVericoinMiningInfo } from "@/lib/rpc/client";
 
@@ -13,7 +13,7 @@ const VRC_MINING_INFO_POLL_MS = 30_000;
  */
 export function useVericoinEarnPollCoordinator(): void {
   const visible = useWindowVisible();
-  const { isLight } = useWalletMode();
+  const { isLight } = useCoinWalletMode("vericoin");
   const vericoinEnabled = useUserPreferences((s) => s.prefs.vericoin_enabled !== false);
   const enabled = !isLight && vericoinEnabled;
 

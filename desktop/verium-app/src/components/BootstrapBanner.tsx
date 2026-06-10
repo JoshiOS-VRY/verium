@@ -15,12 +15,14 @@ import { fetchExplorerStats } from "@/lib/explorer-api";
 import { useIsTestNetwork } from "@/lib/network-mode";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { useWalletMode } from "@/hooks/useWalletMode";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { formatNumber, formatPercent } from "@/lib/utils";
 
 export function BootstrapBanner() {
   const coin = useActiveCoin();
   const { isLight } = useWalletMode();
   const isTestNetwork = useIsTestNetwork();
+  const visible = useWindowVisible();
   const [dialogOpen, setDialogOpen] = useState(false);
   const prefs = useUserPreferences((s) => s.prefs);
   const updatePrefs = useUserPreferences((s) => s.update);
@@ -34,13 +36,13 @@ export function BootstrapBanner() {
   const peers = useQuery({
     queryKey: coinQueryKey(coin, "getpeerinfo"),
     queryFn: () => rpcGetPeerInfo(coin),
-    refetchInterval: 30_000,
+    refetchInterval: visible ? 30_000 : false,
     enabled: !isLight && !isTestNetwork,
   });
   const explorer = useQuery({
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
-    refetchInterval: 30_000,
+    refetchInterval: false,
     retry: 0,
     enabled: !isLight && !isTestNetwork,
   });

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BACKUP_HEALTH_REFETCH_MS } from "@/hooks/useScheduledBackup";
@@ -28,6 +29,7 @@ function formatBackupInterval(hours: number): string {
 
 export function ScheduledBackupControls() {
   const coin = useActiveCoin();
+  const visible = useWindowVisible();
   const queryClient = useQueryClient();
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [savingSchedule, setSavingSchedule] = useState(false);
@@ -35,7 +37,7 @@ export function ScheduledBackupControls() {
   const backupH = useQuery({
     queryKey: ["backup-health"],
     queryFn: backupHealth,
-    refetchInterval: BACKUP_HEALTH_REFETCH_MS,
+    refetchInterval: visible ? BACKUP_HEALTH_REFETCH_MS : false,
   });
   const backupCfg = useQuery({
     queryKey: ["backup-scheduler"],

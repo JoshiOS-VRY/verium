@@ -8,13 +8,15 @@ import {
   electrumStatusTitle,
   formatChainHeight,
 } from "@/lib/light-wallet/labels";
+import { useWindowVisible } from "@/hooks/useWindowVisible";
 
 export function LightServerBadge() {
   const activeCoin = useActiveCoin();
+  const visible = useWindowVisible();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: coinQueryKey(activeCoin, "light-server-status"),
     queryFn: () => lightServerStatus(activeCoin),
-    refetchInterval: 15_000,
+    refetchInterval: visible ? 15_000 : false,
     retry: 1,
   });
 

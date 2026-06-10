@@ -14,6 +14,15 @@ export function walletTransactionsQueryKey(coin: CoinId) {
   return coinQueryKey(coin, "listtransactions", "wallet");
 }
 
+/**
+ * Prefix key covering every `listtransactions` query for a coin (the shared
+ * "wallet" poll and the Transactions page "history" view). Invalidating this
+ * refreshes both from one place so they don't each need an aggressive poll.
+ */
+export function walletTransactionsKeyPrefix(coin: CoinId) {
+  return coinQueryKey(coin, "listtransactions");
+}
+
 export function fetchWalletTransactions(coin: CoinId) {
   return rpcListTransactions(coin, WALLET_TX_POLL_COUNT, 0);
 }

@@ -31,7 +31,8 @@ export function Logs() {
   const logStatus = useQuery({
     queryKey: coinQueryKey(coin, "debug-log-status"),
     queryFn: () => tauriDebugLogStatus(coin),
-    refetchInterval: liveMode && !paused && visible ? POLL_MS : false,
+    // Live tail uses the recursive poll below; avoid duplicate status refetches.
+    refetchInterval: false,
   });
 
   const refreshOnce = useCallback(async () => {

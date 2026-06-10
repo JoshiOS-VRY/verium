@@ -26,7 +26,6 @@ import { MiningStatusBanner } from "@/components/MiningStatusBanner";
 import { MinerHashrateDisplay } from "@/components/MinerBootIndicator";
 import { useDaemonStatus } from "@/hooks/useDaemonStatus";
 import { useWalletMode } from "@/hooks/useWalletMode";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
 import { useUserPreferences } from "@/lib/user-preferences";
 import { fetchExplorerStats } from "@/lib/explorer-api";
 import { Button } from "@/components/ui/Button";
@@ -70,6 +69,7 @@ import {
 } from "@/lib/mining-session";
 import { isChainSynced } from "@/lib/bootstrap-policy";
 import { isMinerBooting, MINING_HASHRATE_POLL_MS } from "@/lib/mining-boot";
+import { lightWalletExists } from "@/lib/light-wallet/client";
 
 type MiningMode = "solo" | "pool";
 
@@ -123,12 +123,24 @@ export function Mining() {
   );
   const lastSampleRef = useRef<{ t: number; hr: number } | null>(null);
 
-  const visible = useWindowVisible();
+  const wallet = useQuery({
+    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryFn: () => rpcGetWalletInfo(coin),
+    refetchInterval: false,
+  });
+  const storedLightWallet = useQuery({
+    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryFn: () => lightWalletExists(coin),
+  });
+  const lightOnlyOnDevice =
+    !isLight && storedLightWallet.data === true && wallet.data == null;
+  const effectiveMiningMode: MiningMode = lightOnlyOnDevice ? "pool" : miningMode;
+
   const minerState = useQuery({
     queryKey: coinQueryKey(coin, "get_miner_state"),
     queryFn: () => rpcGetMinerState(coin),
     refetchInterval: false,
-    enabled: miningMode === "solo",
+    enabled: effectiveMiningMode === "solo",
   });
   const minerActive = minerState.data?.active ?? false;
   const minerStartedAt = minerState.data?.started_at;
@@ -137,16 +149,11 @@ export function Mining() {
     queryKey: coinQueryKey(coin, "getmininginfo"),
     queryFn: () => rpcGetMiningInfo(coin),
     refetchInterval: false,
-    enabled: miningMode === "solo" && (minerActive || minerState.isLoading),
+    enabled: effectiveMiningMode === "solo" && (minerActive || minerState.isLoading),
   });
   const blockchain = useQuery({
     queryKey: coinQueryKey(coin, "getblockchaininfo"),
     queryFn: () => rpcGetBlockchainInfo(coin),
-    refetchInterval: false,
-  });
-  const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
-    queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
   const daemonStatus = useDaemonStatus(coin);
@@ -157,7 +164,7 @@ export function Mining() {
     queryKey: coinQueryKey(coin, "explorer-stats"),
     queryFn: () => fetchExplorerStats(coin),
     enabled: explorerEnabled,
-    refetchInterval: visible ? 30_000 : false,
+    refetchInterval: false,
     retry: 0,
   });
 
@@ -347,6 +354,7 @@ export function Mining() {
 
   return (
     <WalletUnlockGate
+      allowPoolWithoutFullNodeWallet
       title="Unlock to mine"
       description={
         isLight
@@ -367,7 +375,7 @@ export function Mining() {
           />
         )}
 
-        {!isLight && (
+        {!isLight && !lightOnlyOnDevice && (
           <div
             role="radiogroup"
             aria-label="Mining mode"
@@ -375,7 +383,7 @@ export function Mining() {
           >
             <Button
               type="button"
-              variant={miningMode === "solo" ? "primary" : "ghost"}
+              variant={effectiveMiningMode === "solo" ? "primary" : "ghost"}
               className="h-8 px-4 text-sm"
               onClick={() => setMiningModePersist("solo")}
             >
@@ -383,7 +391,7 @@ export function Mining() {
             </Button>
             <Button
               type="button"
-              variant={miningMode === "pool" ? "primary" : "ghost"}
+              variant={effectiveMiningMode === "pool" ? "primary" : "ghost"}
               className="h-8 px-4 text-sm"
               onClick={() => setMiningModePersist("pool")}
             >
@@ -392,7 +400,7 @@ export function Mining() {
           </div>
         )}
 
-        {miningMode === "pool" || isLight ? (
+        {effectiveMiningMode === "pool" || isLight ? (
           <>
             <PoolStatsStrip enabled={explorerEnabled} />
             <PoolMiningPanel
@@ -429,7 +437,7 @@ export function Mining() {
           </>
         ) : null}
 
-        {!isLight && miningMode === "solo" ? (
+        {!isLight && effectiveMiningMode === "solo" ? (
           <>
             <MiningHero
               active={active}

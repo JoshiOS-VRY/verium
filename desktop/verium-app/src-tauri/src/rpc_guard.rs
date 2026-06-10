@@ -1,4 +1,4 @@
-//! RPC console method policy for dev-only `rpc_raw_call`.
+//! RPC console method policy for `rpc_raw_call`.
 
 use crate::error::{AppError, AppResult};
 

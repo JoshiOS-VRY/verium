@@ -40,7 +40,7 @@ fn wallet_mode_status_for(prefs: &UserPreferences, coin: CoinId) -> WalletModeSt
     WalletModeStatus {
         mode: prefs::wallet_mode_for(prefs, coin).as_str().to_string(),
         light_wallet_enabled: crate::features::light_wallet_enabled(),
-        light_wallet_exists: keystore::wallet_exists(coin).unwrap_or(false),
+        light_wallet_exists: keystore::light_wallet_on_disk(coin),
         electrum_servers: prefs
             .electrum_servers_by_coin
             .as_ref()
@@ -135,6 +135,7 @@ pub async fn electrum_validate_defaults(coin: String) -> AppResult<Vec<Conforman
 
 #[tauri::command]
 pub async fn light_wallet_create(
+    state: State<'_, AppState>,
     coin: String,
     mnemonic: String,
     passphrase: String,
@@ -150,7 +151,19 @@ pub async fn light_wallet_create(
         ));
     }
     keystore::create_wallet(coin, &trimmed, &passphrase, label.as_deref())?;
-    ensure_light_wallet_mode_active(coin).await
+    ensure_light_wallet_mode_active(coin).await?;
+    let mut prefs = prefs::load().await?;
+    prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
+    prefs::save(&prefs).await?;
+    prefs::invalidate_prefs_cache();
+    keystore::mark_address_scan_incomplete(coin)?;
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {
+            tracing::error!("light wallet create sync failed for {}: {e}", coin.as_str());
+        }
+    });
+    Ok(())
 }
 
 #[tauri::command]
@@ -174,6 +187,10 @@ pub async fn light_wallet_import(
     }
     keystore::import_wallet(coin, &trimmed, &passphrase, label.as_deref())?;
     ensure_light_wallet_mode_active(coin).await?;
+    let mut prefs = prefs::load().await?;
+    prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
+    prefs::save(&prefs).await?;
+    prefs::invalidate_prefs_cache();
     keystore::mark_address_scan_incomplete(coin)?;
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
@@ -221,13 +238,15 @@ pub async fn light_wallet_rescan(
 #[tauri::command]
 pub async fn light_wallet_lock(coin: String) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
+    // Release the pooled Electrum connection for this coin when locking.
+    crate::wallet::backend::drop_pooled_electrum_client(coin);
     keystore::lock_wallet(coin)
 }
 
 #[tauri::command]
 pub async fn light_wallet_exists(coin: String) -> AppResult<bool> {
     let coin = parse_coin_id(&coin)?;
-    keystore::wallet_exists(coin)
+    Ok(keystore::light_wallet_on_disk(coin))
 }
 
 #[tauri::command]

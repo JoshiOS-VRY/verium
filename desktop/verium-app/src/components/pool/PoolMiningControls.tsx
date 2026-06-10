@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Cpu, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -30,6 +31,8 @@ import {
 } from "@/lib/pool-mining-prefs";
 import type { CpuTopology } from "@/lib/mining-opt";
 import { cn } from "@/lib/utils";
+
+const POOL_IDENTITY_SAVE_MS = 450;
 
 function formatPoolMinerError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -113,24 +116,68 @@ export function PoolMiningControls({
   const rejectRate = totalShares > 0 ? rejectedShares / totalShares : 0;
   const showRejectWarning = running && totalShares >= 10 && rejectRate > 0.05;
 
-  const username = poolWorkerUsername(payoutAddress, workerName || "wallet");
+  const [localPayout, setLocalPayout] = useState(payoutAddress);
+  const [localWorker, setLocalWorker] = useState(workerName);
+  const editingRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const persistIdentity = (
-    address: string,
-    worker: string,
-  ) => {
+  useEffect(() => {
+    if (editingRef.current) return;
+    setLocalPayout(payoutAddress);
+    setLocalWorker(workerName);
+  }, [payoutAddress, workerName]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  const flushIdentity = (address: string, worker: string) => {
     onPoolIdentityChange(
       normalizePoolPayoutAddress(address),
       normalizePoolWorkerName(worker),
     );
   };
 
+  const scheduleIdentitySave = (address: string, worker: string) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      editingRef.current = false;
+      flushIdentity(address, worker);
+    }, POOL_IDENTITY_SAVE_MS);
+  };
+
+  const applyIdentity = (
+    address: string,
+    worker: string,
+    options?: { immediate?: boolean },
+  ) => {
+    setLocalPayout(address);
+    setLocalWorker(worker);
+    if (options?.immediate) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      editingRef.current = false;
+      flushIdentity(address, worker);
+      return;
+    }
+    editingRef.current = true;
+    scheduleIdentitySave(address, worker);
+  };
+
+  const username = poolWorkerUsername(
+    localPayout,
+    localWorker.trim() || "wallet",
+  );
+
   const start = useMutation({
     mutationFn: async () => {
       onStopSolo();
       // Persist payout address + worker name before connecting so the next
       // session restores the same pool identity.
-      persistIdentity(payoutAddress, workerName);
+      flushIdentity(localPayout, localWorker);
       // IBD-aware cap: while the node is still syncing, leave headroom for the
       // sidecar to mine without starving node validation.
       const effectiveThreads =
@@ -168,7 +215,7 @@ export function PoolMiningControls({
   const canStart =
     poolMinerReady &&
     syncGateOk &&
-    poolPayoutAddressConfigured({ pool_payout_address: payoutAddress }) &&
+    poolPayoutAddressConfigured({ pool_payout_address: localPayout }) &&
     !running &&
     !start.isPending;
 
@@ -194,18 +241,23 @@ export function PoolMiningControls({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <PoolPayoutAddressControls
-          address={payoutAddress}
+          address={localPayout}
           disabled={running}
-          onAddressChange={(addr) => persistIdentity(addr, workerName)}
+          onAddressChange={(addr) => applyIdentity(addr, localWorker, { immediate: true })}
         />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-fg-muted">Worker name</span>
             <input
-              value={workerName}
-              onChange={(e) => persistIdentity(payoutAddress, e.target.value)}
-              onBlur={() => persistIdentity(payoutAddress, workerName)}
+              value={localWorker}
+              onChange={(e) => applyIdentity(localPayout, e.target.value)}
+              onBlur={() => {
+                if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+                saveTimerRef.current = null;
+                editingRef.current = false;
+                flushIdentity(localPayout, localWorker);
+              }}
               disabled={running}
               placeholder="wallet"
               className="h-9 rounded-md border border-border bg-bg-panel px-3 font-mono text-sm outline-none focus:border-accent disabled:opacity-60"
@@ -246,6 +298,7 @@ export function PoolMiningControls({
                 <AnimatedHashrate
                   value={status.data?.hashrateHm}
                   fractionDigits={2}
+                  immediate={running}
                 />
               ) : (
                 <AnimatedHashrate value={0} fractionDigits={2} />

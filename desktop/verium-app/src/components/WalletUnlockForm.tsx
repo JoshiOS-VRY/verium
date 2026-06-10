@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { useActiveCoin } from "@/lib/coin/context";
 import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletExists, lightWalletUnlock } from "@/lib/light-wallet/client";
+import { lightWalletUnlock } from "@/lib/light-wallet/client";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
 import { rpcGetWalletInfo, rpcWalletUnlock } from "@/lib/rpc/client";
 import {
@@ -46,16 +46,12 @@ export function WalletUnlockForm({
   const { isLight } = useWalletMode();
   const invalidateWalletMode = useInvalidateWalletMode();
   const queryClient = useQueryClient();
-  const storedLightWallet = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
-    queryFn: () => lightWalletExists(coin),
-  });
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "verifying" | "applied">("idle");
 
-  const useLightUnlock =
-    isLight || storedLightWallet.data === true;
+  // Full-node unlock uses wallet.dat RPC; leftover light-wallet files must not switch paths.
+  const useLightUnlock = isLight;
 
   const unlock = useMutation({
     mutationFn: async () => {

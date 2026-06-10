@@ -623,8 +623,8 @@ fn temp_bootstrap_path(coin: CoinId) -> PathBuf {
 
 async fn stop_daemon_for_bootstrap(
     state: &AppState,
-    coin: CoinId,
-    datadir: &Path,
+    _coin: CoinId,
+    _datadir: &Path,
     cancel: &AtomicBool,
 ) {
     // Stop both daemons so nothing holds files open under AppData during apply.
@@ -686,7 +686,7 @@ fn remove_dir_all_with_retry(path: &Path, label: &str) -> AppResult<()> {
                 force_stop_native_daemon(CoinId::Vericoin);
                 std::thread::sleep(Duration::from_secs(2));
             }
-            Err(e) if !path.exists() => return Ok(()),
+            Err(_e) if !path.exists() => return Ok(()),
             Err(e) => {
                 return Err(AppError::other(format!(
                     "could not remove {label} at {}: {e}. \
@@ -1074,7 +1074,7 @@ async fn poll_chain_height_after_restart(
 async fn rpc_reachable_after_restart(
     state: &AppState,
     coin: CoinId,
-    cfg: &crate::config::DaemonConfig,
+    _cfg: &crate::config::DaemonConfig,
 ) -> bool {
     let Ok(client) = state.rpc_client(coin).await else {
         return false;

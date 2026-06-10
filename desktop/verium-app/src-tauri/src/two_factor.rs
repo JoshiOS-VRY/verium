@@ -1,10 +1,7 @@
 //! TOTP two-factor authentication for sensitive wallet actions.
 
-use std::collections::HashSet;
-
 use serde::{Deserialize, Serialize};
 use totp_rs::{Algorithm as TotpAlgorithm, Secret, TOTP};
-use zeroize::Zeroizing;
 
 use crate::error::{AppError, AppResult};
 use crate::secret_store;
@@ -75,8 +72,11 @@ pub fn load() -> AppResult<TwoFactorConfig> {
         if let Ok(raw) = std::fs::read_to_string(&path) {
             if let Ok(legacy) = serde_json::from_str::<TwoFactorConfig>(&raw) {
                 tracing::info!("migrating legacy plaintext two_factor.json to encrypted store");
-                save(&legacy)?;
-                let _ = std::fs::remove_file(&path);
+                if let Err(e) = save(&legacy) {
+                    tracing::warn!("could not seal migrated two-factor config: {e}");
+                } else {
+                    let _ = std::fs::remove_file(&path);
+                }
                 return Ok(legacy);
             }
         }

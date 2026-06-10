@@ -1,12 +1,17 @@
 //! Lightweight memory and runtime diagnostics for development builds.
 
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Instant;
 
+use once_cell::sync::Lazy;
 use serde::Serialize;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
 static BACKGROUND_TASKS: AtomicU32 = AtomicU32::new(0);
 static NODE_STATE_LISTENERS: AtomicU32 = AtomicU32::new(0);
+
+/// Process start instant, used to express RPC volume as calls/min for benchmarks.
+static PROCESS_START: Lazy<Instant> = Lazy::new(Instant::now);
 
 /// Increment when a long-lived background task starts; decrement on clean shutdown.
 pub fn track_background_task_start() {
@@ -24,6 +29,10 @@ pub struct MemoryDiagnostics {
     pub background_tasks: u32,
     pub node_state_listener_count: u32,
     pub build_profile: String,
+    /// Total logical RPC calls issued by the backend since process start.
+    pub rpc_call_count: u64,
+    /// Seconds since process start (lets the UI derive RPC calls/min).
+    pub uptime_secs: u64,
 }
 
 #[tauri::command]
@@ -33,9 +42,10 @@ pub fn set_node_state_listener_count(count: u32) {
 
 #[tauri::command]
 pub fn get_memory_diagnostics() -> MemoryDiagnostics {
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
     let pid = Pid::from_u32(std::process::id());
+    let mut sys = System::new();
+    // Only refresh this process — scanning every OS process spikes RAM on Windows.
+    sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
     let rss = sys
         .process(pid)
         .map(|p| p.memory())
@@ -50,5 +60,7 @@ pub fn get_memory_diagnostics() -> MemoryDiagnostics {
         } else {
             "release".into()
         },
+        rpc_call_count: crate::rpc::rpc_call_count(),
+        uptime_secs: PROCESS_START.elapsed().as_secs(),
     }
 }

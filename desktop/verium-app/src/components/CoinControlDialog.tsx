@@ -37,7 +37,7 @@ export function CoinControlDialog({
   const coin = useActiveCoin();
   const utxos = useQuery({
     queryKey: coinQueryKey(coin, "listunspent"),
-    queryFn: () => rpcWalletListUnspent(coin, 1, 9_999_999),
+    queryFn: () => rpcWalletListUnspent(coin, 1, 500),
     enabled: open,
   });
 
