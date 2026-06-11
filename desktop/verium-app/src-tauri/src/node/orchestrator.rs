@@ -11,6 +11,7 @@ use crate::commands::{
     daemon_boot_in_progress, ensure_daemon_running, reindex_running_live, startup_prepare_chain_data,
     stop_inner,
 };
+use crate::features::is_light_wallet;
 use crate::commands::{heal_invalid_blocks_silently, rpc_reachable};
 use crate::node::constants::{INVALID_BLOCK_HEAL_TICK, SUPERVISOR_TICK};
 use crate::node::state::NodeSnapshot;
@@ -95,9 +96,61 @@ pub async fn startup(app: AppHandle, state: &AppState) {
 
     let prefs = prefs::load().await.unwrap_or_default();
 
-    // Per-coin wallet mode: a coin in light mode never gets a managed daemon;
-    // a coin in full-node mode follows the daemon prepare/ensure/wait pipeline.
-    // This lets e.g. Verium run a full node while Vericoin runs light.
+    // iOS/Android: Electrum light wallet only — no bundled or managed daemons.
+    if is_light_wallet() {
+        let mut prefs = prefs;
+        let mut prefs_changed = false;
+        for coin in CoinId::all() {
+            if !prefs::coin_enabled(&prefs, *coin) {
+                continue;
+            }
+            if !prefs::wallet_mode_for(&prefs, *coin).is_light() {
+                prefs::set_wallet_mode_for(&mut prefs, *coin, crate::wallet::mode::WalletMode::Light);
+                prefs_changed = true;
+            }
+            state.set_daemon_phase(*coin, "light_wallet");
+        }
+        if prefs_changed {
+            if let Err(e) = prefs::save(&prefs).await {
+                tracing::warn!("startup (mobile): failed to persist light wallet mode: {e}");
+            }
+        }
+
+        let light_coins: Vec<CoinId> = CoinId::all()
+            .iter()
+            .copied()
+            .filter(|c| prefs::coin_enabled(&prefs, *c))
+            .collect();
+
+        for coin in &light_coins {
+            if crate::wallet::keystore::is_unlocked(*coin).unwrap_or(false)
+                && !crate::wallet::keystore::signing_session_active(*coin)
+            {
+                tracing::info!(
+                    "startup (mobile): clearing stale light wallet unlock for {} (session not active)",
+                    coin.as_str()
+                );
+                let _ = crate::wallet::keystore::lock_wallet(*coin);
+            }
+        }
+        if !light_coins.is_empty() {
+            let sync_state = state.clone();
+            let sync_coins = light_coins.clone();
+            tauri::async_runtime::spawn(async move {
+                for coin in sync_coins {
+                    if crate::wallet::keystore::light_wallet_on_disk(coin) {
+                        let _ = crate::wallet::sync::sync_light_wallet(&sync_state, coin).await;
+                    }
+                }
+            });
+        }
+
+        crate::chain_tip_watcher::spawn_chain_tip_watchers(app, state.clone());
+        return;
+    }
+
+    // Desktop: per-coin wallet mode — light coins sync locally; full-node coins
+    // get lazy daemon orchestration via the supervisor.
     let light_coins: Vec<CoinId> = CoinId::all()
         .iter()
         .copied()
@@ -136,14 +189,10 @@ pub async fn startup(app: AppHandle, state: &AppState) {
 
     if full_node_coins.is_empty() {
         tracing::info!("startup: no full-node coins — skipping daemon orchestration");
+        crate::chain_tip_watcher::spawn_chain_tip_watchers(app, state.clone());
         return;
     }
 
-    // Prepare chain data dirs/config up front (cheap, no process spawn) so a
-    // later on-demand start is fast. We intentionally do NOT eagerly start the
-    // daemon here: it is started lazily by the supervisor once demand appears
-    // (the UI registers demand via get_node_status as soon as a full-node view
-    // mounts), and stopped again by the idle watchdog when nothing needs it.
     for coin in &full_node_coins {
         if let Err(e) = startup_prepare_chain_data(state, *coin).await {
             tracing::warn!(
@@ -152,7 +201,6 @@ pub async fn startup(app: AppHandle, state: &AppState) {
             );
         }
     }
-    // Keep every enabled full-node daemon warm so coin switches do not stop peers.
     for coin in &full_node_coins {
         note_daemon_demand(*coin);
     }

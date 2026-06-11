@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::coin_profile::CoinId;
+use crate::features::is_light_wallet;
 use crate::node::status::NodeStatus;
 use crate::daemon::{binary_missing_hint, detect_binary, DaemonBinaryStatus};
 use crate::node::rpc_auth::is_unauthorized_message;
@@ -67,6 +68,14 @@ fn classify_status(
     status: &NodeStatus,
     binary: &DaemonBinaryStatus,
 ) -> (NodeState, Option<RecoveryHint>, String) {
+    if is_light_wallet() {
+        let message = binary
+            .missing_hint
+            .clone()
+            .unwrap_or_else(|| format!("Light wallet — no local {} node.", coin.binary_base()));
+        return (NodeState::ConnectedReady, None, message);
+    }
+
     if !binary.manageable {
         let hint = binary_missing_hint(coin).unwrap_or_else(|| {
             binary

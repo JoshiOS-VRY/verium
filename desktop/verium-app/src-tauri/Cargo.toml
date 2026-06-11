@@ -45,7 +45,6 @@ bs58 = { version = "0.5", features = ["check"] }
 bitcoin = { version = "0.32", default-features = false, features = ["std", "secp-recovery"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 hex = "0.4"
-hidapi = "2"
 rand = "0.8"
 sha2 = "0.10"
 ripemd = "0.1"
@@ -61,6 +60,9 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 tokio-rustls = "0.26"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "0.26"
+
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+hidapi = "2"
 
 [features]
 default = ["custom-protocol"]

@@ -29,3 +29,9 @@ pub fn light_wallet_enabled() -> bool {
     }
     !env!("CARGO_PKG_VERSION").contains("alpha")
 }
+
+/// iOS/Android builds use Electrum light wallet only — they never bundle or spawn
+/// veriumd/vericoind sidecars.
+pub fn is_light_wallet() -> bool {
+    cfg!(mobile)
+}
