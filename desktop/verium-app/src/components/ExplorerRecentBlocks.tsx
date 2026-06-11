@@ -450,7 +450,7 @@ export function ExplorerRecentBlocks({
         ) : mobileOnly ? (
           <div
             className={cn(
-              "relative isolate overflow-auto px-3 pb-3",
+              "relative isolate overflow-x-hidden overflow-y-auto px-3 pb-3",
               isDashboard ? "flex-1" : "max-h-[480px]",
             )}
           >

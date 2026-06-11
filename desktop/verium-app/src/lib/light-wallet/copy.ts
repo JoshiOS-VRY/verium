@@ -30,6 +30,16 @@ export const lightWalletCopy = {
     "This device uses light wallet mode only. Your keys stay encrypted here; balance and history sync via Vericonomy Electrum servers.",
   setupHubMobileOnly:
     "Pick Verium or Vericoin, then set up a light wallet for each chain. No local node or blockchain sync on mobile.",
+  mobileOnboardingWelcome:
+    "Your keys stay encrypted on this device. Balance and history sync through Vericonomy Electrum servers — no blockchain download required.",
+  mobileOnboardingCreate:
+    "Generate a new wallet with a recovery phrase you write down and store safely.",
+  mobileOnboardingImport:
+    "Already have a wallet? Restore it with your 24-word recovery phrase and passphrase.",
+  mobileOnboardingRestoreHint:
+    "We found wallet data on this device that could not be unlocked. Import your recovery phrase to restore access.",
+  mobileOnboardingNotSetUp: "Not set up yet",
+  mobileOnboardingReady: "Ready to use",
   setupWelcomeFull:
     "This wallet ships with a bundled node. Your keys can live in wallet.dat on this machine, with optional blockchain sync.",
   setupFullNodeRecommended:

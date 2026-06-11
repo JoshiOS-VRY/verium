@@ -65,6 +65,7 @@ import { useIsTestNetwork } from "@/lib/network-mode";
 import { LIGHT_WALLET_ENABLED } from "@/lib/features";
 import { walletModeSet, walletModeSetForCoin } from "@/lib/light-wallet/client";
 import { LightWalletSetupForm } from "@/components/LightWalletSetupForm";
+import { MobileSetupHub } from "@/components/MobileSetupHub";
 import { SetupWalletHub } from "@/components/SetupWalletHub";
 import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
 import { lightWalletCopy } from "@/lib/light-wallet/copy";
@@ -300,6 +301,61 @@ export function Setup() {
       }
     },
     [startCoinSetup],
+  );
+
+  const startMobileWalletFlow = useCallback(
+    async (
+      targetCoin: CoinId,
+      action: "create" | "import" | "open",
+    ) => {
+      setHubOpeningCoin(targetCoin);
+      try {
+        if (action === "open") {
+          const walletProfile = await tauriWalletProfile(targetCoin).catch(
+            () => null,
+          );
+          if (walletProfile?.ready) {
+            await openReadyCoinDashboard(targetCoin, "light");
+          }
+          return;
+        }
+        if (action === "import") {
+          setActiveCoin(targetCoin);
+          resetCoinOnboarding();
+          if (LIGHT_WALLET_ENABLED) {
+            try {
+              await walletModeSetForCoin(targetCoin, "light");
+              invalidateWalletMode();
+            } catch {
+              /* continue */
+            }
+          }
+          setWalletAction("restore_phrase");
+          setStep("wallet");
+          return;
+        }
+        setActiveCoin(targetCoin);
+        resetCoinOnboarding();
+        if (LIGHT_WALLET_ENABLED) {
+          try {
+            await walletModeSetForCoin(targetCoin, "light");
+            invalidateWalletMode();
+          } catch {
+            /* continue */
+          }
+        }
+        setWalletAction("choose");
+        setStep("welcome");
+      } finally {
+        setHubOpeningCoin(null);
+      }
+    },
+    [
+      openReadyCoinDashboard,
+      resetCoinOnboarding,
+      setActiveCoin,
+      invalidateWalletMode,
+    ],
   );
   const config = useQuery({
     queryKey: coinQueryKey(coin, "daemon-config"),
@@ -648,7 +704,7 @@ export function Setup() {
     <div
       className={
         mobileOnly
-          ? "mobile-setup flex min-h-screen flex-col bg-bg text-fg"
+          ? "mobile-setup flex min-h-screen w-full max-w-full flex-col overflow-x-hidden bg-bg text-fg"
           : "flex min-h-screen items-center justify-center bg-bg p-8 text-fg"
       }
     >
@@ -662,7 +718,9 @@ export function Setup() {
         <CardHeader>
           <CardTitle className="!normal-case !tracking-normal !text-base">
             {step === "hub"
-              ? "Vericonomy wallets"
+              ? mobileOnly
+                ? "Welcome to Vericonomy"
+                : "Vericonomy wallets"
               : `Set up ${profile.displayName}`}
           </CardTitle>
           <CardDescription>
@@ -675,11 +733,19 @@ export function Setup() {
                 : `Start the bundled ${profile.binaryName} node, set up your ${profile.symbol} wallet and recovery phrase, enable app-wide 2FA, then optionally import a chain bootstrap.`}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          {step === "hub" && (
+        <CardContent className="flex min-w-0 max-w-full flex-col gap-5">
+          {step === "hub" && mobileOnly && (
+            <MobileSetupHub
+              onCreateWallet={(coin) => startMobileWalletFlow(coin, "create")}
+              onImportPhrase={(coin) => startMobileWalletFlow(coin, "import")}
+              onOpenWallet={(coin) => startMobileWalletFlow(coin, "open")}
+              openingCoin={hubOpeningCoin}
+            />
+          )}
+
+          {step === "hub" && !mobileOnly && (
             <SetupWalletHub
               walletMode={setupWalletMode}
-              mobileOnly={mobileOnly}
               onWalletModeChange={(mode) =>
                 void handleSetupWalletModeChange(mode)
               }
@@ -888,11 +954,9 @@ export function Setup() {
                       Recovery phrase required
                     </p>
                     <p className="mt-1">
-                      Wallet files are on this device but the saved keys need to
-                      be rebuilt. Passphrase unlock will not work — import your
-                      24-word recovery phrase (or HD master key) below. Seeds
-                      stay encrypted with your new passphrase; no Windows
-                      Credential Manager entry is required.
+                      {mobileOnly
+                        ? lightWalletCopy.mobileOnboardingRestoreHint
+                        : "Wallet files are on this device but the saved keys need to be rebuilt. Passphrase unlock will not work — import your 24-word recovery phrase (or HD master key) below. Seeds stay encrypted with your new passphrase; no Windows Credential Manager entry is required."}
                     </p>
                   </div>
                   <LightWalletSetupForm

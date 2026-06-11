@@ -18,13 +18,13 @@ export function AppShell() {
 
   if (mobileOnly) {
     return (
-      <div className="mobile-shell flex min-h-screen flex-col bg-bg text-fg">
+      <div className="mobile-shell flex min-h-screen w-full max-w-full flex-col overflow-x-hidden bg-bg text-fg">
         <ShutdownProgressOverlay />
         <NetworkModeBanner />
         <MobileHeader />
-        <main className="mobile-main relative flex-1 overflow-y-auto">
+        <main className="mobile-main relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           <CoinSwitchOverlay />
-          <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
+          <div className="mx-auto flex w-full min-w-0 max-w-lg flex-col gap-4">
             <Outlet />
           </div>
         </main>

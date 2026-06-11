@@ -62,11 +62,12 @@ import {
 } from "@/lib/explorer-links";
 import { DOCS_DOWNLOADS } from "@/lib/verium-links";
 import { ADVANCED_SETTINGS_ENABLED } from "@/lib/features";
+import { MobileSettingsGroup } from "@/components/mobile/MobileSettingsGroup";
 
 export function Settings() {
   const enabledCoins = useEnabledCoins();
   const activeCoin = useActiveCoin();
-  const { isLight } = useWalletMode();
+  const { isLight, mobileOnly } = useWalletMode();
   const [daemonCoin, setDaemonCoin] = useState<CoinId>("verium");
   const config = useQuery({
     queryKey: coinQueryKey(daemonCoin, "daemon-config"),
@@ -110,8 +111,138 @@ export function Settings() {
     void updatePrefs(updates);
   };
 
+  if (mobileOnly) {
+    return (
+      <div className="mobile-page">
+        <section className="mobile-panel overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent/10 to-bg-panel p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+              <Shield className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-fg">Security</h2>
+              <p className="mt-1 text-xs leading-relaxed text-fg-subtle">
+                Recovery phrase, backups, and spending controls.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/security"
+            className="mt-4 flex h-11 w-full items-center justify-center rounded-xl bg-accent text-sm font-semibold text-accent-fg active:bg-accent/90"
+          >
+            Open security settings
+          </Link>
+        </section>
+
+        <MobileSettingsGroup
+          title="Appearance"
+          description="Light, dark, or match your device."
+          defaultOpen
+        >
+          <ThemeSegmented value={themeMode} onChange={setThemeMode} />
+        </MobileSettingsGroup>
+
+        <WalletBackupCard />
+
+        <NetworkModeCard />
+
+        <WalletModeCard />
+
+        <MobileSettingsGroup
+          title="Chains"
+          description="Show Verium and Vericoin in the wallet."
+        >
+          <label className="mobile-checkbox-row">
+            <input
+              type="checkbox"
+              checked={prefs.verium_enabled !== false}
+              onChange={(e) =>
+                void updatePrefs({ verium_enabled: e.target.checked })
+              }
+            />
+            <span>Verium (VRM)</span>
+          </label>
+          <label className="mobile-checkbox-row">
+            <input
+              type="checkbox"
+              checked={prefs.vericoin_enabled !== false}
+              onChange={(e) =>
+                void updatePrefs({ vericoin_enabled: e.target.checked })
+              }
+            />
+            <span>Vericoin (VRC)</span>
+          </label>
+          <Link
+            to="/setup"
+            state={{ setupHub: true }}
+            className="mt-2 block rounded-xl border border-border px-4 py-3 text-center text-sm font-medium text-accent active:bg-bg-subtle"
+          >
+            Wallet setup
+          </Link>
+        </MobileSettingsGroup>
+
+        <MobileSettingsGroup title="Notifications" defaultOpen={false}>
+          <label className="mobile-checkbox-row">
+            <input
+              type="checkbox"
+              checked={prefs.notify_on_vrm_received !== false}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                void unlockReceivedVrmAudio();
+                void updatePrefs({ notify_on_vrm_received: checked });
+                if (checked) void playReceivedVrmSound();
+              }}
+            />
+            <span>Notify when VRM is received</span>
+          </label>
+          <label className="mobile-checkbox-row">
+            <input
+              type="checkbox"
+              checked={prefs.notify_on_vrc_received !== false}
+              onChange={(e) =>
+                void updatePrefs({ notify_on_vrc_received: e.target.checked })
+              }
+            />
+            <span>Notify when VRC is received</span>
+          </label>
+        </MobileSettingsGroup>
+
+        <MobileSettingsGroup title="Updates" defaultOpen={false}>
+          <Button
+            className="h-11 w-full rounded-xl"
+            variant="secondary"
+            onClick={() => updates.mutate()}
+            disabled={updates.isPending}
+          >
+            {updates.isPending ? "Checking…" : "Check for updates"}
+          </Button>
+          {updates.data && (
+            <p className="mt-3 text-center text-xs text-fg-muted">
+              {updates.data.update_available
+                ? `Update available: ${updates.data.latest}`
+                : `Up to date (${updates.data.current})`}
+            </p>
+          )}
+          {updates.error && (
+            <p className="mt-2 text-center text-xs text-danger">
+              {String(updates.error)}
+            </p>
+          )}
+          {updates.data?.download_url && (
+            <ExternalLinkButton
+              href={updates.data.download_url}
+              className="mt-3 h-11 w-full justify-center rounded-xl"
+            >
+              Download update
+            </ExternalLinkButton>
+          )}
+        </MobileSettingsGroup>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 max-w-full flex-col gap-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

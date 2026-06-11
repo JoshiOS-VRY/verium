@@ -45,6 +45,13 @@ fn keychain_label() -> &'static str {
 }
 
 fn orphaned_encrypted_data_message_text() -> String {
+    #[cfg(mobile)]
+    {
+        return "Encrypted app data on this device could not be unlocked. \
+                 Import your recovery phrase to restore a wallet, or set up a new wallet to start fresh."
+            .to_string();
+    }
+    #[cfg(not(mobile))]
     format!(
         "{} entry missing for {}/{} but encrypted wallet data exists. \
          Restore the saved credential or recover from your recovery phrase — creating a new master key \

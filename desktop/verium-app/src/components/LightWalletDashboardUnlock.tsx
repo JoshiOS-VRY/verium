@@ -15,7 +15,7 @@ import { isWalletLocked } from "@/lib/wallet-unlock";
 /** Prompt to unlock the light wallet so balance and history can load from Electrum. */
 export function LightWalletDashboardUnlock() {
   const coin = useActiveCoin();
-  const { isLight } = useWalletMode();
+  const { isLight, mobileOnly } = useWalletMode();
   const exists = useQuery({
     queryKey: coinQueryKey(coin, "light-wallet-exists"),
     queryFn: () => lightWalletExists(coin),
@@ -37,6 +37,27 @@ export function LightWalletDashboardUnlock() {
   if (profile.isLoading || wallet.isLoading) return null;
 
   if (needsLightWalletRecovery(profile.data, "light")) {
+    if (mobileOnly) {
+      return (
+        <div className="mobile-banner border border-warning/40 bg-warning/10">
+          <div className="flex items-start gap-2 font-medium text-fg">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            Import recovery phrase
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+            Wallet info is on this device but keys need to be restored from
+            your recovery phrase.
+          </p>
+          <Link
+            to="/setup"
+            state={{ setupHub: false }}
+            className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl bg-accent text-sm font-semibold text-accent-fg"
+          >
+            Import phrase
+          </Link>
+        </div>
+      );
+    }
     return (
       <Card className="border-warning/40 bg-warning/10">
         <CardContent className="flex flex-col gap-3 py-4">
@@ -63,6 +84,25 @@ export function LightWalletDashboardUnlock() {
 
   const locked = !wallet.data || isWalletLocked(wallet.data);
   if (!locked) return null;
+
+  if (mobileOnly) {
+    return (
+      <section className="mobile-panel overflow-hidden rounded-2xl border border-accent/30 bg-accent/5 p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-semibold text-fg">
+          <Lock className="h-4 w-4 text-accent" />
+          Unlock wallet
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+          Enter your passphrase to send and view full transaction history.
+        </p>
+        <WalletUnlockForm
+          title="Unlock light wallet"
+          description="Wallet passphrase"
+          className="mt-3 gap-3"
+        />
+      </section>
+    );
+  }
 
   return (
     <Card className="border-accent/30 bg-accent/5">

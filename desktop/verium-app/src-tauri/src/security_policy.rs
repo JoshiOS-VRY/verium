@@ -34,7 +34,16 @@ pub async fn authorize_send(
     wallet_passphrase: Option<&str>,
 ) -> AppResult<()> {
     if two_factor::is_action_gated("send", None, coin.as_str())? {
-        return require_gated_action("send", totp_code);
+        require_gated_action("send", totp_code)?;
+        let prefs = crate::prefs::load().await?;
+        if crate::prefs::wallet_mode_for(&prefs, coin).is_light()
+            && !crate::wallet::keystore::signing_session_active(coin)
+        {
+            return Err(AppError::other(
+                "Unlock your light wallet before sending (Dashboard or Transactions).",
+            ));
+        }
+        return Ok(());
     }
     verify_wallet_passphrase_for_send(state, coin, wallet_passphrase).await
 }

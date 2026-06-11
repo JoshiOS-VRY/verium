@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { MobileSegmented } from "@/components/mobile/MobileSegmented";
+import { useWalletMode } from "@/hooks/useWalletMode";
 import {
   deleteAddressBookEntry,
   listAddressBookEntries,
@@ -35,6 +37,7 @@ function emptyDraft(category: AddressBookCategory = "send"): DraftEntry {
 
 export function AddressBook() {
   const coin = useActiveCoin();
+  const { mobileOnly } = useWalletMode();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<AddressBookCategory>("send");
   const [draft, setDraft] = useState<DraftEntry | null>(null);
@@ -90,8 +93,94 @@ export function AddressBook() {
     return rows.sort((a, b) => a.label.localeCompare(b.label));
   }, [entries.data, filter]);
 
+  if (mobileOnly) {
+    return (
+      <div className="mobile-page">
+        <section className="mobile-panel rounded-2xl border border-border bg-bg-panel px-4 py-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="flex items-center gap-2 text-base font-semibold text-fg">
+                <BookUser className="h-4 w-4 shrink-0 text-accent" />
+                Saved addresses
+              </h1>
+              <p className="mt-1 text-xs leading-relaxed text-fg-subtle">
+                Contacts for sending and receiving. Stored on this device only.
+              </p>
+            </div>
+          </div>
+          <Button
+            className="mt-4 h-11 w-full rounded-xl"
+            onClick={() => setDraft(emptyDraft(filter))}
+          >
+            <Plus className="h-4 w-4" /> Add address
+          </Button>
+        </section>
+
+        <MobileSegmented
+          value={filter}
+          ariaLabel="Address type"
+          onChange={setFilter}
+          options={[
+            { value: "send", label: "Send to" },
+            { value: "receive", label: "Receive at" },
+          ]}
+        />
+
+        {draft && (
+          <section className="mobile-panel rounded-2xl border border-accent/40 bg-accent/5 p-4">
+            <DraftRow
+              draft={draft}
+              onChange={setDraft}
+              onCancel={() => setDraft(null)}
+              onSave={() => upsert.mutate(draft)}
+              saving={upsert.isPending}
+              saveError={upsert.error ? String(upsert.error) : null}
+              mobile
+            />
+          </section>
+        )}
+
+        {entries.isError && (
+          <div className="mobile-banner border border-danger/30 bg-danger/10 text-danger">
+            Could not load address book: {String(entries.error)}
+          </div>
+        )}
+        {upsert.isError && (
+          <div className="mobile-banner border border-danger/30 bg-danger/10 text-danger">
+            Save failed: {String(upsert.error)}
+          </div>
+        )}
+
+        {entries.isLoading ? (
+          <div className="py-12 text-center text-sm text-fg-muted">Loading…</div>
+        ) : filtered.length === 0 ? (
+          <section className="mobile-panel rounded-2xl border border-dashed border-border px-4 py-12 text-center">
+            <p className="text-sm font-medium text-fg-muted">
+              No {filter === "send" ? "send" : "receive"} addresses yet
+            </p>
+            <p className="mt-1 text-xs text-fg-subtle">
+              Tap Add address to save a label and address for quick reuse.
+            </p>
+          </section>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {filtered.map((entry) => (
+              <EntryRow
+                key={entry.id}
+                entry={entry}
+                onEdit={() => setDraft({ ...entry })}
+                onDelete={() => remove.mutate(entry.id)}
+                mobile
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 max-w-full flex-col gap-4">
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
           <div>
@@ -181,6 +270,7 @@ function DraftRow({
   onCancel,
   saving,
   saveError,
+  mobile = false,
 }: {
   draft: DraftEntry;
   onChange: (next: DraftEntry) => void;
@@ -188,21 +278,33 @@ function DraftRow({
   onCancel: () => void;
   saving: boolean;
   saveError: string | null;
+  mobile?: boolean;
 }) {
+  const inputClass = mobile ? "mobile-input w-full" : "h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent";
+  const addressClass = mobile
+    ? "mobile-input w-full font-mono text-sm"
+    : "h-9 rounded-md border border-border bg-bg-subtle px-3 text-xs outline-none focus:border-accent";
+  const textareaClass = mobile
+    ? "mobile-textarea w-full"
+    : "rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-accent";
+  const selectClass = mobile
+    ? "mobile-select w-full"
+    : "h-9 rounded-md border border-border bg-bg-subtle px-2 text-sm outline-none focus:border-accent";
+
   return (
-    <div className="flex flex-col gap-2 text-sm">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-fg-muted">Label</label>
+    <div className="flex flex-col gap-3 text-sm">
+      <div className={cn("grid gap-3", mobile ? "grid-cols-1" : "grid-cols-1 gap-2 sm:grid-cols-2")}>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-fg-muted">Label</label>
           <input
             value={draft.label}
             onChange={(e) => onChange({ ...draft, label: e.target.value })}
-            className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent"
+            className={inputClass}
             placeholder="e.g. Exchange deposit"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-fg-muted">Type</label>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-fg-muted">Type</label>
           <select
             value={draft.category}
             onChange={(e) =>
@@ -211,43 +313,52 @@ function DraftRow({
                 category: e.target.value as AddressBookCategory,
               })
             }
-            className="h-9 rounded-md border border-border bg-bg-subtle px-2 text-sm outline-none focus:border-accent"
+            className={selectClass}
           >
             <option value="send">Send to</option>
             <option value="receive">Receive at</option>
           </select>
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-fg-muted">Address</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium text-fg-muted">Address</label>
         <input
           value={draft.address}
           onChange={(e) => onChange({ ...draft, address: e.target.value })}
           spellCheck={false}
-          className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-xs outline-none focus:border-accent"
+          autoCapitalize="off"
+          autoCorrect="off"
+          className={addressClass}
           placeholder="VTDns…"
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-fg-muted">Notes (optional)</label>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-medium text-fg-muted">Notes (optional)</label>
         <textarea
           value={draft.notes}
           onChange={(e) => onChange({ ...draft, notes: e.target.value })}
-          rows={2}
-          className="rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm outline-none focus:border-accent"
+          rows={mobile ? 3 : 2}
+          className={textareaClass}
         />
       </div>
       {saveError && <div className="text-xs text-danger">{saveError}</div>}
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
-          <X className="h-3.5 w-3.5" /> Cancel
+      <div className={cn("flex gap-2", mobile ? "flex-col-reverse pt-1" : "justify-end")}>
+        <Button
+          size={mobile ? "md" : "sm"}
+          variant="ghost"
+          className={mobile ? "h-11 w-full rounded-xl" : undefined}
+          onClick={onCancel}
+          disabled={saving}
+        >
+          <X className="h-4 w-4" /> Cancel
         </Button>
         <Button
-          size="sm"
+          size={mobile ? "md" : "sm"}
+          className={mobile ? "h-11 w-full rounded-xl" : undefined}
           onClick={onSave}
           disabled={!draft.address.trim() || saving}
         >
-          <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+          <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
         </Button>
       </div>
     </div>
@@ -258,38 +369,60 @@ function EntryRow({
   entry,
   onEdit,
   onDelete,
+  mobile = false,
 }: {
   entry: AddressBookEntry;
   onEdit: () => void;
   onDelete: () => void;
+  mobile?: boolean;
 }) {
   return (
-    <li className="flex items-start justify-between gap-3 rounded-md border border-border bg-bg-subtle/40 px-3 py-2.5">
+    <li
+      className={cn(
+        mobile
+          ? "mobile-list-card flex items-start justify-between gap-3"
+          : "flex items-start justify-between gap-3 rounded-md border border-border bg-bg-subtle/40 px-3 py-2.5",
+      )}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-fg">
+          <span className="text-sm font-semibold text-fg">
             {entry.label || "(no label)"}
           </span>
           <Badge tone="neutral">{entry.category}</Badge>
         </div>
-        <div className="mt-0.5 break-all text-[11px] text-fg-muted">
+        <div
+          className={cn(
+            "mt-1 break-all text-fg-muted",
+            mobile ? "text-xs leading-relaxed" : "text-[11px]",
+          )}
+        >
           {entry.address}
         </div>
         {entry.notes && (
-          <div className="mt-1 text-xs text-fg-subtle">{entry.notes}</div>
+          <div className="mt-1.5 text-xs leading-relaxed text-fg-subtle">
+            {entry.notes}
+          </div>
         )}
       </div>
       <div className="flex shrink-0 gap-1">
-        <Button size="sm" variant="ghost" onClick={onEdit} aria-label="Edit">
-          <Pencil className="h-3.5 w-3.5" />
+        <Button
+          size="sm"
+          variant="ghost"
+          className={mobile ? "h-10 w-10 rounded-xl" : undefined}
+          onClick={onEdit}
+          aria-label="Edit"
+        >
+          <Pencil className="h-4 w-4" />
         </Button>
         <Button
           size="sm"
           variant="ghost"
+          className={mobile ? "h-10 w-10 rounded-xl" : undefined}
           onClick={onDelete}
           aria-label="Delete"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
     </li>

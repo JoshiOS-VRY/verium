@@ -103,6 +103,13 @@ impl CoinId {
     }
 
     pub fn default_datadir(self) -> PathBuf {
+        #[cfg(mobile)]
+        {
+            return crate::config::app_config_base().join(match self {
+                CoinId::Verium => "verium-chain",
+                CoinId::Vericoin => "vericoin-chain",
+            });
+        }
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         {
             if let Some(d) = dirs::data_dir() {
@@ -112,7 +119,7 @@ impl CoinId {
                 };
             }
         }
-        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        #[cfg(not(any(target_os = "windows", target_os = "macos", mobile)))]
         {
             if let Some(h) = dirs::home_dir() {
                 return match self {

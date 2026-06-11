@@ -4,7 +4,8 @@
   "identifier": "com.vericonomy.wallet.ios",
   "build": {
     "beforeBuildCommand": "npm run build",
-    "beforeDevCommand": "npm run dev"
+    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../dist"
   },
   "bundle": {
     "active": true,

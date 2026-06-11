@@ -6,7 +6,6 @@ import { lightServerStatus } from "@/lib/light-wallet/client";
 import {
   electrumServerShortLabel,
   electrumStatusTitle,
-  formatChainHeight,
 } from "@/lib/light-wallet/labels";
 import { useWindowVisible } from "@/hooks/useWindowVisible";
 
@@ -37,7 +36,9 @@ export function LightServerBadge() {
     return (
       <span
         className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400"
-        title={isError ? String(error) : "Could not reach the light wallet server"}
+        title={
+          isError ? String(error) : "Could not reach the light wallet server"
+        }
       >
         <CloudOff className="h-3.5 w-3.5" />
         Light wallet offline
@@ -46,26 +47,14 @@ export function LightServerBadge() {
   }
 
   const serverLabel = electrumServerShortLabel(activeCoin, data);
-  const heightLabel =
-    data.tip_height != null
-      ? `block ${formatChainHeight(data.tip_height)}`
-      : null;
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+      className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
       title={electrumStatusTitle(activeCoin, data)}
     >
       <Cloud className="h-3.5 w-3.5 shrink-0" />
-      <span>
-        {serverLabel}
-        {heightLabel ? (
-          <>
-            <span className="text-fg-subtle"> · </span>
-            {heightLabel}
-          </>
-        ) : null}
-      </span>
+      <span className="min-w-0 truncate">{serverLabel.toUpperCase()}</span>
     </span>
   );
 }

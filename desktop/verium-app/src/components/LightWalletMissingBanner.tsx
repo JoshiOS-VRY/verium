@@ -13,7 +13,7 @@ import { walletInfoForMode } from "@/lib/wallet-unlock";
 export function LightWalletMissingBanner() {
   const coin = useActiveCoin();
   const location = useLocation();
-  const { isLight } = useWalletMode();
+  const { isLight, mobileOnly } = useWalletMode();
   const exists = useQuery({
     queryKey: coinQueryKey(coin, "light-wallet-exists"),
     queryFn: () => lightWalletExists(coin),
@@ -34,6 +34,27 @@ export function LightWalletMissingBanner() {
   }
   if (exists.data === true || effectiveWallet) return null;
   if (exists.data !== false) return null;
+
+  if (mobileOnly) {
+    return (
+      <div className="mobile-banner border border-warning/40 bg-warning/10">
+        <div className="flex items-start gap-2 font-medium text-fg">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          Set up this chain
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+          Create or import a wallet for {coin === "verium" ? "Verium" : "Vericoin"} to get started.
+        </p>
+        <Link
+          to="/setup"
+          state={{ lightWalletSetup: coin, from: location.pathname }}
+          className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl bg-accent text-sm font-semibold text-accent-fg"
+        >
+          {lightWalletCopy.dashboardNoWalletCta}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm">

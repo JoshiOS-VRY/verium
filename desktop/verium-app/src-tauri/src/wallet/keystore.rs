@@ -389,7 +389,39 @@ fn light_wallet_cache_exists(coin: CoinId) -> bool {
 }
 
 /// Whether a light wallet for this coin is recorded on disk (no CM decrypt).
+fn keystore_backing_exists() -> bool {
+    encrypted_keystore_on_disk() || keystore_path().exists()
+}
+
+/// Remove stale manifest / orphaned encrypted blobs left by a crashed or partial install.
+#[cfg(mobile)]
+pub fn cleanup_stale_mobile_wallet_artifacts() -> AppResult<()> {
+    if !keystore_backing_exists() {
+        let path = manifest_path();
+        if path.exists() {
+            let _ = std::fs::remove_file(&path);
+            tracing::info!("mobile: removed stale light-wallet manifest without keystore");
+        }
+    }
+    if crate::secret_store::encrypted_data_orphaned() && !keystore_backing_exists() {
+        match crate::secret_store::quarantine_orphaned_encrypted_data() {
+            Ok(msg) => tracing::info!("mobile: {msg}"),
+            Err(e) => tracing::warn!("mobile: could not quarantine orphaned encrypted blobs: {e}"),
+        }
+        invalidate_keystore_cache();
+    }
+    Ok(())
+}
+
+#[cfg(not(mobile))]
+pub fn cleanup_stale_mobile_wallet_artifacts() -> AppResult<()> {
+    Ok(())
+}
+
 pub fn light_wallet_on_disk(coin: CoinId) -> bool {
+    if !keystore_backing_exists() {
+        return false;
+    }
     manifest_lists_coin(coin) || light_wallet_cache_exists(coin)
 }
 
@@ -425,7 +457,10 @@ impl LightKeystoreHealth {
 
 /// Decrypt health for a coin's light keystore (presence uses [`light_wallet_on_disk`]).
 pub fn light_keystore_health(coin: CoinId) -> LightKeystoreHealth {
-    if !light_wallet_on_disk(coin) {
+    if !keystore_backing_exists() {
+        return LightKeystoreHealth::Missing;
+    }
+    if !manifest_lists_coin(coin) && !light_wallet_cache_exists(coin) {
         return LightKeystoreHealth::Missing;
     }
     match load_keystore() {
@@ -928,13 +963,13 @@ mod presence_tests {
     }
 
     #[test]
-    fn light_wallet_on_disk_true_from_manifest_without_decrypt() {
+    fn manifest_without_keystore_backing_is_not_on_disk() {
         write_manifest(&["verium"]);
         assert!(manifest_lists_coin(CoinId::Verium));
-        assert!(light_wallet_on_disk(CoinId::Verium));
+        assert!(!light_wallet_on_disk(CoinId::Verium));
         assert_eq!(
             light_keystore_health(CoinId::Verium),
-            LightKeystoreHealth::Unreadable
+            LightKeystoreHealth::Missing
         );
         cleanup_manifest();
     }

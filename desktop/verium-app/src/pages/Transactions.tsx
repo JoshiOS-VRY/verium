@@ -1,6 +1,7 @@
 import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
 import { coinQueryKey } from "@/lib/coin/profile";
 import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { useMinerPayoutsQuery } from "@/hooks/usePoolQueries";
 import { useWalletMode } from "@/hooks/useWalletMode";
 import { resolvePoolDashboardAddress } from "@/lib/pool-dashboard-address";
@@ -27,6 +28,9 @@ import { ConfirmationProgress } from "@/components/ConfirmationProgress";
 import { ExplorerLink } from "@/components/ExplorerLink";
 import { ReceivePanel } from "@/components/ReceivePanel";
 import { SendPanel } from "@/components/SendPanel";
+import { TransactionHistoryCard } from "@/components/TransactionHistoryRow";
+import { MobileBalanceHero } from "@/components/mobile/MobileBalanceHero";
+import { MobileSegmented } from "@/components/mobile/MobileSegmented";
 import { WalletBalanceSummary } from "@/components/WalletBalanceSummary";
 import { WalletUnlockGate } from "@/components/WalletUnlockGate";
 import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from "@/lib/rpc/client";
@@ -47,6 +51,7 @@ import { cn, formatNumber } from "@/lib/utils";
 import { consumePendingPaymentUri } from "@/lib/payment-uri-pending";
 
 type TransferMode = "send" | "receive";
+type MobileActivityView = TransferMode | "history";
 
 const stickyTableHeadClass =
   "sticky top-0 z-10 border-b border-border bg-bg-panel text-xs uppercase text-fg-subtle";
@@ -102,9 +107,11 @@ function TransferModeToggle({
 export function Transactions() {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
-  const { isLight } = useWalletMode();
+  const location = useLocation();
+  const { isLight, mobileOnly } = useWalletMode();
   const prefs = useUserPreferences((s) => s.prefs);
   const [mode, setMode] = useState<TransferMode>("send");
+  const [mobileView, setMobileView] = useState<MobileActivityView>("send");
   const [prefill, setPrefill] = useState<{
     address?: string;
     amount?: string;
@@ -115,6 +122,7 @@ export function Transactions() {
     const pending = consumePendingPaymentUri();
     if (!pending) return;
     setMode("send");
+    if (mobileOnly) setMobileView("send");
     setPrefill({
       address: pending.address,
       amount:
@@ -123,7 +131,15 @@ export function Transactions() {
           : undefined,
       label: pending.label ?? undefined,
     });
-  }, []);
+  }, [mobileOnly]);
+
+  useEffect(() => {
+    const view = (location.state as { mobileActivityView?: MobileActivityView })
+      ?.mobileActivityView;
+    if (!mobileOnly || !view) return;
+    setMobileView(view);
+    if (view === "send" || view === "receive") setMode(view);
+  }, [location.state, mobileOnly]);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -224,7 +240,7 @@ export function Transactions() {
             <span className="mt-1 block text-fg-subtle">{cappedNote}</span>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
           <Button
             type="button"
             variant="secondary"
@@ -236,7 +252,7 @@ export function Transactions() {
             <ChevronLeft className="h-3.5 w-3.5" />
             Previous
           </Button>
-          <span className="min-w-28 text-center text-xs tabular-nums text-fg-muted">
+          <span className="text-center text-xs tabular-nums text-fg-muted">
             Page {effectivePage + 1} of {pages}
           </span>
           <Button
@@ -255,12 +271,329 @@ export function Transactions() {
     );
   }
 
+  const historySection = (
+    <Card className={mobileOnly ? "mobile-panel overflow-hidden rounded-2xl" : undefined}>
+      <CardHeader className={mobileOnly ? "px-4 py-4" : undefined}>
+        <CardTitle className="flex items-center gap-2 text-base">
+          {mobileOnly ? "History" : "Recent transactions"}
+          {isHistoryLoading ? (
+            <Loader2
+              className="h-4 w-4 animate-spin text-accent"
+              aria-hidden
+            />
+          ) : null}
+        </CardTitle>
+        <CardDescription>
+          {isHistoryLoading
+            ? "Loading your wallet transaction history…"
+            : txs.isError
+              ? "Could not load transaction history from the wallet."
+              : showEmptyHistory
+                ? "Transactions you send or receive will appear here."
+                : "Newest first."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="min-w-0 p-0">
+        <div
+          className={cn(
+            "max-h-[480px] min-w-0 overflow-x-hidden",
+            mobileOnly ? "overflow-y-auto px-3 py-3" : "overflow-auto",
+          )}
+        >
+          {isHistoryLoading ? (
+            mobileOnly ? (
+              <div className="flex flex-col gap-2.5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={`loading-card-${i}`}
+                    className="h-24 animate-pulse rounded-xl border border-border bg-bg-subtle"
+                  />
+                ))}
+              </div>
+            ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead className={stickyTableHeadClass}>
+                <tr>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-left",
+                    )}
+                  >
+                    When
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-left",
+                    )}
+                  >
+                    Type
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-left",
+                    )}
+                  >
+                    Address
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-right",
+                    )}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-right",
+                    )}
+                  >
+                    Confs
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-right",
+                    )}
+                  >
+                    Explorer
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={`loading-${i}`} className="border-t border-border">
+                    <td colSpan={6} className="px-4 py-2">
+                      <div className="h-4 animate-pulse rounded bg-bg-subtle" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            )
+          ) : showEmptyHistory ? (
+            <div className={cn("py-10", mobileOnly ? "px-2" : "px-4")}>
+              <div className="mx-auto max-w-md space-y-5 text-center">
+                {!mobileOnly && (
+                <div
+                  className="space-y-2.5 opacity-50"
+                  aria-hidden
+                >
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={`empty-skeleton-${i}`}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="h-3 w-24 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                      <div className="h-3 w-16 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                      <div className="h-3 min-w-0 flex-1 animate-pulse rounded bg-bg-subtle" />
+                      <div className="h-3 w-14 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                    </div>
+                  ))}
+                </div>
+                )}
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-fg-muted">
+                    {mobileOnly
+                      ? "No transactions yet"
+                      : "This wallet has not made any transactions yet."}
+                  </p>
+                  <p className="text-xs text-fg-subtle">
+                    {mobileOnly
+                      ? `Send or receive ${profile.symbol} and your activity will show up here.`
+                      : `Use Send or Receive above to move ${profile.symbol}. Your history will show up here once activity is recorded in the wallet.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : mobileOnly ? (
+            <div className="flex flex-col gap-2.5">
+              {pageRows.map((tx: TransactionItem) => (
+                <TransactionHistoryCard
+                  key={`${tx.txid}-${tx.category}-${tx.address ?? ""}-${tx.time}`}
+                  tx={tx}
+                  coin={coin}
+                  isPoolPayout={
+                    coin === "verium" && poolPayoutTxids.has(tx.txid)
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead className={stickyTableHeadClass}>
+                <tr>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-left",
+                    )}
+                  >
+                    When
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-left",
+                    )}
+                  >
+                    Type
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-left",
+                    )}
+                  >
+                    Address
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-right",
+                    )}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-right",
+                    )}
+                  >
+                    Confs
+                  </th>
+                  <th
+                    className={cn(
+                      stickyTableHeadCellClass,
+                      "text-right",
+                    )}
+                  >
+                    Explorer
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((tx: TransactionItem) => (
+                  <tr
+                    key={`${tx.txid}-${tx.category}-${tx.address ?? ""}-${tx.time}`}
+                    className="border-t border-border odd:bg-bg-subtle/30"
+                  >
+                    <td className="px-4 py-2 text-xs text-fg-muted">
+                      {new Date(tx.time * 1000).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge
+                          className={transactionCategoryBadgeClass(tx.category)}
+                        >
+                          {transactionCategoryLabel(tx.category)}
+                        </Badge>
+                        {coin === "verium" && poolPayoutTxids.has(tx.txid) ? (
+                          <Badge tone="neutral">Pool payout</Badge>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="truncate px-4 py-2 text-xs">
+                      {tx.address ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {formatCoinAmount(tx.amount, coin, 8)}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <ConfirmationProgress
+                        confirmations={tx.confirmations}
+                        category={tx.category}
+                      />
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <ExplorerLink
+                        coin={coin}
+                        target={{ kind: "tx", txid: tx.txid }}
+                        label="View"
+                        title={`Open tx ${tx.txid} on the explorer`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {!isHistoryLoading && !showEmptyHistory && !txs.isError
+          ? renderPagination({
+              totalItems: sortedTxs.length,
+              totalPages,
+              rangeFrom,
+              rangeTo,
+              cappedNote: historyCapped
+                ? `Showing the ${formatNumber(TRANSACTIONS_LIST_CAP)} most recent wallet entries.`
+                : undefined,
+            })
+          : null}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <WalletUnlockGate
       title="Unlock to send and view transactions"
       description={`Enter your wallet passphrase to send or receive ${profile.symbol} and view your transaction history.`}
     >
-      <div className="flex flex-col gap-6">
+      {mobileOnly ? (
+        <div className="mobile-page">
+          <MobileBalanceHero />
+          <MobileSegmented
+            value={mobileView}
+            ariaLabel="Activity"
+            onChange={(view) => {
+              setMobileView(view);
+              if (view === "send" || view === "receive") setMode(view);
+            }}
+            options={[
+              { value: "send", label: "Send", icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
+              { value: "receive", label: "Receive", icon: <ArrowDownLeft className="h-3.5 w-3.5" /> },
+              { value: "history", label: "History" },
+            ]}
+          />
+          {mobileView === "send" ? (
+            <Card className="mobile-panel overflow-hidden rounded-2xl">
+              <CardHeader className="px-4 py-4">
+                <CardTitle className="text-base">Send {profile.symbol}</CardTitle>
+                <CardDescription>
+                  Pay to one or more {profile.displayName} addresses.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 pb-5">
+                <SendPanel
+                  initialAddress={prefill.address}
+                  initialAmount={prefill.amount}
+                  initialLabel={prefill.label}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+          {mobileView === "receive" ? (
+            <Card className="mobile-panel overflow-hidden rounded-2xl">
+              <CardHeader className="px-4 py-4">
+                <CardTitle className="text-base">Receive {profile.symbol}</CardTitle>
+                <CardDescription>
+                  Create a receiving address or payment request.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-4 pb-5">
+                <ReceivePanel />
+              </CardContent>
+            </Card>
+          ) : null}
+          {mobileView === "history" ? historySection : null}
+        </div>
+      ) : (
+      <div className="flex min-w-0 max-w-full flex-col gap-6">
         <WalletBalanceSummary />
 
         <Card>
@@ -288,239 +621,9 @@ export function Transactions() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Recent transactions
-              {isHistoryLoading ? (
-                <Loader2
-                  className="h-4 w-4 animate-spin text-accent"
-                  aria-hidden
-                />
-              ) : null}
-            </CardTitle>
-            <CardDescription>
-              {isHistoryLoading
-                ? "Loading your wallet transaction history…"
-                : txs.isError
-                  ? "Could not load transaction history from the wallet."
-                  : showEmptyHistory
-                    ? "Transactions you send or receive will appear here."
-                    : "Newest first."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="max-h-[480px] overflow-auto">
-              {isHistoryLoading ? (
-                <table className="w-full border-collapse text-sm">
-                  <thead className={stickyTableHeadClass}>
-                    <tr>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        When
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Type
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Address
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Amount
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Confs
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Explorer
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <tr key={`loading-${i}`} className="border-t border-border">
-                        <td colSpan={6} className="px-4 py-2">
-                          <div className="h-4 animate-pulse rounded bg-bg-subtle" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : showEmptyHistory ? (
-                <div className="px-4 py-10">
-                  <div className="mx-auto max-w-md space-y-5 text-center">
-                    <div
-                      className="space-y-2.5 opacity-50"
-                      aria-hidden
-                    >
-                      {Array.from({ length: 4 }).map((_, i) => (
-                        <div
-                          key={`empty-skeleton-${i}`}
-                          className="flex items-center gap-3"
-                        >
-                          <div className="h-3 w-24 shrink-0 animate-pulse rounded bg-bg-subtle" />
-                          <div className="h-3 w-16 shrink-0 animate-pulse rounded bg-bg-subtle" />
-                          <div className="h-3 min-w-0 flex-1 animate-pulse rounded bg-bg-subtle" />
-                          <div className="h-3 w-14 shrink-0 animate-pulse rounded bg-bg-subtle" />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-medium text-fg-muted">
-                        This wallet has not made any transactions yet.
-                      </p>
-                      <p className="text-xs text-fg-subtle">
-                        Use Send or Receive above to move {profile.symbol}. Your
-                        history will show up here once activity is recorded in
-                        the wallet.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <table className="w-full border-collapse text-sm">
-                  <thead className={stickyTableHeadClass}>
-                    <tr>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        When
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Type
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Address
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Amount
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Confs
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Explorer
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageRows.map((tx: TransactionItem) => (
-                      <tr
-                        key={`${tx.txid}-${tx.category}-${tx.address ?? ""}-${tx.time}`}
-                        className="border-t border-border odd:bg-bg-subtle/30"
-                      >
-                        <td className="px-4 py-2 text-xs text-fg-muted">
-                          {new Date(tx.time * 1000).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge
-                              className={transactionCategoryBadgeClass(tx.category)}
-                            >
-                              {transactionCategoryLabel(tx.category)}
-                            </Badge>
-                            {coin === "verium" && poolPayoutTxids.has(tx.txid) ? (
-                              <Badge tone="neutral">Pool payout</Badge>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="truncate px-4 py-2 text-xs">
-                          {tx.address ?? "—"}
-                        </td>
-                        <td className="px-4 py-2 text-right tabular-nums">
-                          {formatCoinAmount(tx.amount, coin, 8)}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <ConfirmationProgress
-                            confirmations={tx.confirmations}
-                            category={tx.category}
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <ExplorerLink
-                            coin={coin}
-                            target={{ kind: "tx", txid: tx.txid }}
-                            label="View"
-                            title={`Open tx ${tx.txid} on the explorer`}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-            {!isHistoryLoading && !showEmptyHistory && !txs.isError
-              ? renderPagination({
-                  totalItems: sortedTxs.length,
-                  totalPages,
-                  rangeFrom,
-                  rangeTo,
-                  cappedNote: historyCapped
-                    ? `Showing the ${formatNumber(TRANSACTIONS_LIST_CAP)} most recent wallet entries.`
-                    : undefined,
-                })
-              : null}
-          </CardContent>
-        </Card>
+        {historySection}
       </div>
+      )}
     </WalletUnlockGate>
   );
 }

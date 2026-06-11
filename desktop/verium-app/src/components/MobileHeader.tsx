@@ -14,7 +14,7 @@ export function MobileHeader() {
 
   return (
     <header className="mobile-header sticky top-0 z-30 shrink-0 border-b border-border bg-bg-subtle/95 backdrop-blur-md">
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2 px-3 py-2">
         <Link
           to="/setup"
           state={{ setupHub: true }}
@@ -31,11 +31,11 @@ export function MobileHeader() {
             {title}
           </h1>
         </div>
-        <div className="shrink-0">
+        <div className="min-w-0 max-w-[42%]">
           {isLight ? <LightServerBadge /> : <DaemonStatusBadge />}
         </div>
       </div>
-      <div className="border-t border-border/60 px-3 py-2">
+      <div className="min-w-0 border-t border-border/60 px-3 py-2">
         <CoinSwitcher />
       </div>
     </header>

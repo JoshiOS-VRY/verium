@@ -190,7 +190,7 @@ function NetworkModeCardWithBinarytest() {
             <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-3 text-xs text-warning">
               <div className="font-semibold">DACE daemons not installed</div>
               <p className="mt-1">{current.data.dace_missing_hint}</p>
-              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-fg-subtle">
+              <pre className="mt-2 max-w-full whitespace-pre-wrap break-all font-mono text-[11px] text-fg-subtle">
                 {DACE_BUILD_HINT}
               </pre>
             </div>

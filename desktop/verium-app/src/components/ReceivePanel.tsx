@@ -28,7 +28,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
   const isTestNetwork = useIsTestNetwork();
-  const { isLight } = useWalletMode();
+  const { isLight, mobileOnly } = useWalletMode();
   const { data: nodeStatus } = useDaemonStatus(coin);
   const queryClient = useQueryClient();
   const [label, setLabel] = useState("");
@@ -220,7 +220,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
             type="button"
             onClick={() => create.mutate()}
             disabled={create.isPending}
-            className="min-w-[12rem]"
+            className="w-full min-w-0 sm:min-w-[12rem] sm:w-auto"
           >
             <QrCode className="h-4 w-4" />
             {create.isPending ? "Creating…" : "Create new receiving address"}
@@ -248,7 +248,90 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
           </div>
         )}
 
-        <div className="max-h-[280px] overflow-auto">
+        <div
+          className={cn(
+            "max-h-[280px] min-w-0 overflow-x-hidden",
+            mobileOnly ? "overflow-y-auto px-3 py-3" : "overflow-auto",
+          )}
+        >
+          {mobileOnly ? (
+            <div className="flex flex-col gap-2.5">
+              {requests.map((row) => {
+                const isSelected = row.id === selectedId;
+                return (
+                  <article
+                    key={row.id}
+                    onClick={() => setSelectedId(row.id)}
+                    onDoubleClick={() => {
+                      setSelectedId(row.id);
+                      setShowDetail(true);
+                    }}
+                    className={cn(
+                      "min-w-0 max-w-full cursor-pointer rounded-xl border px-3 py-3 transition-colors",
+                      isSelected
+                        ? "border-accent/40 bg-accent/10"
+                        : "border-border bg-bg-panel/60 odd:bg-bg-subtle/30",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {row.label || "Payment request"}
+                        </p>
+                        <p className="mt-1 text-xs text-fg-muted">
+                          {new Date(row.created_at * 1000).toLocaleString()}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-medium tabular-nums">
+                        {row.amount != null
+                          ? formatCoinAmount(row.amount, coin, 8)
+                          : "—"}
+                      </span>
+                    </div>
+                    <p className="mt-2 break-all font-mono text-xs text-fg-muted">
+                      {row.address}
+                    </p>
+                    {row.message ? (
+                      <p className="mt-1.5 text-xs text-fg-muted">{row.message}</p>
+                    ) : null}
+                    <div className="mt-2.5 flex justify-end gap-1 border-t border-border/60 pt-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Show QR code"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(row.id);
+                          setShowDetail(true);
+                        }}
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Remove payment request"
+                        disabled={remove.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingDeleteId(row.id);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-danger" />
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+              {!requestsQuery.isLoading && requests.length === 0 && (
+                <p className="py-8 text-center text-sm text-fg-subtle">
+                  No payment requests yet. Create a receiving address above.
+                </p>
+              )}
+            </div>
+          ) : (
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 bg-bg-panel text-xs uppercase text-fg-subtle">
               <tr>
@@ -345,6 +428,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
               )}
             </tbody>
           </table>
+          )}
         </div>
       </div>
 
