@@ -17,7 +17,6 @@ The size of some in-memory caches can be reduced. As caches trade off memory usa
   - A lower maximum mempool size means that transactions will be evicted sooner. This will affect any uses of `veriumd` that process unconfirmed transactions.
 
 - To completely disable mempool functionality there is the option `-blocksonly`. This will make the client opt out of receiving (and thus relaying) transactions completely, except as part of blocks.
-
   - Do not use this when using the client to broadcast transactions as any transaction sent will stick out like a sore thumb, affecting privacy. When used with the wallet it should be combined with `-walletbroadcast=0` and `-spendzeroconfchange=0`. Another mechanism for broadcasting outgoing transactions (if any) should be used.
 
 - Since `0.14.0`, unused memory allocated to the mempool (default: 300MB) is shared with the UTXO cache, so when trying to reduce memory usage you should limit the mempool, with the `-maxmempool` command line argument.
@@ -25,7 +24,7 @@ The size of some in-memory caches can be reduced. As caches trade off memory usa
 ## Number of peers
 
 - `-maxconnections=<n>` - the maximum number of connections, this defaults to `125`. Each active connection takes up some memory. Only significant if incoming
-   connections are enabled, otherwise the number of connections will never be more than `8`.
+  connections are enabled, otherwise the number of connections will never be more than `8`.
 
 ## Thread configuration
 

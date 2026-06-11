@@ -1,7 +1,7 @@
-import { Loader2 } from "lucide-react";
-import { useShutdownProgress } from "@/hooks/useShutdownProgress";
-import { SHUTDOWN_FALLBACK_MESSAGE } from "@/lib/shutdown-progress";
-import { ShutdownProgressPanel } from "./ShutdownProgressPanel";
+import { Loader2 } from 'lucide-react';
+import { useShutdownProgress } from '@/hooks/useShutdownProgress';
+import { SHUTDOWN_FALLBACK_MESSAGE } from '@/lib/shutdown-progress';
+import { ShutdownProgressPanel } from './ShutdownProgressPanel';
 
 export function ShutdownProgressOverlay() {
   const progress = useShutdownProgress();
@@ -17,10 +17,7 @@ export function ShutdownProgressOverlay() {
           <Loader2 className="h-5 w-5 shrink-0 animate-spin text-accent" />
           <h4 className="text-lg font-semibold">Quitting wallet</h4>
         </div>
-        <ShutdownProgressPanel
-          progress={progress}
-          fallbackMessage={SHUTDOWN_FALLBACK_MESSAGE}
-        />
+        <ShutdownProgressPanel progress={progress} fallbackMessage={SHUTDOWN_FALLBACK_MESSAGE} />
       </div>
     </div>
   );

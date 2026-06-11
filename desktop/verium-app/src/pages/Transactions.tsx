@@ -1,35 +1,23 @@
-import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useState, useEffect, useMemo } from "react";
-import { useMinerPayoutsQuery } from "@/hooks/usePoolQueries";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { resolvePoolDashboardAddress } from "@/lib/pool-dashboard-address";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { rpcListAddressGroupings } from "@/lib/rpc/client";
-import { useQuery } from "@tanstack/react-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Loader2,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { ConfirmationProgress } from "@/components/ConfirmationProgress";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { ReceivePanel } from "@/components/ReceivePanel";
-import { SendPanel } from "@/components/SendPanel";
-import { WalletBalanceSummary } from "@/components/WalletBalanceSummary";
-import { WalletUnlockGate } from "@/components/WalletUnlockGate";
-import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from "@/lib/rpc/client";
+import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useState, useEffect, useMemo } from 'react';
+import { useMinerPayoutsQuery } from '@/hooks/usePoolQueries';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { resolvePoolDashboardAddress } from '@/lib/pool-dashboard-address';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { rpcListAddressGroupings } from '@/lib/rpc/client';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, ArrowDownLeft, ArrowUpRight, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ConfirmationProgress } from '@/components/ConfirmationProgress';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { ReceivePanel } from '@/components/ReceivePanel';
+import { SendPanel } from '@/components/SendPanel';
+import { WalletBalanceSummary } from '@/components/WalletBalanceSummary';
+import { WalletUnlockGate } from '@/components/WalletUnlockGate';
+import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from '@/lib/rpc/client';
 import {
   listTransactionsFetchParams,
   paginateTransactions,
@@ -37,20 +25,20 @@ import {
   TRANSACTIONS_LIST_CAP,
   TRANSACTIONS_PAGE_SIZE,
   transactionPageCount,
-} from "@/lib/transactions-list";
-import { formatCoinAmount } from "@/lib/units";
+} from '@/lib/transactions-list';
+import { formatCoinAmount } from '@/lib/units';
 import {
   transactionCategoryLabel,
   transactionCategoryBadgeClass,
-} from "@/lib/transaction-category";
-import { cn, formatNumber } from "@/lib/utils";
-import { consumePendingPaymentUri } from "@/lib/payment-uri-pending";
+} from '@/lib/transaction-category';
+import { cn, formatNumber } from '@/lib/utils';
+import { consumePendingPaymentUri } from '@/lib/payment-uri-pending';
 
-type TransferMode = "send" | "receive";
+type TransferMode = 'send' | 'receive';
 
 const stickyTableHeadClass =
-  "sticky top-0 z-10 border-b border-border bg-bg-panel text-xs uppercase text-fg-subtle";
-const stickyTableHeadCellClass = "bg-bg-panel px-4 py-2 font-medium";
+  'sticky top-0 z-10 border-b border-border bg-bg-panel text-xs uppercase text-fg-subtle';
+const stickyTableHeadCellClass = 'bg-bg-panel px-4 py-2 font-medium';
 
 function TransferModeToggle({
   value,
@@ -68,13 +56,13 @@ function TransferModeToggle({
       <button
         type="button"
         role="radio"
-        aria-checked={value === "send"}
-        onClick={() => onChange("send")}
+        aria-checked={value === 'send'}
+        onClick={() => onChange('send')}
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
-          value === "send"
-            ? "bg-accent text-accent-fg"
-            : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+          'inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
+          value === 'send'
+            ? 'bg-accent text-accent-fg'
+            : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
         )}
       >
         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -83,13 +71,13 @@ function TransferModeToggle({
       <button
         type="button"
         role="radio"
-        aria-checked={value === "receive"}
-        onClick={() => onChange("receive")}
+        aria-checked={value === 'receive'}
+        onClick={() => onChange('receive')}
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
-          value === "receive"
-            ? "bg-accent text-accent-fg"
-            : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+          'inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
+          value === 'receive'
+            ? 'bg-accent text-accent-fg'
+            : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
         )}
       >
         <ArrowDownLeft className="h-3.5 w-3.5" />
@@ -104,7 +92,7 @@ export function Transactions() {
   const profile = useCoinProfile();
   const { isLight } = useWalletMode();
   const prefs = useUserPreferences((s) => s.prefs);
-  const [mode, setMode] = useState<TransferMode>("send");
+  const [mode, setMode] = useState<TransferMode>('send');
   const [prefill, setPrefill] = useState<{
     address?: string;
     amount?: string;
@@ -114,13 +102,10 @@ export function Transactions() {
   useEffect(() => {
     const pending = consumePendingPaymentUri();
     if (!pending) return;
-    setMode("send");
+    setMode('send');
     setPrefill({
       address: pending.address,
-      amount:
-        pending.amount != null && pending.amount > 0
-          ? String(pending.amount)
-          : undefined,
+      amount: pending.amount != null && pending.amount > 0 ? String(pending.amount) : undefined,
       label: pending.label ?? undefined,
     });
   }, []);
@@ -131,30 +116,25 @@ export function Transactions() {
   }, [coin]);
 
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
 
   const addressGroupings = useQuery({
-    queryKey: coinQueryKey(coin, "listaddressgroupings"),
+    queryKey: coinQueryKey(coin, 'listaddressgroupings'),
     queryFn: () => rpcListAddressGroupings(coin),
-    enabled: coin === "verium" && !isLight,
+    enabled: coin === 'verium' && !isLight,
     staleTime: 30_000,
   });
 
   const poolDashboardAddress = useMemo(
     () =>
-      coin === "verium"
-        ? resolvePoolDashboardAddress(prefs, addressGroupings.data)
-        : undefined,
-    [coin, prefs, addressGroupings.data],
+      coin === 'verium' ? resolvePoolDashboardAddress(prefs, addressGroupings.data) : undefined,
+    [coin, prefs, addressGroupings.data]
   );
 
-  const poolPayouts = useMinerPayoutsQuery(
-    poolDashboardAddress,
-    coin === "verium",
-  );
+  const poolPayouts = useMinerPayoutsQuery(poolDashboardAddress, coin === 'verium');
 
   const poolPayoutTxids = useMemo(() => {
     const rows = poolPayouts.data?.rows ?? [];
@@ -165,7 +145,7 @@ export function Transactions() {
   const historyCapped = walletTxCount > TRANSACTIONS_LIST_CAP;
 
   const txs = useQuery({
-    queryKey: coinQueryKey(coin, "listtransactions", "history", walletTxCount),
+    queryKey: coinQueryKey(coin, 'listtransactions', 'history', walletTxCount),
     queryFn: async () => {
       const { count, skip } = listTransactionsFetchParams(walletTxCount);
       if (count <= 0) return [];
@@ -179,25 +159,17 @@ export function Transactions() {
   });
 
   const sortedTxs = txs.data ?? [];
-  const isHistoryLoading =
-    wallet.isPending || (wallet.isSuccess && txs.isPending);
-  const showEmptyHistory =
-    !isHistoryLoading && !txs.isError && sortedTxs.length === 0;
+  const isHistoryLoading = wallet.isPending || (wallet.isSuccess && txs.isPending);
+  const showEmptyHistory = !isHistoryLoading && !txs.isError && sortedTxs.length === 0;
 
   const totalPages = transactionPageCount(sortedTxs.length);
   const effectivePage = Math.min(page, Math.max(0, totalPages - 1));
   const pageRows = useMemo(
     () => paginateTransactions(sortedTxs, effectivePage),
-    [sortedTxs, effectivePage],
+    [sortedTxs, effectivePage]
   );
-  const rangeFrom =
-    sortedTxs.length === 0
-      ? 0
-      : effectivePage * TRANSACTIONS_PAGE_SIZE + 1;
-  const rangeTo = Math.min(
-    sortedTxs.length,
-    (effectivePage + 1) * TRANSACTIONS_PAGE_SIZE,
-  );
+  const rangeFrom = sortedTxs.length === 0 ? 0 : effectivePage * TRANSACTIONS_PAGE_SIZE + 1;
+  const rangeTo = Math.min(sortedTxs.length, (effectivePage + 1) * TRANSACTIONS_PAGE_SIZE);
 
   function renderPagination({
     totalItems,
@@ -217,12 +189,9 @@ export function Transactions() {
       <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs text-fg-muted">
           <span>
-            Showing {formatNumber(from)}–{formatNumber(to)} of{" "}
-            {formatNumber(totalItems)}
+            Showing {formatNumber(from)}–{formatNumber(to)} of {formatNumber(totalItems)}
           </span>
-          {cappedNote ? (
-            <span className="mt-1 block text-fg-subtle">{cappedNote}</span>
-          ) : null}
+          {cappedNote ? <span className="mt-1 block text-fg-subtle">{cappedNote}</span> : null}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -266,9 +235,9 @@ export function Transactions() {
         <Card>
           <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
             <div>
-              <CardTitle>{mode === "send" ? "Send" : "Receive"}</CardTitle>
+              <CardTitle>{mode === 'send' ? 'Send' : 'Receive'}</CardTitle>
               <CardDescription>
-                {mode === "send"
+                {mode === 'send'
                   ? `Pay to one or more ${profile.displayName} addresses. Labels are saved locally with the transaction comment.`
                   : `Create ${profile.symbol} receiving addresses with optional label, amount, and message.`}
               </CardDescription>
@@ -276,7 +245,7 @@ export function Transactions() {
             <TransferModeToggle value={mode} onChange={setMode} />
           </CardHeader>
           <CardContent>
-            {mode === "send" ? (
+            {mode === 'send' ? (
               <SendPanel
                 initialAddress={prefill.address}
                 initialAmount={prefill.amount}
@@ -293,20 +262,17 @@ export function Transactions() {
             <CardTitle className="flex items-center gap-2">
               Recent transactions
               {isHistoryLoading ? (
-                <Loader2
-                  className="h-4 w-4 animate-spin text-accent"
-                  aria-hidden
-                />
+                <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden />
               ) : null}
             </CardTitle>
             <CardDescription>
               {isHistoryLoading
-                ? "Loading your wallet transaction history…"
+                ? 'Loading your wallet transaction history…'
                 : txs.isError
-                  ? "Could not load transaction history from the wallet."
+                  ? 'Could not load transaction history from the wallet.'
                   : showEmptyHistory
-                    ? "Transactions you send or receive will appear here."
-                    : "Newest first."}
+                    ? 'Transactions you send or receive will appear here.'
+                    : 'Newest first.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -315,54 +281,12 @@ export function Transactions() {
                 <table className="w-full border-collapse text-sm">
                   <thead className={stickyTableHeadClass}>
                     <tr>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        When
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Type
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Address
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Amount
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Confs
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Explorer
-                      </th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-left')}>When</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-left')}>Type</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-left')}>Address</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-right')}>Amount</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-right')}>Confs</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-right')}>Explorer</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -378,15 +302,9 @@ export function Transactions() {
               ) : showEmptyHistory ? (
                 <div className="px-4 py-10">
                   <div className="mx-auto max-w-md space-y-5 text-center">
-                    <div
-                      className="space-y-2.5 opacity-50"
-                      aria-hidden
-                    >
+                    <div className="space-y-2.5 opacity-50" aria-hidden>
                       {Array.from({ length: 4 }).map((_, i) => (
-                        <div
-                          key={`empty-skeleton-${i}`}
-                          className="flex items-center gap-3"
-                        >
+                        <div key={`empty-skeleton-${i}`} className="flex items-center gap-3">
                           <div className="h-3 w-24 shrink-0 animate-pulse rounded bg-bg-subtle" />
                           <div className="h-3 w-16 shrink-0 animate-pulse rounded bg-bg-subtle" />
                           <div className="h-3 min-w-0 flex-1 animate-pulse rounded bg-bg-subtle" />
@@ -399,9 +317,8 @@ export function Transactions() {
                         This wallet has not made any transactions yet.
                       </p>
                       <p className="text-xs text-fg-subtle">
-                        Use Send or Receive above to move {profile.symbol}. Your
-                        history will show up here once activity is recorded in
-                        the wallet.
+                        Use Send or Receive above to move {profile.symbol}. Your history will show
+                        up here once activity is recorded in the wallet.
                       </p>
                     </div>
                   </div>
@@ -410,60 +327,18 @@ export function Transactions() {
                 <table className="w-full border-collapse text-sm">
                   <thead className={stickyTableHeadClass}>
                     <tr>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        When
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Type
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-left",
-                        )}
-                      >
-                        Address
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Amount
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Confs
-                      </th>
-                      <th
-                        className={cn(
-                          stickyTableHeadCellClass,
-                          "text-right",
-                        )}
-                      >
-                        Explorer
-                      </th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-left')}>When</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-left')}>Type</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-left')}>Address</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-right')}>Amount</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-right')}>Confs</th>
+                      <th className={cn(stickyTableHeadCellClass, 'text-right')}>Explorer</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageRows.map((tx: TransactionItem) => (
                       <tr
-                        key={`${tx.txid}-${tx.category}-${tx.address ?? ""}-${tx.time}`}
+                        key={`${tx.txid}-${tx.category}-${tx.address ?? ''}-${tx.time}`}
                         className="border-t border-border odd:bg-bg-subtle/30"
                       >
                         <td className="px-4 py-2 text-xs text-fg-muted">
@@ -471,19 +346,15 @@ export function Transactions() {
                         </td>
                         <td className="px-4 py-2">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge
-                              className={transactionCategoryBadgeClass(tx.category)}
-                            >
+                            <Badge className={transactionCategoryBadgeClass(tx.category)}>
                               {transactionCategoryLabel(tx.category)}
                             </Badge>
-                            {coin === "verium" && poolPayoutTxids.has(tx.txid) ? (
+                            {coin === 'verium' && poolPayoutTxids.has(tx.txid) ? (
                               <Badge tone="neutral">Pool payout</Badge>
                             ) : null}
                           </div>
                         </td>
-                        <td className="truncate px-4 py-2 text-xs">
-                          {tx.address ?? "—"}
-                        </td>
+                        <td className="truncate px-4 py-2 text-xs">{tx.address ?? '—'}</td>
                         <td className="px-4 py-2 text-right tabular-nums">
                           {formatCoinAmount(tx.amount, coin, 8)}
                         </td>
@@ -496,7 +367,7 @@ export function Transactions() {
                         <td className="px-4 py-2 text-right">
                           <ExplorerLink
                             coin={coin}
-                            target={{ kind: "tx", txid: tx.txid }}
+                            target={{ kind: 'tx', txid: tx.txid }}
                             label="View"
                             title={`Open tx ${tx.txid} on the explorer`}
                           />

@@ -1,21 +1,21 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { RecoveryPhraseWizard } from "@/components/RecoveryPhraseWizard";
-import { useActiveCoin } from "@/lib/coin/context";
-import { invalidateLightWalletQueries } from "@/lib/invalidate-wallet-queries";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { RecoveryPhraseWizard } from '@/components/RecoveryPhraseWizard';
+import { useActiveCoin } from '@/lib/coin/context';
+import { invalidateLightWalletQueries } from '@/lib/invalidate-wallet-queries';
 import {
   lightWalletCreate,
   lightWalletImport,
   lightWalletUnlock,
   walletModeSetForCoin,
-} from "@/lib/light-wallet/client";
-import { onboardingMarkComplete } from "@/lib/wallet-profile";
-import { scorePassphrase } from "@/lib/passphrase-strength";
+} from '@/lib/light-wallet/client';
+import { onboardingMarkComplete } from '@/lib/wallet-profile';
+import { scorePassphrase } from '@/lib/passphrase-strength';
 
 interface LightWalletSetupFormProps {
-  mode: "create" | "import" | "unlock";
+  mode: 'create' | 'import' | 'unlock';
   importPhrase?: string;
   onDone: () => void;
   onBack?: () => void;
@@ -23,8 +23,8 @@ interface LightWalletSetupFormProps {
 
 function formatMutationError(err: unknown): string {
   if (err instanceof Error) return err.message;
-  if (typeof err === "string") return err;
-  return "Something went wrong. Check your passphrase and try again.";
+  if (typeof err === 'string') return err;
+  return 'Something went wrong. Check your passphrase and try again.';
 }
 
 export function LightWalletSetupForm({
@@ -35,14 +35,12 @@ export function LightWalletSetupForm({
 }: LightWalletSetupFormProps) {
   const coin = useActiveCoin();
   const queryClient = useQueryClient();
-  const [passphrase, setPassphrase] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [phrase, setPhrase] = useState(importPhrase ?? "");
-  const [phase, setPhase] = useState("");
+  const [passphrase, setPassphrase] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [phrase, setPhrase] = useState(importPhrase ?? '');
+  const [phase, setPhase] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [createStep, setCreateStep] = useState<"passphrase" | "phrase">(
-    "passphrase",
-  );
+  const [createStep, setCreateStep] = useState<'passphrase' | 'phrase'>('passphrase');
 
   const score = scorePassphrase(passphrase);
   const matches = passphrase.length > 0 && passphrase === confirm;
@@ -50,44 +48,41 @@ export function LightWalletSetupForm({
   const action = useMutation({
     mutationFn: async (mnemonic?: string) => {
       setError(null);
-      if (mode === "unlock") {
-        setPhase("Unlocking wallet…");
+      if (mode === 'unlock') {
+        setPhase('Unlocking wallet…');
         await lightWalletUnlock(coin, passphrase);
         return;
       }
       const mnemonicToUse = (mnemonic ?? phrase).trim();
-      setPhase(mode === "import" ? "Importing wallet…" : "Encrypting wallet…");
-      if (mode === "import") {
+      setPhase(mode === 'import' ? 'Importing wallet…' : 'Encrypting wallet…');
+      if (mode === 'import') {
         await lightWalletImport(coin, mnemonicToUse, passphrase);
       } else {
         await lightWalletCreate(coin, mnemonicToUse, passphrase);
       }
     },
     onSuccess: async () => {
-      setPhase("");
+      setPhase('');
       setError(null);
       await invalidateLightWalletQueries(queryClient, coin);
-      if (mode !== "unlock") {
-        await walletModeSetForCoin(coin, "light").catch(() => undefined);
+      if (mode !== 'unlock') {
+        await walletModeSetForCoin(coin, 'light').catch(() => undefined);
         await onboardingMarkComplete(coin).catch(() => undefined);
       }
       onDone();
     },
     onError: (err) => {
-      setPhase("");
+      setPhase('');
       setError(formatMutationError(err));
     },
   });
 
   const disabled =
-    mode === "unlock"
+    mode === 'unlock'
       ? !passphrase.trim() || action.isPending
-      : !matches ||
-        score.score < 2 ||
-        (mode === "import" && !phrase.trim()) ||
-        action.isPending;
+      : !matches || score.score < 2 || (mode === 'import' && !phrase.trim()) || action.isPending;
 
-  if (mode === "create" && createStep === "phrase") {
+  if (mode === 'create' && createStep === 'phrase') {
     return (
       <div className="flex flex-col gap-3">
         <RecoveryPhraseWizard
@@ -100,7 +95,7 @@ export function LightWalletSetupForm({
           size="sm"
           variant="ghost"
           className="self-start"
-          onClick={() => setCreateStep("passphrase")}
+          onClick={() => setCreateStep('passphrase')}
         >
           Back
         </Button>
@@ -113,14 +108,14 @@ export function LightWalletSetupForm({
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (mode === "create" && createStep === "passphrase" && !disabled) {
-          setCreateStep("phrase");
+        if (mode === 'create' && createStep === 'passphrase' && !disabled) {
+          setCreateStep('phrase');
           return;
         }
         if (!disabled) action.mutate(undefined);
       }}
     >
-      {mode === "import" && (
+      {mode === 'import' && (
         <textarea
           className="min-h-[96px] rounded border border-border bg-bg px-3 py-2 text-sm"
           placeholder="24-word recovery phrase, or HD master key from Security → Export"
@@ -139,7 +134,7 @@ export function LightWalletSetupForm({
           if (error) setError(null);
         }}
       />
-      {mode !== "unlock" && (
+      {mode !== 'unlock' && (
         <input
           type="password"
           className="rounded border border-border bg-bg px-3 py-2 text-sm"
@@ -157,12 +152,12 @@ export function LightWalletSetupForm({
       {error && <p className="text-xs text-danger">{error}</p>}
       <Button type="submit" disabled={disabled}>
         {action.isPending
-          ? "Working…"
-          : mode === "unlock"
-            ? "Unlock"
-            : mode === "create"
-              ? "Continue to recovery phrase"
-              : "Create light wallet"}
+          ? 'Working…'
+          : mode === 'unlock'
+            ? 'Unlock'
+            : mode === 'create'
+              ? 'Continue to recovery phrase'
+              : 'Create light wallet'}
       </Button>
       {onBack && (
         <Button

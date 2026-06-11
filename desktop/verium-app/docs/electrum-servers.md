@@ -5,10 +5,10 @@ The desktop wallet does not operate these servers.
 
 ## Default endpoints (mainnet)
 
-| Chain   | Primary (TLS)                              | Failover (TLS)                              |
-| ------- | ------------------------------------------ | ------------------------------------------- |
-| Verium  | `electrumx-vrm1.vericonomy.com:51002`      | `electrumx-vrm2.vericonomy.com:52002`       |
-| VeriCoin| `electrumx-vrc1.vericonomy.com:50012`      | `electrumx-vrc2.vericonomy.com:50012`       |
+| Chain    | Primary (TLS)                         | Failover (TLS)                        |
+| -------- | ------------------------------------- | ------------------------------------- |
+| Verium   | `electrumx-vrm1.vericonomy.com:51002` | `electrumx-vrm2.vericonomy.com:52002` |
+| VeriCoin | `electrumx-vrc1.vericonomy.com:50012` | `electrumx-vrc2.vericonomy.com:50012` |
 
 VRM WebSocket (not used by desktop wallet): `51004` / `52004` on the same hosts.
 

@@ -1,10 +1,6 @@
-import type { CoinId } from "@/lib/coin/profile";
-import type { WalletMode } from "@/lib/light-wallet/client";
-import type {
-  OnboardingCheckpoint,
-  OnboardingIntent,
-  WalletProfile,
-} from "@/lib/wallet-profile";
+import type { CoinId } from '@/lib/coin/profile';
+import type { WalletMode } from '@/lib/light-wallet/client';
+import type { OnboardingCheckpoint, OnboardingIntent, WalletProfile } from '@/lib/wallet-profile';
 
 /**
  * Intent router for the setup wizard.
@@ -17,16 +13,16 @@ import type {
  */
 
 export type WizardStep =
-  | "hub"
-  | "welcome"
-  | "daemon"
-  | "wallet"
-  | "recovery"
-  | "hd_upgrade"
-  | "twofa"
-  | "bootstrap"
-  | "done"
-  | "advanced";
+  | 'hub'
+  | 'welcome'
+  | 'daemon'
+  | 'wallet'
+  | 'recovery'
+  | 'hd_upgrade'
+  | 'twofa'
+  | 'bootstrap'
+  | 'done'
+  | 'advanced';
 
 export interface IntentRoute {
   intent: OnboardingIntent;
@@ -39,30 +35,30 @@ export interface IntentRoute {
 }
 
 const FULL_STEPS: WizardStep[] = [
-  "welcome",
-  "daemon",
-  "wallet",
-  "recovery",
-  "twofa",
-  "bootstrap",
-  "done",
+  'welcome',
+  'daemon',
+  'wallet',
+  'recovery',
+  'twofa',
+  'bootstrap',
+  'done',
 ];
 
-const LIGHT_STEPS: WizardStep[] = ["welcome", "wallet", "twofa", "done"];
+const LIGHT_STEPS: WizardStep[] = ['welcome', 'wallet', 'twofa', 'done'];
 
 /**
  * Legacy upgrade has its own ordered flow: explain -> connect node ->
  * unlock -> mandatory security (HD + recovery) -> finish.
  */
 const LEGACY_STEPS: WizardStep[] = [
-  "welcome",
-  "daemon",
-  "wallet",
-  "hd_upgrade",
-  "recovery",
-  "twofa",
-  "bootstrap",
-  "done",
+  'welcome',
+  'daemon',
+  'wallet',
+  'hd_upgrade',
+  'recovery',
+  'twofa',
+  'bootstrap',
+  'done',
 ];
 
 /**
@@ -70,24 +66,24 @@ const LEGACY_STEPS: WizardStep[] = [
  * wallet mode the user is setting up (full node vs light).
  */
 export function routeForProfile(
-  profile: Pick<WalletProfile, "intent" | "mode">,
-  mode: WalletMode = profile.mode,
+  profile: Pick<WalletProfile, 'intent' | 'mode'>,
+  mode: WalletMode = profile.mode
 ): IntentRoute {
   const intent = profile.intent;
 
-  if (mode === "full_node" && intent === "legacy_upgrade") {
+  if (mode === 'full_node' && intent === 'legacy_upgrade') {
     return {
       intent,
-      initialStep: "welcome",
+      initialStep: 'welcome',
       steps: LEGACY_STEPS,
       isLegacyUpgrade: true,
     };
   }
 
-  if (mode === "light") {
+  if (mode === 'light') {
     return {
       intent,
-      initialStep: "welcome",
+      initialStep: 'welcome',
       steps: LIGHT_STEPS,
       isLegacyUpgrade: false,
     };
@@ -95,7 +91,7 @@ export function routeForProfile(
 
   return {
     intent,
-    initialStep: "welcome",
+    initialStep: 'welcome',
     steps: FULL_STEPS,
     isLegacyUpgrade: false,
   };
@@ -103,22 +99,22 @@ export function routeForProfile(
 
 export function stepLabel(step: WizardStep): string {
   switch (step) {
-    case "welcome":
-      return "Welcome";
-    case "daemon":
-      return "Start node";
-    case "wallet":
-      return "Wallet";
-    case "hd_upgrade":
-      return "Upgrade";
-    case "recovery":
-      return "Recovery";
-    case "twofa":
-      return "2FA";
-    case "bootstrap":
-      return "Sync";
-    case "done":
-      return "Finish";
+    case 'welcome':
+      return 'Welcome';
+    case 'daemon':
+      return 'Start node';
+    case 'wallet':
+      return 'Wallet';
+    case 'hd_upgrade':
+      return 'Upgrade';
+    case 'recovery':
+      return 'Recovery';
+    case 'twofa':
+      return '2FA';
+    case 'bootstrap':
+      return 'Sync';
+    case 'done':
+      return 'Finish';
     default:
       return step;
   }
@@ -128,10 +124,10 @@ export function stepLabel(step: WizardStep): string {
 export function checkpointFor(
   intent: OnboardingIntent,
   step: WizardStep,
-  legacyPath?: string | null,
+  legacyPath?: string | null
 ): OnboardingCheckpoint {
   return {
-    phase: step === "done" ? "complete" : "in_progress",
+    phase: step === 'done' ? 'complete' : 'in_progress',
     intent,
     step,
     legacy_path: legacyPath ?? null,
@@ -145,14 +141,14 @@ export function checkpointFor(
  */
 export function resumeStep(
   route: IntentRoute,
-  checkpoint: OnboardingCheckpoint | undefined,
+  checkpoint: OnboardingCheckpoint | undefined
 ): WizardStep {
-  if (!checkpoint || checkpoint.phase !== "in_progress" || !checkpoint.step) {
+  if (!checkpoint || checkpoint.phase !== 'in_progress' || !checkpoint.step) {
     return route.initialStep;
   }
   const step = checkpoint.step as WizardStep;
   return route.steps.includes(step) ? step : route.initialStep;
 }
 
-export type { OnboardingCheckpoint, OnboardingIntent } from "@/lib/wallet-profile";
+export type { OnboardingCheckpoint, OnboardingIntent } from '@/lib/wallet-profile';
 export type { CoinId };

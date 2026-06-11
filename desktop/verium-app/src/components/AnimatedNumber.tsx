@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import { animated } from "@react-spring/web";
-import { useSpringNumber, type UseSpringNumberOptions } from "@/hooks/useSpringNumber";
-import { cn, formatNumber } from "@/lib/utils";
+import type { ReactNode } from 'react';
+import { animated } from '@react-spring/web';
+import { useSpringNumber, type UseSpringNumberOptions } from '@/hooks/useSpringNumber';
+import { cn, formatNumber } from '@/lib/utils';
 
 export interface AnimatedNumberProps extends UseSpringNumberOptions {
   value?: number;
@@ -20,7 +20,7 @@ export function AnimatedNumber({
   value,
   fractionDigits = 0,
   className,
-  fallback = "—",
+  fallback = '—',
   showTrendColor = true,
   format = formatNumber,
   ...springOptions
@@ -28,16 +28,16 @@ export function AnimatedNumber({
   const { number, trend, hasValue } = useSpringNumber(value, springOptions);
 
   if (!hasValue) {
-    return <span className={cn("tabular-nums", className)}>{fallback}</span>;
+    return <span className={cn('tabular-nums', className)}>{fallback}</span>;
   }
 
   return (
     <animated.span
       className={cn(
-        "inline tabular-nums",
-        showTrendColor && trend === "up" && "metric-flash-up",
-        showTrendColor && trend === "down" && "metric-flash-down",
-        className,
+        'inline tabular-nums',
+        showTrendColor && trend === 'up' && 'metric-flash-up',
+        showTrendColor && trend === 'down' && 'metric-flash-down',
+        className
       )}
     >
       {number.to((n) => format(n, fractionDigits))}

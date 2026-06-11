@@ -1,21 +1,15 @@
-import type { CoinId } from "@/lib/coin/profile";
-import { Users } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { ExplorerLink } from "@/components/ExplorerLink";
+import type { CoinId } from '@/lib/coin/profile';
+import { Users } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { ExplorerLink } from '@/components/ExplorerLink';
 import {
   explorerExtractionHash,
   explorerPeersHash,
   explorerRichlistHash,
-} from "@/lib/explorer-links";
-import type { PeerInfo } from "@/lib/rpc/client";
-import { formatNumber, formatRelativeTime } from "@/lib/utils";
+} from '@/lib/explorer-links';
+import type { PeerInfo } from '@/lib/rpc/client';
+import { formatNumber, formatRelativeTime } from '@/lib/utils';
 
 interface NetworkLocalPeersCardProps {
   coin: CoinId;
@@ -33,9 +27,7 @@ export function NetworkLocalPeersCard({
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-bg-panel text-xs uppercase text-fg-subtle shadow-[0_1px_0_var(--border)]">
           <tr>
-            <th className="px-4 py-2.5 text-left font-medium sm:px-5">
-              Address
-            </th>
+            <th className="px-4 py-2.5 text-left font-medium sm:px-5">Address</th>
             <th className="px-4 py-2.5 text-left font-medium sm:px-5">Dir</th>
             <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell sm:px-5">
               Headers
@@ -59,19 +51,13 @@ export function NetworkLocalPeersCard({
                 {p.addr}
               </td>
               <td className="px-4 py-2.5 sm:px-5">
-                <Badge tone={p.inbound ? "neutral" : "accent"}>
-                  {p.inbound ? "in" : "out"}
-                </Badge>
+                <Badge tone={p.inbound ? 'neutral' : 'accent'}>{p.inbound ? 'in' : 'out'}</Badge>
               </td>
               <td className="hidden px-4 py-2.5 text-right tabular-nums sm:table-cell sm:px-5">
-                {p.synced_headers != null
-                  ? formatNumber(p.synced_headers)
-                  : "—"}
+                {p.synced_headers != null ? formatNumber(p.synced_headers) : '—'}
               </td>
               <td className="px-4 py-2.5 text-right tabular-nums text-fg-muted sm:px-5">
-                {p.pingtime
-                  ? `${formatNumber(p.pingtime * 1000, 0)} ms`
-                  : "—"}
+                {p.pingtime ? `${formatNumber(p.pingtime * 1000, 0)} ms` : '—'}
               </td>
               <td className="hidden px-4 py-2.5 text-right text-xs text-fg-muted md:table-cell sm:px-5">
                 {formatRelativeTime(p.conntime)}
@@ -112,24 +98,22 @@ export function NetworkLocalPeersCard({
         <div className="flex flex-col items-end gap-1">
           <ExplorerLink
             coin={coin}
-            target={{ kind: "raw", url: explorerPeersHash(coin) }}
+            target={{ kind: 'raw', url: explorerPeersHash(coin) }}
             label="Peers on explorer"
           />
           <ExplorerLink
             coin={coin}
-            target={{ kind: "raw", url: explorerExtractionHash(coin) }}
+            target={{ kind: 'raw', url: explorerExtractionHash(coin) }}
             label="Extraction stats"
           />
           <ExplorerLink
             coin={coin}
-            target={{ kind: "raw", url: explorerRichlistHash(coin) }}
+            target={{ kind: 'raw', url: explorerRichlistHash(coin) }}
             label="Rich list"
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        {peers.length === 0 ? empty : table}
-      </CardContent>
+      <CardContent className="p-0">{peers.length === 0 ? empty : table}</CardContent>
     </Card>
   );
 }

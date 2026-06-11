@@ -11,14 +11,14 @@
 //
 // See vericoin/doc/dace/binarytest-network.md.
 
-import { invoke } from "@tauri-apps/api/core";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CoinId } from "@/lib/coin/profile";
-import { resetDaemonEnsureAttempt } from "@/hooks/useDaemonStatus";
-import { isExplorerApiEnabled } from "@/lib/explorer-api";
-import { BINARYTEST_ENABLED } from "@/lib/features";
+import { invoke } from '@tauri-apps/api/core';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { CoinId } from '@/lib/coin/profile';
+import { resetDaemonEnsureAttempt } from '@/hooks/useDaemonStatus';
+import { isExplorerApiEnabled } from '@/lib/explorer-api';
+import { BINARYTEST_ENABLED } from '@/lib/features';
 
-export type NetworkMode = "mainnet" | "binarytest";
+export type NetworkMode = 'mainnet' | 'binarytest';
 
 export interface CoinEndpoint {
   coin: string;
@@ -37,22 +37,18 @@ export interface NetworkModeInfo {
 }
 
 export async function rpcNetworkModeGet(): Promise<NetworkModeInfo> {
-  return invoke<NetworkModeInfo>("network_mode_get");
+  return invoke<NetworkModeInfo>('network_mode_get');
 }
 
-export async function rpcNetworkModePreview(
-  mode: NetworkMode,
-): Promise<NetworkModeInfo> {
-  return invoke<NetworkModeInfo>("network_mode_preview", { mode });
+export async function rpcNetworkModePreview(mode: NetworkMode): Promise<NetworkModeInfo> {
+  return invoke<NetworkModeInfo>('network_mode_preview', { mode });
 }
 
-export async function rpcNetworkModeSet(
-  mode: NetworkMode,
-): Promise<NetworkModeInfo> {
-  return invoke<NetworkModeInfo>("network_mode_set", { mode });
+export async function rpcNetworkModeSet(mode: NetworkMode): Promise<NetworkModeInfo> {
+  return invoke<NetworkModeInfo>('network_mode_set', { mode });
 }
 
-const QK = ["network-mode"] as const;
+const QK = ['network-mode'] as const;
 
 export function useNetworkMode() {
   return useQuery({
@@ -64,7 +60,7 @@ export function useNetworkMode() {
 
 export function useNetworkModePreview(mode: NetworkMode | null) {
   return useQuery({
-    queryKey: ["network-mode", "preview", mode],
+    queryKey: ['network-mode', 'preview', mode],
     queryFn: () => rpcNetworkModePreview(mode!),
     enabled: !!mode,
   });
@@ -78,12 +74,12 @@ export function useSetNetworkMode() {
       qc.setQueryData(QK, info);
       resetDaemonEnsureAttempt();
       // Drop cached mainnet RPC/explorer data — keys are prefixed by coin id.
-      for (const coin of ["verium", "vericoin"] as CoinId[]) {
+      for (const coin of ['verium', 'vericoin'] as CoinId[]) {
         qc.removeQueries({ queryKey: [coin] });
       }
-      qc.removeQueries({ queryKey: ["binarychain_status"] });
-      qc.removeQueries({ queryKey: ["binarychain_metrics"] });
-      qc.removeQueries({ queryKey: ["binarychain_anchor"] });
+      qc.removeQueries({ queryKey: ['binarychain_status'] });
+      qc.removeQueries({ queryKey: ['binarychain_metrics'] });
+      qc.removeQueries({ queryKey: ['binarychain_anchor'] });
     },
   });
 }
@@ -99,7 +95,7 @@ export function useIsTestNetwork(): boolean {
 export function useExplorerQueriesEnabled(): boolean {
   const isTest = useIsTestNetwork();
   const enabled = useQuery({
-    queryKey: ["explorer-api-enabled"],
+    queryKey: ['explorer-api-enabled'],
     queryFn: isExplorerApiEnabled,
     staleTime: Infinity,
   });

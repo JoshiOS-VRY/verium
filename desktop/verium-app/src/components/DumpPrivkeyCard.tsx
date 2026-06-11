@@ -1,36 +1,30 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { KeyRound } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
-import { useActiveCoin } from "@/lib/coin/context";
-import { rpcWalletDumpPrivKey } from "@/lib/rpc/client";
-import { auditLogRecord } from "@/lib/security/client";
-import { useTwoFactorGate } from "@/hooks/useTwoFactorGate";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { KeyRound } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
+import { useActiveCoin } from '@/lib/coin/context';
+import { rpcWalletDumpPrivKey } from '@/lib/rpc/client';
+import { auditLogRecord } from '@/lib/security/client';
+import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
 
 export function DumpPrivkeyCard() {
   const coin = useActiveCoin();
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState('');
   const [privkey, setPrivkey] = useState<string | null>(null);
   const twoFa = useTwoFactorGate(coin);
 
   const dump = useMutation({
     mutationFn: async (totpCode?: string) => {
       const key = await rpcWalletDumpPrivKey(coin, address.trim(), totpCode);
-      await auditLogRecord("dump_privkey", address.trim(), coin);
+      await auditLogRecord('dump_privkey', address.trim(), coin);
       return key;
     },
     onSuccess: (key) => {
       setPrivkey(key);
       void navigator.clipboard.writeText(key);
-      window.setTimeout(() => void navigator.clipboard.writeText(""), 30_000);
+      window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
     },
   });
 
@@ -49,8 +43,7 @@ export function DumpPrivkeyCard() {
             Export private key
           </CardTitle>
           <CardDescription>
-            Dump the WIF private key for a single address. Requires 2FA when
-            enabled.
+            Dump the WIF private key for a single address. Requires 2FA when enabled.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -65,12 +58,12 @@ export function DumpPrivkeyCard() {
             variant="danger"
             disabled={!address.trim() || dump.isPending}
             onClick={() =>
-              void twoFa.gate("dump_privkey", (code) => dump.mutate(code), {
-                title: "Confirm key export with 2FA",
+              void twoFa.gate('dump_privkey', (code) => dump.mutate(code), {
+                title: 'Confirm key export with 2FA',
               })
             }
           >
-            {dump.isPending ? "Exporting…" : "Show private key"}
+            {dump.isPending ? 'Exporting…' : 'Show private key'}
           </Button>
           {privkey && (
             <textarea
@@ -80,9 +73,7 @@ export function DumpPrivkeyCard() {
               className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs"
             />
           )}
-          {dump.error && (
-            <p className="text-xs text-danger">{String(dump.error)}</p>
-          )}
+          {dump.error && <p className="text-xs text-danger">{String(dump.error)}</p>}
         </CardContent>
       </Card>
     </>

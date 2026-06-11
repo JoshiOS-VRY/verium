@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Copy, Eye, EyeOff } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, Copy, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
 import {
   recoveryGenerateMnemonic,
   recoveryVerificationIndices,
   recoveryVerifyWords,
-} from "@/lib/security/client";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useTwoFactorGate } from "@/hooks/useTwoFactorGate";
+} from '@/lib/security/client';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
 
 interface RecoveryPhraseWizardProps {
   /** Called after phrase verification; may apply HD seed (await before showing success). */
@@ -17,20 +17,17 @@ interface RecoveryPhraseWizardProps {
   onSkip?: () => void;
 }
 
-type Step = "generate" | "reveal" | "verify" | "done";
+type Step = 'generate' | 'reveal' | 'verify' | 'done';
 
-export function RecoveryPhraseWizard({
-  onComplete,
-  onSkip,
-}: RecoveryPhraseWizardProps) {
+export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizardProps) {
   const coin = useActiveCoin();
   const twoFa = useTwoFactorGate(coin);
-  const [step, setStep] = useState<Step>("generate");
-  const [phrase, setPhrase] = useState("");
+  const [step, setStep] = useState<Step>('generate');
+  const [phrase, setPhrase] = useState('');
   const [revealed, setRevealed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [indices, setIndices] = useState<number[]>([]);
-  const [answers, setAnswers] = useState<string[]>(["", "", ""]);
+  const [answers, setAnswers] = useState<string[]>(['', '', '']);
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const generate = useMutation({
@@ -39,15 +36,15 @@ export function RecoveryPhraseWizard({
       setPhrase(bundle.mnemonic);
       const idx = await recoveryVerificationIndices(bundle.word_count);
       setIndices(idx);
-      setStep("reveal");
+      setStep('reveal');
     },
   });
 
   const words = phrase.split(/\s+/).filter(Boolean);
 
   const startGenerate = () => {
-    void twoFa.gate("show_recovery_phrase", () => generate.mutate(), {
-      title: "Confirm recovery phrase setup with 2FA",
+    void twoFa.gate('show_recovery_phrase', () => generate.mutate(), {
+      title: 'Confirm recovery phrase setup with 2FA',
     });
   };
 
@@ -60,18 +57,17 @@ export function RecoveryPhraseWizard({
     />
   );
 
-  if (step === "generate") {
+  if (step === 'generate') {
     return (
       <>
         {prompt}
         <div className="flex flex-col gap-4">
           <p className="text-sm text-fg-muted">
-            A 24-word recovery phrase is the master key to your wallet. Write it
-            down on paper and store it somewhere safe. Anyone with this phrase
-            can steal your coins.
+            A 24-word recovery phrase is the master key to your wallet. Write it down on paper and
+            store it somewhere safe. Anyone with this phrase can steal your coins.
           </p>
           <Button onClick={startGenerate} disabled={generate.isPending}>
-            {generate.isPending ? "Generating…" : "Generate recovery phrase"}
+            {generate.isPending ? 'Generating…' : 'Generate recovery phrase'}
           </Button>
           {onSkip && (
             <Button variant="secondary" onClick={onSkip}>
@@ -83,7 +79,7 @@ export function RecoveryPhraseWizard({
     );
   }
 
-  if (step === "reveal") {
+  if (step === 'reveal') {
     return (
       <>
         {prompt}
@@ -95,17 +91,13 @@ export function RecoveryPhraseWizard({
               onClick={() => setRevealed((v) => !v)}
               className="flex items-center gap-1 text-xs text-fg-muted hover:text-fg"
             >
-              {revealed ? (
-                <EyeOff className="h-3.5 w-3.5" />
-              ) : (
-                <Eye className="h-3.5 w-3.5" />
-              )}
-              {revealed ? "Hide" : "Reveal"}
+              {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {revealed ? 'Hide' : 'Reveal'}
             </button>
           </div>
           <div
             className={`grid grid-cols-3 gap-2 rounded-lg border border-border p-4 ${
-              revealed ? "bg-bg-subtle" : "bg-bg-subtle blur-sm select-none"
+              revealed ? 'bg-bg-subtle' : 'bg-bg-subtle blur-sm select-none'
             }`}
           >
             {words.map((word, i) => (
@@ -120,10 +112,7 @@ export function RecoveryPhraseWizard({
               variant="secondary"
               onClick={() => {
                 void navigator.clipboard.writeText(phrase);
-                window.setTimeout(
-                  () => void navigator.clipboard.writeText(""),
-                  30_000,
-                );
+                window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
               }}
             >
               <Copy className="h-3.5 w-3.5" />
@@ -137,10 +126,9 @@ export function RecoveryPhraseWizard({
               onChange={(e) => setAcknowledged(e.target.checked)}
               className="mt-0.5 accent-accent"
             />
-            I have written down my recovery phrase and stored it securely
-            offline.
+            I have written down my recovery phrase and stored it securely offline.
           </label>
-          <Button disabled={!acknowledged} onClick={() => setStep("verify")}>
+          <Button disabled={!acknowledged} onClick={() => setStep('verify')}>
             Continue to verification
           </Button>
         </div>
@@ -148,14 +136,13 @@ export function RecoveryPhraseWizard({
     );
   }
 
-  if (step === "verify") {
+  if (step === 'verify') {
     return (
       <>
         {prompt}
         <div className="flex flex-col gap-4">
           <p className="text-sm text-fg-muted">
-            Confirm you wrote the phrase correctly by entering the requested
-            words.
+            Confirm you wrote the phrase correctly by entering the requested words.
           </p>
           {indices.map((idx, i) => (
             <div key={idx} className="flex flex-col gap-1">
@@ -184,13 +171,13 @@ export function RecoveryPhraseWizard({
             onClick={async () => {
               const ok = await recoveryVerifyWords(phrase, indices, answers);
               if (!ok) {
-                setVerifyError("Words do not match. Check your written copy.");
+                setVerifyError('Words do not match. Check your written copy.');
                 return;
               }
               setVerifyError(null);
               try {
                 await onComplete(phrase);
-                setStep("done");
+                setStep('done');
               } catch (err) {
                 setVerifyError(String(err));
               }

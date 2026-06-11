@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 /**
  * Opens a URL in the user's default browser via the Tauri shell plugin.
@@ -9,5 +9,5 @@ import { invoke } from "@tauri-apps/api/core";
  */
 export async function openExternal(url: string): Promise<void> {
   if (!url) return;
-  await invoke<void>("open_external_url", { url });
+  await invoke<void>('open_external_url', { url });
 }

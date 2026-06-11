@@ -1,32 +1,29 @@
-import { Link } from "react-router-dom";
-import { ArrowLeftRight, Coins, Cpu, TrendingUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { getCoinProfile, type CoinId } from "@/lib/coin/profile";
-import { useDashboardData } from "@/hooks/useDashboardData";
-import { type TransactionItem } from "@/lib/rpc/client";
-import { formatCoinAmount } from "@/lib/units";
-import {
-  networkCoinsStakingPercent,
-  mergeStakingNetworkKpis,
-} from "@/lib/staking-stats";
-import { transactionCategoryLabel } from "@/lib/transaction-category";
-import { AnimatedHashrate } from "@/components/AnimatedHashrate";
-import { cn, formatNumber } from "@/lib/utils";
-import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
+import { Link } from 'react-router-dom';
+import { ArrowLeftRight, Coins, Cpu, TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { getCoinProfile, type CoinId } from '@/lib/coin/profile';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { type TransactionItem } from '@/lib/rpc/client';
+import { formatCoinAmount } from '@/lib/units';
+import { networkCoinsStakingPercent, mergeStakingNetworkKpis } from '@/lib/staking-stats';
+import { transactionCategoryLabel } from '@/lib/transaction-category';
+import { AnimatedHashrate } from '@/components/AnimatedHashrate';
+import { cn, formatNumber } from '@/lib/utils';
+import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';
 
 function isEarnActivity(tx: TransactionItem, coin: CoinId): boolean {
-  if (coin === "verium") {
+  if (coin === 'verium') {
     return (
-      tx.category === "generate" ||
-      tx.category === "immature" ||
-      (tx.category === "receive" && tx.amount > 0)
+      tx.category === 'generate' ||
+      tx.category === 'immature' ||
+      (tx.category === 'receive' && tx.amount > 0)
     );
   }
   return (
-    tx.category === "stake" ||
-    tx.category === "stake-mint" ||
-    tx.category === "stake-orphan" ||
-    (tx.category === "receive" && tx.amount > 0)
+    tx.category === 'stake' ||
+    tx.category === 'stake-mint' ||
+    tx.category === 'stake-orphan' ||
+    (tx.category === 'receive' && tx.amount > 0)
   );
 }
 
@@ -46,13 +43,9 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
   const showRpcData = connected;
 
   const vrcNetwork =
-    coin === "vericoin"
-      ? mergeStakingNetworkKpis(vrcMining.data, stats.data)
-      : null;
+    coin === 'vericoin' ? mergeStakingNetworkKpis(vrcMining.data, stats.data) : null;
   const vrcNetworkStakePct =
-    coin === "vericoin"
-      ? networkCoinsStakingPercent(vrcNetwork?.netStakeWeight)
-      : null;
+    coin === 'vericoin' ? networkCoinsStakingPercent(vrcNetwork?.netStakeWeight) : null;
 
   const activity = (txs.data ?? [])
     .filter((tx) => isEarnActivity(tx, coin))
@@ -64,41 +57,39 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <Card>
         <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-base normal-case">
-            {profile.displayName} wallet
-          </CardTitle>
+          <CardTitle className="text-base normal-case">{profile.displayName} wallet</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3 pb-4 pt-0 text-sm">
           <div>
             <div className="text-xs text-fg-subtle">Balance</div>
-            <div className={cn("font-semibold tabular-nums", blurClass)}>
+            <div className={cn('font-semibold tabular-nums', blurClass)}>
               {showRpcData && effectiveWallet
                 ? formatCoinAmount(effectiveWallet.balance, coin, 4)
-                : "—"}
+                : '—'}
             </div>
           </div>
           <div>
             <div className="text-xs text-fg-subtle">Immature</div>
-            <div className={cn("font-semibold tabular-nums", blurClass)}>
+            <div className={cn('font-semibold tabular-nums', blurClass)}>
               {showRpcData && effectiveWallet
                 ? formatCoinAmount(effectiveWallet.immature_balance, coin, 4)
-                : "—"}
+                : '—'}
             </div>
           </div>
-          {coin === "vericoin" && (
+          {coin === 'vericoin' && (
             <div className="col-span-2">
               <div className="text-xs text-fg-subtle">Stake weight</div>
-              <div className={cn("font-semibold tabular-nums", blurClass)}>
+              <div className={cn('font-semibold tabular-nums', blurClass)}>
                 {vrcMining.data?.stakeweight?.combined != null
                   ? formatNumber(vrcMining.data.stakeweight.combined, 0)
-                  : "—"}
+                  : '—'}
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {coin === "verium" ? (
+      {coin === 'verium' ? (
         <Card>
           <CardHeader className="flex-row items-center justify-between pb-2 pt-4">
             <CardTitle className="flex items-center gap-2 text-base normal-case">
@@ -121,9 +112,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
             </div>
             <div>
               <div className="text-xs text-fg-subtle">Miner</div>
-              <div className="font-semibold">
-                {vrmMiner.data?.active ? "Running" : "Stopped"}
-              </div>
+              <div className="font-semibold">{vrmMiner.data?.active ? 'Running' : 'Stopped'}</div>
             </div>
             {stats.data?.price_usd != null && (
               <div className="col-span-2">
@@ -150,24 +139,20 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
           <CardContent className="grid grid-cols-2 gap-3 pb-4 pt-0 text-sm">
             <div>
               <div className="text-xs text-fg-subtle">Staking</div>
-              <div className="font-semibold">
-                {vrcStaking.data?.active ? "Active" : "Stopped"}
-              </div>
+              <div className="font-semibold">{vrcStaking.data?.active ? 'Active' : 'Stopped'}</div>
             </div>
             <div>
               <div className="text-xs text-fg-subtle">Interest rate</div>
               <div className="font-semibold tabular-nums">
                 {vrcNetwork?.interestRate != null
                   ? `${formatNumber(vrcNetwork.interestRate, 2)}%`
-                  : "—"}
+                  : '—'}
               </div>
             </div>
             <div>
               <div className="text-xs text-fg-subtle">Network stake</div>
               <div className="font-semibold tabular-nums">
-                {vrcNetworkStakePct != null
-                  ? `${formatNumber(vrcNetworkStakePct, 2)}%`
-                  : "—"}
+                {vrcNetworkStakePct != null ? `${formatNumber(vrcNetworkStakePct, 2)}%` : '—'}
               </div>
             </div>
             <div>
@@ -175,7 +160,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
               <div className="font-semibold tabular-nums">
                 {vrcMining.data?.stakeweight?.combined != null
                   ? formatNumber(vrcMining.data.stakeweight.combined, 0)
-                  : "—"}
+                  : '—'}
               </div>
             </div>
             {stats.data?.price_usd != null && (
@@ -195,8 +180,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
       <Card className="lg:col-span-2">
         <CardHeader className="flex-row items-center justify-between pb-2 pt-4">
           <CardTitle className="flex items-center gap-2 text-base normal-case">
-            <ArrowLeftRight className="h-4 w-4" /> Recent {profile.symbol}{" "}
-            activity
+            <ArrowLeftRight className="h-4 w-4" /> Recent {profile.symbol} activity
           </CardTitle>
           <Link to="/transactions" className="text-xs text-accent underline">
             All transactions →
@@ -204,9 +188,7 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
         </CardHeader>
         <CardContent className="pb-4 pt-0">
           {activity.length === 0 ? (
-            <div className="text-sm text-fg-muted">
-              No recent {profile.symbol} activity yet.
-            </div>
+            <div className="text-sm text-fg-muted">No recent {profile.symbol} activity yet.</div>
           ) : (
             <ul className="divide-y divide-border text-sm">
               {activity.map((tx) => (
@@ -215,14 +197,10 @@ export function DashboardStrip({ coin }: { coin: CoinId }) {
                   className="flex items-center justify-between gap-3 py-2"
                 >
                   <div className="min-w-0">
-                    <div className="font-medium">
-                      {transactionCategoryLabel(tx.category)}
-                    </div>
-                    <div className="truncate text-xs text-fg-subtle">
-                      {tx.txid.slice(0, 16)}…
-                    </div>
+                    <div className="font-medium">{transactionCategoryLabel(tx.category)}</div>
+                    <div className="truncate text-xs text-fg-subtle">{tx.txid.slice(0, 16)}…</div>
                   </div>
-                  <div className={cn("shrink-0 font-semibold tabular-nums", blurClass)}>
+                  <div className={cn('shrink-0 font-semibold tabular-nums', blurClass)}>
                     {formatCoinAmount(tx.amount, coin, 4)}
                   </div>
                 </li>

@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { lightServerStatus } from "@/lib/light-wallet/client";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
+import { useQuery } from '@tanstack/react-query';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { lightServerStatus } from '@/lib/light-wallet/client';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 
 /** Electrum reachability for light mode (replaces daemon `connected` in UI gates). */
 export function useLightServerConnected() {
@@ -12,7 +12,7 @@ export function useLightServerConnected() {
   const visible = useWindowVisible();
 
   const query = useQuery({
-    queryKey: coinQueryKey(coin, "light-server-status"),
+    queryKey: coinQueryKey(coin, 'light-server-status'),
     queryFn: () => lightServerStatus(coin),
     enabled: isLight,
     refetchInterval: isLight && visible ? 15_000 : false,

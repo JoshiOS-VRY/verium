@@ -1,4 +1,4 @@
-import { POOL_DISCLAIMER } from "@/lib/verium-pool";
+import { POOL_DISCLAIMER } from '@/lib/verium-pool';
 
 export function PoolDisclaimer() {
   return (

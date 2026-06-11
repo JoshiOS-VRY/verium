@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useEnabledCoins } from "@/lib/coin/context";
-import { backupRunScheduled } from "@/lib/security/client";
+import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useEnabledCoins } from '@/lib/coin/context';
+import { backupRunScheduled } from '@/lib/security/client';
 
 /** How often the app checks whether a scheduled backup is due. */
 export const BACKUP_SCHEDULER_TICK_MS = 60_000;
@@ -19,22 +19,22 @@ export function useScheduledBackup() {
   const queryClient = useQueryClient();
   const enabledCoins = useEnabledCoins();
   const runningRef = useRef(false);
-  const coinsKey = enabledCoins.join(",");
+  const coinsKey = enabledCoins.join(',');
 
   useEffect(() => {
     if (isLight) return;
     const tick = async () => {
-      if (document.visibilityState === "hidden") return;
+      if (document.visibilityState === 'hidden') return;
       if (runningRef.current || enabledCoins.length === 0) return;
 
       runningRef.current = true;
       try {
         const result = await backupRunScheduled(enabledCoins);
         if (result.ran) {
-          await queryClient.invalidateQueries({ queryKey: ["backup-health"] });
+          await queryClient.invalidateQueries({ queryKey: ['backup-health'] });
         }
       } catch (err) {
-        console.warn("scheduled backup tick failed:", err);
+        console.warn('scheduled backup tick failed:', err);
       } finally {
         runningRef.current = false;
       }

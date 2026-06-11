@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/Button";
-import { TotpQrCode } from "@/components/TotpQrCode";
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/Button';
+import { TotpQrCode } from '@/components/TotpQrCode';
 import {
   twoFactorConfirmEnrollment,
   twoFactorPendingOtpauthUri,
   twoFactorStartEnrollment,
   twoFactorStatus,
-} from "@/lib/security/client";
+} from '@/lib/security/client';
 
 const totpInputClass =
-  "h-9 w-full max-w-[12rem] rounded-md border border-border bg-bg-subtle px-3 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-1 focus:ring-accent/30";
+  'h-9 w-full max-w-[12rem] rounded-md border border-border bg-bg-subtle px-3 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-1 focus:ring-accent/30';
 
 interface TwoFactorEnrollmentPanelProps {
   /** Called after 2FA is confirmed and enabled. */
@@ -29,16 +29,16 @@ export function TwoFactorEnrollmentPanel({
   className,
 }: TwoFactorEnrollmentPanelProps) {
   const queryClient = useQueryClient();
-  const [totpCode, setTotpCode] = useState("");
+  const [totpCode, setTotpCode] = useState('');
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const status = useQuery({
-    queryKey: ["two-factor"],
+    queryKey: ['two-factor'],
     queryFn: twoFactorStatus,
   });
 
   const pendingOtpauth = useQuery({
-    queryKey: ["two-factor-pending-uri", status.data?.secret_base32],
+    queryKey: ['two-factor-pending-uri', status.data?.secret_base32],
     queryFn: twoFactorPendingOtpauthUri,
     enabled: Boolean(!status.data?.enabled && status.data?.secret_base32),
   });
@@ -46,17 +46,15 @@ export function TwoFactorEnrollmentPanel({
   const enroll = useMutation({
     mutationFn: twoFactorStartEnrollment,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["two-factor"] });
-      void queryClient.invalidateQueries({ queryKey: ["two-factor-pending-uri"] });
+      void queryClient.invalidateQueries({ queryKey: ['two-factor'] });
+      void queryClient.invalidateQueries({ queryKey: ['two-factor-pending-uri'] });
     },
   });
 
-  const enrollmentSecret =
-    enroll.data?.secret_base32 ?? status.data?.secret_base32 ?? null;
-  const enrollmentOtpauth =
-    enroll.data?.otpauth_uri ?? pendingOtpauth.data ?? null;
+  const enrollmentSecret = enroll.data?.secret_base32 ?? status.data?.secret_base32 ?? null;
+  const enrollmentOtpauth = enroll.data?.otpauth_uri ?? pendingOtpauth.data ?? null;
   const showEnrollmentPanel = Boolean(
-    !status.data?.enabled && enrollmentSecret && enrollmentOtpauth,
+    !status.data?.enabled && enrollmentSecret && enrollmentOtpauth
   );
 
   const confirm = useMutation({
@@ -64,11 +62,11 @@ export function TwoFactorEnrollmentPanel({
       twoFactorConfirmEnrollment(code, secret),
     onMutate: () => setConfirmError(null),
     onSuccess: async () => {
-      setTotpCode("");
+      setTotpCode('');
       setConfirmError(null);
       enroll.reset();
       queryClient.setQueryData(
-        ["two-factor"],
+        ['two-factor'],
         (prev: Awaited<ReturnType<typeof twoFactorStatus>> | undefined) => ({
           ...(prev ?? {
             enabled: false,
@@ -77,10 +75,10 @@ export function TwoFactorEnrollmentPanel({
           }),
           enabled: true,
           secret_base32: null,
-        }),
+        })
       );
-      await queryClient.invalidateQueries({ queryKey: ["two-factor"] });
-      await queryClient.invalidateQueries({ queryKey: ["two-factor-pending-uri"] });
+      await queryClient.invalidateQueries({ queryKey: ['two-factor'] });
+      await queryClient.invalidateQueries({ queryKey: ['two-factor-pending-uri'] });
       onEnabled?.();
     },
     onError: (err) => setConfirmError(String(err)),
@@ -94,13 +92,7 @@ export function TwoFactorEnrollmentPanel({
     if (autoStartAttempted.current || enroll.isPending) return;
     autoStartAttempted.current = true;
     enroll.mutate();
-  }, [
-    autoStartEnrollment,
-    status.data?.enabled,
-    showEnrollmentPanel,
-    enroll.isPending,
-    enroll,
-  ]);
+  }, [autoStartEnrollment, status.data?.enabled, showEnrollmentPanel, enroll.isPending, enroll]);
 
   if (status.data?.enabled) {
     return (
@@ -119,24 +111,19 @@ export function TwoFactorEnrollmentPanel({
           disabled={enroll.isPending}
           className="self-start"
         >
-          {enroll.isPending ? "Starting…" : "Set up authenticator app"}
+          {enroll.isPending ? 'Starting…' : 'Set up authenticator app'}
         </Button>
       )}
       {autoStartEnrollment && enroll.isPending && !showEnrollmentPanel && (
         <p className="text-xs text-fg-muted">Preparing your authenticator setup…</p>
       )}
-      {enroll.error && (
-        <p className="text-xs text-danger">{String(enroll.error)}</p>
-      )}
+      {enroll.error && <p className="text-xs text-danger">{String(enroll.error)}</p>}
       {showEnrollmentPanel && enrollmentSecret && enrollmentOtpauth && (
         <div className="space-y-3 rounded-md border border-border bg-bg-subtle p-4 text-xs">
-          <TotpQrCode
-            otpauthUri={enrollmentOtpauth}
-            secretBase32={enrollmentSecret}
-          />
+          <TotpQrCode otpauthUri={enrollmentOtpauth} secretBase32={enrollmentSecret} />
           <p className="text-fg-muted">
-            Enter the 6-digit code from your app to confirm. Use the QR or manual
-            key shown here—do not start enrollment again or the code will change.
+            Enter the 6-digit code from your app to confirm. Use the QR or manual key shown here—do
+            not start enrollment again or the code will change.
           </p>
           <input
             type="text"
@@ -145,7 +132,7 @@ export function TwoFactorEnrollmentPanel({
             maxLength={6}
             value={totpCode}
             onChange={(e) => {
-              setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+              setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
               setConfirmError(null);
             }}
             placeholder="6-digit code"
@@ -156,16 +143,14 @@ export function TwoFactorEnrollmentPanel({
             size="sm"
             onClick={() => {
               if (totpCode.length < 6) {
-                setConfirmError(
-                  "Enter the full 6-digit code from your authenticator.",
-                );
+                setConfirmError('Enter the full 6-digit code from your authenticator.');
                 return;
               }
               confirm.mutate({ code: totpCode, secret: enrollmentSecret });
             }}
             disabled={confirm.isPending || totpCode.length < 6}
           >
-            {confirm.isPending ? "Confirming…" : "Confirm 2FA"}
+            {confirm.isPending ? 'Confirming…' : 'Confirm 2FA'}
           </Button>
           {enroll.data?.recovery_codes && (
             <details>
@@ -173,7 +158,7 @@ export function TwoFactorEnrollmentPanel({
                 Recovery codes (save these offline)
               </summary>
               <pre className="mt-1 whitespace-pre-wrap text-fg">
-                {enroll.data.recovery_codes.join("\n")}
+                {enroll.data.recovery_codes.join('\n')}
               </pre>
             </details>
           )}

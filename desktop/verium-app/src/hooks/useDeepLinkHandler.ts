@@ -1,13 +1,13 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import type { CoinId } from "@/lib/coin/profile";
-import { parsePaymentUri } from "@/lib/security/client";
-import { setPendingPaymentUri } from "@/lib/payment-uri-pending";
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
+import type { CoinId } from '@/lib/coin/profile';
+import { parsePaymentUri } from '@/lib/security/client';
+import { setPendingPaymentUri } from '@/lib/payment-uri-pending';
 
 function coinFromScheme(scheme: string): CoinId | null {
-  if (scheme === "verium") return "verium";
-  if (scheme === "vericoin") return "vericoin";
+  if (scheme === 'verium') return 'verium';
+  if (scheme === 'vericoin') return 'vericoin';
   return null;
 }
 
@@ -18,7 +18,7 @@ async function handleUrls(urls: string[], navigate: (path: string) => void) {
       const coin = coinFromScheme(parsed.scheme);
       if (!coin) continue;
       setPendingPaymentUri({ ...parsed, coin });
-      navigate("/transactions");
+      navigate('/transactions');
     } catch {
       // Ignore malformed URIs.
     }

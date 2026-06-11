@@ -1,15 +1,15 @@
-import { Monitor, Moon, Sun } from "lucide-react";
-import type { ThemeMode } from "@/lib/theme";
-import { cn } from "@/lib/utils";
+import { Monitor, Moon, Sun } from 'lucide-react';
+import type { ThemeMode } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 
 const THEME_OPTIONS: {
   value: ThemeMode;
   label: string;
   Icon: typeof Monitor;
 }[] = [
-  { value: "system", label: "Auto", Icon: Monitor },
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
+  { value: 'system', label: 'Auto', Icon: Monitor },
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'dark', label: 'Dark', Icon: Moon },
 ];
 
 export function ThemeSegmented({
@@ -35,10 +35,8 @@ export function ThemeSegmented({
             aria-checked={active}
             onClick={() => void onChange(optionValue)}
             className={cn(
-              "w-full text-center inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
-              active
-                ? "bg-accent text-accent-fg"
-                : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+              'w-full text-center inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
+              active ? 'bg-accent text-accent-fg' : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
             )}
           >
             <Icon className="h-3.5 w-3.5" />

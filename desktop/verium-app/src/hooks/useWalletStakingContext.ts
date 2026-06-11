@@ -1,14 +1,14 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useWalletTransactions } from "@/hooks/useWalletTransactions";
-import { rpcListAddressGroupings } from "@/lib/rpc/client";
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useWalletTransactions } from '@/hooks/useWalletTransactions';
+import { rpcListAddressGroupings } from '@/lib/rpc/client';
 
-const VERICOIN = "vericoin" as const;
+const VERICOIN = 'vericoin' as const;
 
 export function useWalletStakingContext(enabled = true) {
   const addresses = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "listaddressgroupings"),
+    queryKey: coinQueryKey(VERICOIN, 'listaddressgroupings'),
     queryFn: () => rpcListAddressGroupings(VERICOIN),
     staleTime: 60_000,
     refetchInterval: false,
@@ -23,7 +23,7 @@ export function useWalletStakingContext(enabled = true) {
     const stakedHeights = new Set<number>();
 
     for (const tx of txs.data ?? []) {
-      if (tx.category === "stake-mint") {
+      if (tx.category === 'stake-mint') {
         if (tx.address) walletAddresses.add(tx.address);
         if (tx.blockheight != null) stakedHeights.add(tx.blockheight);
       }
@@ -35,13 +35,10 @@ export function useWalletStakingContext(enabled = true) {
 
 export function isBlockStakedByWallet(
   block: { height: number; miner_address?: string },
-  ctx: { walletAddresses: Set<string>; stakedHeights: Set<number> },
+  ctx: { walletAddresses: Set<string>; stakedHeights: Set<number> }
 ): boolean {
   if (ctx.stakedHeights.has(block.height)) return true;
-  if (
-    block.miner_address &&
-    ctx.walletAddresses.has(block.miner_address)
-  ) {
+  if (block.miner_address && ctx.walletAddresses.has(block.miner_address)) {
     return true;
   }
   return false;

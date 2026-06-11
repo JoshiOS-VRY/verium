@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import { Loader2 } from "lucide-react";
-import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { cn } from "@/lib/utils";
+import type { ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
+import { cn } from '@/lib/utils';
 
 export interface AnimatedHashrateProps {
   value?: number;
@@ -23,28 +23,20 @@ export interface AnimatedHashrateProps {
 export function AnimatedHashrate({
   value,
   fractionDigits = 2,
-  unit = "H/m",
+  unit = 'H/m',
   className,
   unitClassName,
   booting = false,
-  fallback = "—",
+  fallback = '—',
   showTrendColor = true,
   spinnerClassName,
   immediate = false,
 }: AnimatedHashrateProps) {
   if (booting) {
     return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 text-fg-muted",
-          className,
-        )}
-      >
+      <span className={cn('inline-flex items-center gap-1.5 text-fg-muted', className)}>
         <Loader2
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 animate-spin text-accent",
-            spinnerClassName,
-          )}
+          className={cn('h-3.5 w-3.5 shrink-0 animate-spin text-accent', spinnerClassName)}
           aria-hidden
         />
         Starting…
@@ -63,14 +55,7 @@ export function AnimatedHashrate({
         immediate={immediate}
       />
       {unit && value != null && Number.isFinite(value) ? (
-        <span
-          className={cn(
-            "ml-1 font-normal text-fg-subtle",
-            unitClassName,
-          )}
-        >
-          {unit}
-        </span>
+        <span className={cn('ml-1 font-normal text-fg-subtle', unitClassName)}>{unit}</span>
       ) : null}
     </span>
   );

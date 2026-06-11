@@ -1,9 +1,6 @@
-import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import {
-  SHUTDOWN_PROGRESS_EVENT,
-  type ShutdownProgress,
-} from "@/lib/shutdown-progress";
+import { useEffect, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
+import { SHUTDOWN_PROGRESS_EVENT, type ShutdownProgress } from '@/lib/shutdown-progress';
 
 /** Subscribes to backend shutdown-progress events during wallet quit. */
 export function useShutdownProgress(active = true) {
@@ -16,13 +13,10 @@ export function useShutdownProgress(active = true) {
     }
 
     let cancelled = false;
-    const unlistenPromise = listen<ShutdownProgress>(
-      SHUTDOWN_PROGRESS_EVENT,
-      (event) => {
-        if (cancelled) return;
-        setProgress(event.payload);
-      },
-    );
+    const unlistenPromise = listen<ShutdownProgress>(SHUTDOWN_PROGRESS_EVENT, (event) => {
+      if (cancelled) return;
+      setProgress(event.payload);
+    });
 
     return () => {
       cancelled = true;

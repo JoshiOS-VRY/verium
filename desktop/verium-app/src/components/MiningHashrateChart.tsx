@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { Loader2 } from "lucide-react";
+import { memo } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -9,17 +9,12 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { MiningPickaxeAnimation } from "@/components/MiningPickaxeAnimation";
-import { EXPLORER_PROFITABILITY } from "@/lib/verium-links";
-import { formatNumber } from "@/lib/utils";
+} from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { MiningPickaxeAnimation } from '@/components/MiningPickaxeAnimation';
+import { EXPLORER_PROFITABILITY } from '@/lib/verium-links';
+import { formatNumber } from '@/lib/utils';
 
 export interface HashSample {
   t: number;
@@ -43,12 +38,9 @@ function MiningHashrateChartImpl({
   active,
   emptyWhenIdle,
 }: MiningHashrateChartProps) {
-  const sessionStartMs =
-    sessionStartedAt != null ? sessionStartedAt * 1000 : undefined;
-  const showEmpty =
-    emptyWhenIdle && !active && !minerBooting && samples.length === 0;
-  const showBootingWait =
-    minerBooting && samples.length === 0 && !showEmpty;
+  const sessionStartMs = sessionStartedAt != null ? sessionStartedAt * 1000 : undefined;
+  const showEmpty = emptyWhenIdle && !active && !minerBooting && samples.length === 0;
+  const showBootingWait = minerBooting && samples.length === 0 && !showEmpty;
 
   return (
     <Card>
@@ -64,7 +56,7 @@ function MiningHashrateChartImpl({
           </CardTitle>
         </div>
         <ExplorerLink
-          target={{ kind: "raw", url: EXPLORER_PROFITABILITY }}
+          target={{ kind: 'raw', url: EXPLORER_PROFITABILITY }}
           label="Profitability calculator"
         />
       </CardHeader>
@@ -101,27 +93,19 @@ function MiningHashrateChartImpl({
               />
               <YAxis stroke="var(--fg-subtle)" fontSize={11} />
               <Tooltip
-                labelFormatter={(t) =>
-                  new Date(t as number).toLocaleTimeString()
-                }
+                labelFormatter={(t) => new Date(t as number).toLocaleTimeString()}
                 formatter={(value) => {
                   const hr = Number(value);
-                  const lines = [`${formatNumber(hr, 2)} H/m`, "Hashrate"];
-                  if (
-                    sessionAvg != null &&
-                    sessionAvg > 0 &&
-                    Number.isFinite(hr)
-                  ) {
+                  const lines = [`${formatNumber(hr, 2)} H/m`, 'Hashrate'];
+                  if (sessionAvg != null && sessionAvg > 0 && Number.isFinite(hr)) {
                     const delta = ((hr - sessionAvg) / sessionAvg) * 100;
-                    lines.push(
-                      `${delta >= 0 ? "+" : ""}${formatNumber(delta, 1)}% vs avg`,
-                    );
+                    lines.push(`${delta >= 0 ? '+' : ''}${formatNumber(delta, 1)}% vs avg`);
                   }
                   return lines;
                 }}
                 contentStyle={{
-                  backgroundColor: "var(--bg-panel)",
-                  border: "1px solid var(--border)",
+                  backgroundColor: 'var(--bg-panel)',
+                  border: '1px solid var(--border)',
                   borderRadius: 6,
                   fontSize: 12,
                 }}
@@ -132,10 +116,10 @@ function MiningHashrateChartImpl({
                   stroke="var(--fg-subtle)"
                   strokeDasharray="3 3"
                   label={{
-                    value: "session",
-                    position: "insideTopLeft",
+                    value: 'session',
+                    position: 'insideTopLeft',
                     fontSize: 10,
-                    fill: "var(--fg-subtle)",
+                    fill: 'var(--fg-subtle)',
                   }}
                 />
               )}
@@ -145,10 +129,10 @@ function MiningHashrateChartImpl({
                   stroke="var(--fg-subtle)"
                   strokeDasharray="4 4"
                   label={{
-                    value: "avg",
-                    position: "insideTopRight",
+                    value: 'avg',
+                    position: 'insideTopRight',
                     fontSize: 10,
-                    fill: "var(--fg-subtle)",
+                    fill: 'var(--fg-subtle)',
                   }}
                 />
               )}

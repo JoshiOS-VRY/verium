@@ -1,14 +1,14 @@
-import { Outlet } from "react-router-dom";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { DashboardNodeActivity } from "./DashboardNodeActivity";
-import { NodeRecoveryBanner } from "./NodeRecoveryBanner";
-import { NetworkModeBanner } from "./NetworkModeBanner";
-import { ShutdownProgressOverlay } from "./ShutdownProgressOverlay";
-import { SyncStallBanner } from "./SyncStallBanner";
-import { CoinSwitchOverlay } from "./CoinSwitchOverlay";
-import { Sidebar } from "./Sidebar";
-import { TopBar } from "./TopBar";
+import { Outlet } from 'react-router-dom';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { DashboardNodeActivity } from './DashboardNodeActivity';
+import { NodeRecoveryBanner } from './NodeRecoveryBanner';
+import { NetworkModeBanner } from './NetworkModeBanner';
+import { ShutdownProgressOverlay } from './ShutdownProgressOverlay';
+import { SyncStallBanner } from './SyncStallBanner';
+import { CoinSwitchOverlay } from './CoinSwitchOverlay';
+import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
 
 export function AppShell() {
   const coin = useActiveCoin();

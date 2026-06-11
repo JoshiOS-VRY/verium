@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { animated, useSpring } from "@react-spring/web";
-import { WALLET_NUMBER_SPRING } from "@/hooks/useSpringNumber";
-import { cn, formatNumber } from "@/lib/utils";
+import { useEffect, useRef } from 'react';
+import { animated, useSpring } from '@react-spring/web';
+import { WALLET_NUMBER_SPRING } from '@/hooks/useSpringNumber';
+import { cn, formatNumber } from '@/lib/utils';
 
 interface AnimatedBlockNumberProps {
   value?: number;
@@ -15,8 +15,7 @@ interface AnimatedBlockNumberProps {
 
 function prefersReducedMotion(): boolean {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
 
@@ -28,19 +27,14 @@ export function AnimatedBlockNumber({
   className,
   animateOnIncrease = true,
   forceSpring = false,
-  fallback = "—",
+  fallback = '—',
 }: AnimatedBlockNumberProps) {
   const prev = useRef<number | undefined>(undefined);
 
   const hasValue = value != null && Number.isFinite(value);
-  const increased =
-    hasValue &&
-    prev.current != null &&
-    value > prev.current;
+  const increased = hasValue && prev.current != null && value > prev.current;
   const shouldSpring =
-    hasValue &&
-    !prefersReducedMotion() &&
-    (forceSpring || (animateOnIncrease && increased));
+    hasValue && !prefersReducedMotion() && (forceSpring || (animateOnIncrease && increased));
 
   const { number } = useSpring({
     number: hasValue ? value : 0,
@@ -59,9 +53,9 @@ export function AnimatedBlockNumber({
   return (
     <animated.span
       className={cn(
-        "inline-block tabular-nums",
-        shouldSpring && "animated-block-number",
-        className,
+        'inline-block tabular-nums',
+        shouldSpring && 'animated-block-number',
+        className
       )}
     >
       {number.to((n) => formatNumber(Math.round(n)))}

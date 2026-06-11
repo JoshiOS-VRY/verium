@@ -1,23 +1,17 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Cloud, HardDrive, Loader2, Server } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { electrumUriFriendlyLabel } from "@/lib/light-wallet/labels";
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { invalidateLightWalletQueries } from "@/lib/invalidate-wallet-queries";
-import { useUserPreferences } from "@/lib/user-preferences";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Cloud, HardDrive, Loader2, Server } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useInvalidateWalletMode, useWalletMode } from '@/hooks/useWalletMode';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { electrumUriFriendlyLabel } from '@/lib/light-wallet/labels';
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { invalidateLightWalletQueries } from '@/lib/invalidate-wallet-queries';
+import { useUserPreferences } from '@/lib/user-preferences';
 import {
   electrumServersGet,
   electrumServersSet,
@@ -25,7 +19,7 @@ import {
   type WalletMode,
   walletModeGetForCoin,
   walletModeSetForCoin,
-} from "@/lib/light-wallet/client";
+} from '@/lib/light-wallet/client';
 
 export function WalletModeCard() {
   const { lightWalletEnabled } = useWalletMode();
@@ -42,18 +36,18 @@ function WalletModeCardInner() {
   const queryClient = useQueryClient();
   const reloadPrefs = useUserPreferences((s) => s.load);
   const invalidateWalletMode = useInvalidateWalletMode();
-  const [customServers, setCustomServers] = useState("");
+  const [customServers, setCustomServers] = useState('');
   const [confirmSwitch, setConfirmSwitch] = useState<WalletMode | null>(null);
 
   const modeStatus = useQuery({
-    queryKey: ["wallet-mode-status", activeCoin],
+    queryKey: ['wallet-mode-status', activeCoin],
     queryFn: () => walletModeGetForCoin(activeCoin),
   });
 
   const servers = useQuery({
-    queryKey: ["electrum-servers", activeCoin],
+    queryKey: ['electrum-servers', activeCoin],
     queryFn: () => electrumServersGet(activeCoin),
-    enabled: modeStatus.data?.mode === "light",
+    enabled: modeStatus.data?.mode === 'light',
   });
 
   const setMode = useMutation({
@@ -61,19 +55,19 @@ function WalletModeCardInner() {
     onSuccess: async (_data, mode) => {
       invalidateWalletMode();
       queryClient.removeQueries({
-        queryKey: coinQueryKey(activeCoin, "getwalletinfo"),
+        queryKey: coinQueryKey(activeCoin, 'getwalletinfo'),
       });
-      for (const targetCoin of ["verium", "vericoin"] as CoinId[]) {
+      for (const targetCoin of ['verium', 'vericoin'] as CoinId[]) {
         await invalidateLightWalletQueries(queryClient, targetCoin);
       }
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(activeCoin, "light-server-status"),
+        queryKey: coinQueryKey(activeCoin, 'light-server-status'),
       });
       await reloadPrefs();
       setConfirmSwitch(null);
-      if (mode === "light") {
+      if (mode === 'light') {
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(activeCoin, "getwalletinfo"),
+          queryKey: coinQueryKey(activeCoin, 'getwalletinfo'),
         });
       }
     },
@@ -82,7 +76,7 @@ function WalletModeCardInner() {
   const saveServers = useMutation({
     mutationFn: (list: string[]) => electrumServersSet(activeCoin, list),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["electrum-servers", activeCoin] });
+      void queryClient.invalidateQueries({ queryKey: ['electrum-servers', activeCoin] });
     },
   });
 
@@ -90,22 +84,19 @@ function WalletModeCardInner() {
     mutationFn: () => electrumTestConnection(activeCoin),
   });
 
-  const activeMode = modeStatus.data?.mode ?? "full_node";
-  const isLight = activeMode === "light";
+  const activeMode = modeStatus.data?.mode ?? 'full_node';
+  const isLight = activeMode === 'light';
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Wallet mode
-          <Badge tone={isLight ? "accent" : "neutral"}>
-            {isLight ? "Light" : "Full node"}
-          </Badge>
+          <Badge tone={isLight ? 'accent' : 'neutral'}>{isLight ? 'Light' : 'Full node'}</Badge>
         </CardTitle>
         <CardDescription>
-          Full node mode (recommended) validates the chain locally. Light mode is
-          a convenience tier that trusts Electrum index servers for balance data;
-          keys still sign on this device.
+          Full node mode (recommended) validates the chain locally. Light mode is a convenience tier
+          that trusts Electrum index servers for balance data; keys still sign on this device.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -118,55 +109,47 @@ function WalletModeCardInner() {
           <button
             type="button"
             className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-              !isLight
-                ? "border-accent bg-accent/10"
-                : "border-border hover:border-accent/50"
+              !isLight ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50'
             }`}
-            onClick={() => setConfirmSwitch("full_node")}
+            onClick={() => setConfirmSwitch('full_node')}
           >
             <div className="mb-1 flex items-center gap-2 font-medium">
               <HardDrive className="h-4 w-4" />
               Full node (recommended)
             </div>
-            <p className="text-xs text-fg-muted">
-              {lightWalletCopy.setupFullNodeRecommended}
-            </p>
+            <p className="text-xs text-fg-muted">{lightWalletCopy.setupFullNodeRecommended}</p>
           </button>
           <button
             type="button"
             className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-              isLight
-                ? "border-warning bg-warning/10"
-                : "border-border hover:border-accent/50"
+              isLight ? 'border-warning bg-warning/10' : 'border-border hover:border-accent/50'
             }`}
-            onClick={() => setConfirmSwitch("light")}
+            onClick={() => setConfirmSwitch('light')}
           >
             <div className="mb-1 flex items-center gap-2 font-medium">
               <Cloud className="h-4 w-4" />
               Light wallet (convenience)
             </div>
-            <p className="text-xs text-fg-muted">
-              {lightWalletCopy.lightConvenienceWarning}
-            </p>
+            <p className="text-xs text-fg-muted">{lightWalletCopy.lightConvenienceWarning}</p>
           </button>
         </div>
 
         {confirmSwitch && confirmSwitch !== activeMode && (
           <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
             <p className="mb-1 font-medium text-fg">
-              {confirmSwitch === "light"
+              {confirmSwitch === 'light'
                 ? lightWalletCopy.migrationFullToLightTitle
                 : lightWalletCopy.migrationLightToFullTitle}
             </p>
             <p className="mb-2 text-fg-muted">
-              {confirmSwitch === "light"
+              {confirmSwitch === 'light'
                 ? lightWalletCopy.migrationFullToLightBody
                 : lightWalletCopy.migrationLightToFullBody}
             </p>
             <p className="mb-2 text-fg-muted">
               <Link to="/security" className="text-accent underline">
                 Open Security
-              </Link>{" "}
+              </Link>{' '}
               to export or import your recovery phrase before confirming.
             </p>
             <div className="flex gap-2">
@@ -175,16 +158,10 @@ function WalletModeCardInner() {
                 onClick={() => setMode.mutate(confirmSwitch)}
                 disabled={setMode.isPending}
               >
-                {setMode.isPending && (
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                )}
+                {setMode.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                 Confirm switch
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmSwitch(null)}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setConfirmSwitch(null)}>
                 Cancel
               </Button>
             </div>
@@ -203,9 +180,7 @@ function WalletModeCardInner() {
                   <span className="font-medium text-fg">
                     {electrumUriFriendlyLabel(s, activeCoin, i)}
                   </span>
-                  <span className="break-all font-mono text-[11px] text-fg-subtle">
-                    {s}
-                  </span>
+                  <span className="break-all font-mono text-[11px] text-fg-subtle">{s}</span>
                 </li>
               ))}
             </ul>
@@ -221,7 +196,7 @@ function WalletModeCardInner() {
                 variant="secondary"
                 onClick={() => {
                   const list = customServers
-                    .split(",")
+                    .split(',')
                     .map((s) => s.trim())
                     .filter(Boolean);
                   if (list.length > 0) saveServers.mutate(list);
@@ -236,27 +211,20 @@ function WalletModeCardInner() {
                 onClick={() => testConn.mutate()}
                 disabled={testConn.isPending}
               >
-                {testConn.isPending ? "Testing…" : "Test connection"}
+                {testConn.isPending ? 'Testing…' : 'Test connection'}
               </Button>
             </div>
             {testConn.data && (
               <div className="flex flex-col gap-2">
                 {(() => {
-                  const blocking = testConn.data.checks.filter(
-                    (c) => !c.ok && !c.optional,
-                  );
+                  const blocking = testConn.data.checks.filter((c) => !c.ok && !c.optional);
                   return (
-                <p
-                  className={
-                    testConn.data.passed ? "text-success" : "text-danger"
-                  }
-                >
-                  {testConn.data.server}:{" "}
-                  {testConn.data.passed ? "OK" : "Failed"}
-                  {blocking.length > 0
-                    ? ` (${blocking.length} issue${blocking.length === 1 ? "" : "s"})`
-                    : ""}
-                </p>
+                    <p className={testConn.data.passed ? 'text-success' : 'text-danger'}>
+                      {testConn.data.server}: {testConn.data.passed ? 'OK' : 'Failed'}
+                      {blocking.length > 0
+                        ? ` (${blocking.length} issue${blocking.length === 1 ? '' : 's'})`
+                        : ''}
+                    </p>
                   );
                 })()}
                 {!testConn.data.passed && (
@@ -266,7 +234,7 @@ function WalletModeCardInner() {
                       .map((c) => (
                         <li key={c.method}>
                           <span className="font-mono text-fg">{c.method}</span>
-                          {c.detail && c.detail !== "ok" ? (
+                          {c.detail && c.detail !== 'ok' ? (
                             <span className="text-danger"> — {c.detail}</span>
                           ) : null}
                         </li>
@@ -282,26 +250,18 @@ function WalletModeCardInner() {
                       <li
                         key={c.method}
                         className={
-                          c.ok
-                            ? "text-success"
-                            : c.optional
-                              ? "text-warning"
-                              : "text-danger"
+                          c.ok ? 'text-success' : c.optional ? 'text-warning' : 'text-danger'
                         }
                       >
-                        {c.ok ? "✓" : c.optional ? "○" : "✗"} {c.method}
-                        {c.detail && c.detail !== "ok" ? ` (${c.detail})` : ""}
+                        {c.ok ? '✓' : c.optional ? '○' : '✗'} {c.method}
+                        {c.detail && c.detail !== 'ok' ? ` (${c.detail})` : ''}
                       </li>
                     ))}
                   </ul>
                 </details>
               </div>
             )}
-            {testConn.error && (
-              <p className="text-danger text-xs">
-                {String(testConn.error)}
-              </p>
-            )}
+            {testConn.error && <p className="text-danger text-xs">{String(testConn.error)}</p>}
           </div>
         )}
       </CardContent>

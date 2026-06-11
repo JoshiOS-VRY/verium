@@ -1,37 +1,32 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/Button";
-import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
-import {
-  recoveryApplyHdSeed,
-  recoveryValidateMnemonic,
-} from "@/lib/security/client";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useTwoFactorGate } from "@/hooks/useTwoFactorGate";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { Button } from '@/components/ui/Button';
+import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
+import { recoveryApplyHdSeed, recoveryValidateMnemonic } from '@/lib/security/client';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
 
 interface RestoreFromPhraseFormProps {
   onRestored?: () => void;
 }
 
-export function RestoreFromPhraseForm({
-  onRestored,
-}: RestoreFromPhraseFormProps) {
+export function RestoreFromPhraseForm({ onRestored }: RestoreFromPhraseFormProps) {
   const coin = useActiveCoin();
   const twoFa = useTwoFactorGate(coin);
-  const [phrase, setPhrase] = useState("");
-  const [walletPassphrase, setWalletPassphrase] = useState("");
-  const [bip39Pass, setBip39Pass] = useState("");
+  const [phrase, setPhrase] = useState('');
+  const [walletPassphrase, setWalletPassphrase] = useState('');
+  const [bip39Pass, setBip39Pass] = useState('');
 
   const restore = useMutation({
     mutationFn: async (totpCode?: string) => {
       const valid = await recoveryValidateMnemonic(phrase);
-      if (!valid) throw new Error("Invalid recovery phrase checksum");
+      if (!valid) throw new Error('Invalid recovery phrase checksum');
       return recoveryApplyHdSeed(
         coin,
         phrase,
         bip39Pass || undefined,
         walletPassphrase || undefined,
-        totpCode,
+        totpCode
       );
     },
     onSuccess: () => onRestored?.(),
@@ -49,15 +44,14 @@ export function RestoreFromPhraseForm({
         className="flex flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void twoFa.gate("restore_wallet", (code) => restore.mutate(code), {
-            title: "Confirm phrase restore with 2FA",
+          void twoFa.gate('restore_wallet', (code) => restore.mutate(code), {
+            title: 'Confirm phrase restore with 2FA',
           });
         }}
       >
         <p className="text-sm text-fg-muted">
-          Restore from your 24-word BIP39 recovery phrase. Your wallet must be
-          unlocked first — enter the wallet passphrase you use day to day (not
-          the optional BIP39 passphrase below).
+          Restore from your 24-word BIP39 recovery phrase. Your wallet must be unlocked first —
+          enter the wallet passphrase you use day to day (not the optional BIP39 passphrase below).
         </p>
         <input
           type="password"
@@ -80,14 +74,10 @@ export function RestoreFromPhraseForm({
           placeholder="Optional BIP39 passphrase (25th word)"
           className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent"
         />
-        {restore.error && (
-          <p className="text-xs text-danger">{String(restore.error)}</p>
-        )}
-        {restore.isSuccess && (
-          <p className="text-xs text-success">{restore.data}</p>
-        )}
+        {restore.error && <p className="text-xs text-danger">{String(restore.error)}</p>}
+        {restore.isSuccess && <p className="text-xs text-success">{restore.data}</p>}
         <Button type="submit" disabled={!phrase.trim() || restore.isPending}>
-          {restore.isPending ? "Restoring…" : "Restore from phrase"}
+          {restore.isPending ? 'Restoring…' : 'Restore from phrase'}
         </Button>
       </form>
     </>

@@ -15,13 +15,13 @@ Grab the installer that matches your machine from the
 [GitHub Releases](https://github.com/JoshiOS-VRY/verium/releases) page (look
 for the `desktop-v1.0.0-alpha.1` prerelease).
 
-| Platform | Asset | Notes |
-| --- | --- | --- |
-| Windows 10/11 (x64) | `Vericonomy_Wallet_<version>_Windows_x64.exe` | Unsigned — see SmartScreen note below |
-| macOS (Intel) | `Vericonomy_Wallet_<version>_macOS_Intel.dmg` | For Intel Macs |
-| macOS (Apple Silicon) | `Vericonomy_Wallet_<version>_macOS_AppleSilicon.dmg` | For M1/M2/M3/M4 Macs |
-| Linux x64 | `Vericonomy_Wallet_<version>_Linux_x64.AppImage` or `.deb` | Most desktops/servers |
-| Linux ARM64 | `Vericonomy_Wallet_<version>_Linux_ARM64.AppImage` or `.deb` | Raspberry Pi 4/5, ARM servers |
+| Platform              | Asset                                                        | Notes                                 |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------- |
+| Windows 10/11 (x64)   | `Vericonomy_Wallet_<version>_Windows_x64.exe`                | Unsigned — see SmartScreen note below |
+| macOS (Intel)         | `Vericonomy_Wallet_<version>_macOS_Intel.dmg`                | For Intel Macs                        |
+| macOS (Apple Silicon) | `Vericonomy_Wallet_<version>_macOS_AppleSilicon.dmg`         | For M1/M2/M3/M4 Macs                  |
+| Linux x64             | `Vericonomy_Wallet_<version>_Linux_x64.AppImage` or `.deb`   | Most desktops/servers                 |
+| Linux ARM64           | `Vericonomy_Wallet_<version>_Linux_ARM64.AppImage` or `.deb` | Raspberry Pi 4/5, ARM servers         |
 
 **macOS: pick the DMG that matches your Mac.** If you are unsure, open the
 Apple menu → About This Mac. "Apple M…" means Apple Silicon (`aarch64`);
@@ -52,11 +52,11 @@ Alpha builds are not yet code-signed, so the OS will warn you on first launch.
 
 Installing or upgrading the alpha does not delete your existing data.
 
-| Platform | Data directory |
-| --- | --- |
-| Windows | `%APPDATA%\Verium` (app prefs under `%APPDATA%\Verium\desktop-app\`) |
-| macOS | `~/Library/Application Support/Verium` |
-| Linux | `~/.verium` (app prefs under `~/.config/Verium/desktop-app/`) |
+| Platform | Data directory                                                       |
+| -------- | -------------------------------------------------------------------- |
+| Windows  | `%APPDATA%\Verium` (app prefs under `%APPDATA%\Verium\desktop-app\`) |
+| macOS    | `~/Library/Application Support/Verium`                               |
+| Linux    | `~/.verium` (app prefs under `~/.config/Verium/desktop-app/`)        |
 
 ## Quick smoke test
 

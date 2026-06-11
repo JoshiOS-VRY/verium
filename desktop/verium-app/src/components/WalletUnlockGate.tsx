@@ -1,22 +1,16 @@
-import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { WalletUnlockForm } from "@/components/WalletUnlockForm";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useActiveCoin } from "@/lib/coin/context";
-import { rpcGetWalletInfo } from "@/lib/rpc/client";
-import { lightWalletExists } from "@/lib/light-wallet/client";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { COIN_PROFILES } from "@/lib/coin/profile";
-import { isWalletLocked } from "@/lib/wallet-unlock";
+import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { WalletUnlockForm } from '@/components/WalletUnlockForm';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useActiveCoin } from '@/lib/coin/context';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import { lightWalletExists } from '@/lib/light-wallet/client';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { COIN_PROFILES } from '@/lib/coin/profile';
+import { isWalletLocked } from '@/lib/wallet-unlock';
 
 interface WalletUnlockGateProps {
   children: ReactNode;
@@ -38,11 +32,11 @@ export function WalletUnlockGate({
   const profile = COIN_PROFILES[coin];
   const { isLight } = useWalletMode();
   const storedLightWallet = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryKey: coinQueryKey(coin, 'light-wallet-exists'),
     queryFn: () => lightWalletExists(coin),
   });
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
@@ -69,19 +63,14 @@ export function WalletUnlockGate({
               <CardTitle>{lightWalletCopy.modeMismatchMiningTitle}</CardTitle>
               <CardDescription>
                 {lightWalletCopy.modeMismatchMiningDescription.replace(
-                  "{coin}",
-                  profile.displayName,
+                  '{coin}',
+                  profile.displayName
                 )}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2 pt-0">
-              <p className="text-xs text-fg-muted">
-                {lightWalletCopy.modeMismatchMiningPoolHint}
-              </p>
-              <Link
-                to="/settings"
-                className="text-sm text-accent underline"
-              >
+              <p className="text-xs text-fg-muted">{lightWalletCopy.modeMismatchMiningPoolHint}</p>
+              <Link to="/settings" className="text-sm text-accent underline">
                 {lightWalletCopy.modeMismatchCta}
               </Link>
             </CardContent>
@@ -99,23 +88,20 @@ export function WalletUnlockGate({
               ? lightWalletCopy.modeMismatchTitle
               : isLight
                 ? lightWalletCopy.unlockUnavailableTitle
-                : "Wallet unavailable"}
+                : 'Wallet unavailable'}
           </CardTitle>
           <CardDescription>
             {modeMismatch
-              ? lightWalletCopy.modeMismatchDescription.replace(
-                  "{coin}",
-                  profile.displayName,
-                )
+              ? lightWalletCopy.modeMismatchDescription.replace('{coin}', profile.displayName)
               : isLight
                 ? lightWalletCopy.unlockUnavailableDescription
-                : "Connect to your node and ensure a wallet is loaded before using this page."}
+                : 'Connect to your node and ensure a wallet is loaded before using this page.'}
           </CardDescription>
         </CardHeader>
         {(modeMismatch || (isLight && !hasStoredLightWallet)) && (
           <CardContent>
             <Link
-              to={modeMismatch ? "/settings" : "/setup"}
+              to={modeMismatch ? '/settings' : '/setup'}
               className="text-sm text-accent underline"
             >
               {modeMismatch
@@ -132,11 +118,7 @@ export function WalletUnlockGate({
     return (
       <Card>
         <CardContent className="py-6">
-          <WalletUnlockForm
-            title={title}
-            description={description}
-            mintingOnly={mintingOnly}
-          />
+          <WalletUnlockForm title={title} description={description} mintingOnly={mintingOnly} />
         </CardContent>
       </Card>
     );

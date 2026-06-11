@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import QrScanner from "qr-scanner";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { parsePaymentUri } from "@/lib/security/client";
+import { useEffect, useRef, useState } from 'react';
+import QrScanner from 'qr-scanner';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { parsePaymentUri } from '@/lib/security/client';
 
 interface QrScanModalProps {
   open: boolean;
@@ -36,11 +36,11 @@ export function QrScanModal({ open, onClose, onScan }: QrScanModalProps) {
           }
         })();
       },
-      { highlightScanRegion: true, preferredCamera: "environment" },
+      { highlightScanRegion: true, preferredCamera: 'environment' }
     );
     scannerRef.current = scanner;
     scanner.start().catch(() => {
-      setError("Camera unavailable. Paste the address manually instead.");
+      setError('Camera unavailable. Paste the address manually instead.');
     });
 
     return () => {

@@ -1,7 +1,7 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
-import { AlertTriangle, Clipboard, RefreshCcw } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { tauriDiagnosticBundle } from "@/lib/rpc/client";
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { AlertTriangle, Clipboard, RefreshCcw } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { tauriDiagnosticBundle } from '@/lib/rpc/client';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -13,26 +13,21 @@ interface AppErrorBoundaryState {
   copied: boolean;
 }
 
-export class AppErrorBoundary extends Component<
-  AppErrorBoundaryProps,
-  AppErrorBoundaryState
-> {
+export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   state: AppErrorBoundaryState = {
     error: null,
     componentStack: null,
     copied: false,
   };
 
-  static getDerivedStateFromError(
-    error: Error,
-  ): Partial<AppErrorBoundaryState> {
+  static getDerivedStateFromError(error: Error): Partial<AppErrorBoundaryState> {
     return { error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     this.setState({ componentStack: info.componentStack ?? null });
     // eslint-disable-next-line no-console
-    console.error("AppErrorBoundary caught:", error, info);
+    console.error('AppErrorBoundary caught:', error, info);
   }
 
   reset = () => {
@@ -47,7 +42,7 @@ export class AppErrorBoundary extends Component<
       componentStack,
     };
     try {
-      const diag = await tauriDiagnosticBundle("verium");
+      const diag = await tauriDiagnosticBundle('verium');
       bundle = { ...bundle, ...diag };
     } catch {
       // Diagnostic command may not be available if Tauri itself died.
@@ -73,9 +68,8 @@ export class AppErrorBoundary extends Component<
             <div>
               <h1 className="text-lg font-semibold">Something went wrong</h1>
               <p className="mt-1 text-sm text-fg-muted">
-                The wallet UI hit an unexpected error. Your funds and daemon are
-                unaffected. You can try again, or send us a diagnostic bundle so
-                we can fix it.
+                The wallet UI hit an unexpected error. Your funds and daemon are unaffected. You can
+                try again, or send us a diagnostic bundle so we can fix it.
               </p>
             </div>
           </div>
@@ -99,7 +93,7 @@ export class AppErrorBoundary extends Component<
             </Button>
             <Button variant="secondary" onClick={this.copyDiagnostics}>
               <Clipboard className="h-3.5 w-3.5" />
-              {copied ? "Copied!" : "Copy diagnostic bundle"}
+              {copied ? 'Copied!' : 'Copy diagnostic bundle'}
             </Button>
             <Button variant="ghost" onClick={() => window.location.reload()}>
               Reload wallet

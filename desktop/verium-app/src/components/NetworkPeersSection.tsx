@@ -1,26 +1,20 @@
-import { useState } from "react";
-import type { CoinId } from "@/lib/coin/profile";
-import { Users } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { ExplorerPeersPanel } from "@/components/ExplorerPeersPanel";
-import { NetworkLocalPeersCard } from "@/components/NetworkLocalPeersCard";
+import { useState } from 'react';
+import type { CoinId } from '@/lib/coin/profile';
+import { Users } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { ExplorerPeersPanel } from '@/components/ExplorerPeersPanel';
+import { NetworkLocalPeersCard } from '@/components/NetworkLocalPeersCard';
 import {
   explorerExtractionHash,
   explorerPeersHash,
   explorerRichlistHash,
-} from "@/lib/explorer-links";
-import type { PeerInfo } from "@/lib/rpc/client";
-import { cn } from "@/lib/utils";
+} from '@/lib/explorer-links';
+import type { PeerInfo } from '@/lib/rpc/client';
+import { cn } from '@/lib/utils';
 
-type PeersTab = "connected" | "discover";
+type PeersTab = 'connected' | 'discover';
 
 export function NetworkPeersSection({
   coin,
@@ -31,7 +25,7 @@ export function NetworkPeersSection({
   peers?: PeerInfo[];
   explorerEnabled: boolean;
 }) {
-  const [tab, setTab] = useState<PeersTab>("connected");
+  const [tab, setTab] = useState<PeersTab>('connected');
   const peerCount = peers?.length ?? 0;
 
   return (
@@ -45,26 +39,26 @@ export function NetworkPeersSection({
             </CardTitle>
             <CardDescription className="mt-1">
               {peerCount > 0
-                ? `${peerCount} live connection${peerCount === 1 ? "" : "s"} from your node.`
-                : "No live connections — discover peers below or check firewall / P2P port."}
+                ? `${peerCount} live connection${peerCount === 1 ? '' : 's'} from your node.`
+                : 'No live connections — discover peers below or check firewall / P2P port.'}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
             <ExplorerLink
               coin={coin}
-              target={{ kind: "raw", url: explorerPeersHash(coin) }}
+              target={{ kind: 'raw', url: explorerPeersHash(coin) }}
               label="Explorer peers"
             />
-            {coin === "verium" && (
+            {coin === 'verium' && (
               <>
                 <ExplorerLink
                   coin={coin}
-                  target={{ kind: "raw", url: explorerExtractionHash(coin) }}
+                  target={{ kind: 'raw', url: explorerExtractionHash(coin) }}
                   label="Extraction"
                 />
                 <ExplorerLink
                   coin={coin}
-                  target={{ kind: "raw", url: explorerRichlistHash(coin) }}
+                  target={{ kind: 'raw', url: explorerRichlistHash(coin) }}
                   label="Rich list"
                 />
               </>
@@ -81,21 +75,21 @@ export function NetworkPeersSection({
             <Button
               type="button"
               role="tab"
-              aria-selected={tab === "connected"}
-              variant={tab === "connected" ? "primary" : "ghost"}
-              className={cn("h-8 px-3 text-sm")}
-              onClick={() => setTab("connected")}
+              aria-selected={tab === 'connected'}
+              variant={tab === 'connected' ? 'primary' : 'ghost'}
+              className={cn('h-8 px-3 text-sm')}
+              onClick={() => setTab('connected')}
             >
               Your connections
-              {peerCount > 0 ? ` (${peerCount})` : ""}
+              {peerCount > 0 ? ` (${peerCount})` : ''}
             </Button>
             <Button
               type="button"
               role="tab"
-              aria-selected={tab === "discover"}
-              variant={tab === "discover" ? "primary" : "ghost"}
-              className={cn("h-8 px-3 text-sm")}
-              onClick={() => setTab("discover")}
+              aria-selected={tab === 'discover'}
+              variant={tab === 'discover' ? 'primary' : 'ghost'}
+              className={cn('h-8 px-3 text-sm')}
+              onClick={() => setTab('discover')}
             >
               Discover peers
             </Button>
@@ -104,7 +98,7 @@ export function NetworkPeersSection({
       </CardHeader>
 
       <CardContent className="p-0 pt-0">
-        {tab === "connected" || !explorerEnabled ? (
+        {tab === 'connected' || !explorerEnabled ? (
           <NetworkLocalPeersCard coin={coin} peers={peers} embedded />
         ) : (
           <ExplorerPeersPanel embedded />

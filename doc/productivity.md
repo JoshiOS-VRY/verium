@@ -1,28 +1,25 @@
-Productivity Notes
-==================
+# Productivity Notes
 
-Table of Contents
------------------
+## Table of Contents
 
-* [General](#general)
-   * [Cache compilations with `ccache`](#cache-compilations-with-ccache)
-   * [Disable features with `./configure`](#disable-features-with-configure)
-   * [Make use of your threads with `make -j`](#make-use-of-your-threads-with-make--j)
-   * [Only build what you need](#only-build-what-you-need)
-   * [Multiple working directories with `git worktrees`](#multiple-working-directories-with-git-worktrees)
-   * [Interactive "dummy rebases" for fixups and execs with `git merge-base`](#interactive-dummy-rebases-for-fixups-and-execs-with-git-merge-base)
-* [Writing code](#writing-code)
-   * [Format C/C++/Protobuf diffs with `clang-format-diff.py`](#format-ccprotobuf-diffs-with-clang-format-diffpy)
-   * [Format Python diffs with `yapf-diff.py`](#format-python-diffs-with-yapf-diffpy)
-* [Rebasing/Merging code](#rebasingmerging-code)
-   * [More conflict context with `merge.conflictstyle diff3`](#more-conflict-context-with-mergeconflictstyle-diff3)
-* [Reviewing code](#reviewing-code)
-   * [Reduce mental load with `git diff` options](#reduce-mental-load-with-git-diff-options)
-   * [Reference PRs easily with `refspec`s](#reference-prs-easily-with-refspecs)
-   * [Diff the diffs with `git range-diff`](#diff-the-diffs-with-git-range-diff)
+- [General](#general)
+  - [Cache compilations with `ccache`](#cache-compilations-with-ccache)
+  - [Disable features with `./configure`](#disable-features-with-configure)
+  - [Make use of your threads with `make -j`](#make-use-of-your-threads-with-make--j)
+  - [Only build what you need](#only-build-what-you-need)
+  - [Multiple working directories with `git worktrees`](#multiple-working-directories-with-git-worktrees)
+  - [Interactive "dummy rebases" for fixups and execs with `git merge-base`](#interactive-dummy-rebases-for-fixups-and-execs-with-git-merge-base)
+- [Writing code](#writing-code)
+  - [Format C/C++/Protobuf diffs with `clang-format-diff.py`](#format-ccprotobuf-diffs-with-clang-format-diffpy)
+  - [Format Python diffs with `yapf-diff.py`](#format-python-diffs-with-yapf-diffpy)
+- [Rebasing/Merging code](#rebasingmerging-code)
+  - [More conflict context with `merge.conflictstyle diff3`](#more-conflict-context-with-mergeconflictstyle-diff3)
+- [Reviewing code](#reviewing-code)
+  - [Reduce mental load with `git diff` options](#reduce-mental-load-with-git-diff-options)
+  - [Reference PRs easily with `refspec`s](#reference-prs-easily-with-refspecs)
+  - [Diff the diffs with `git range-diff`](#diff-the-diffs-with-git-range-diff)
 
-General
-------
+## General
 
 ### Cache compilations with `ccache`
 
@@ -85,11 +82,13 @@ make -C src verium_bench
 If you work with multiple branches or multiple copies of the repository, you should try `git worktrees`.
 
 To create a new branch that lives under a new working directory without disrupting your current working directory (useful for creating pull requests):
+
 ```sh
 git worktree add -b my-shiny-new-branch ../living-at-my-new-working-directory based-on-my-crufty-old-commit-ish
 ```
 
 To simply check out a commit-ish under a new working directory without disrupting your current working directory (useful for reviewing pull requests):
+
 ```sh
 git worktree add --checkout ../where-my-checkout-commit-ish-will-live my-checkout-commit-ish
 ```
@@ -105,18 +104,18 @@ git rebase -i --autosquash "$(git merge-base master HEAD)"
 ```
 
 To execute `make check` on every commit since last diverged from master, but without rebasing over an updated master, we can do the following:
+
 ```sh
 git rebase -i --exec "make check" "$(git merge-base master HEAD)"
 ```
 
------
+---
 
 This synergizes well with [`ccache`](#cache-compilations-with-ccache) as objects resulting from unchanged code will most likely hit the cache and won't need to be recompiled.
 
 You can also set up [upstream refspecs](#reference-prs-easily-with-refspecs) to refer to pull requests easier in the above `git worktree` commands.
 
-Writing code
-------------
+## Writing code
 
 ### Format C/C++/Protobuf diffs with `clang-format-diff.py`
 
@@ -126,8 +125,7 @@ See [contrib/devtools/README.md](/contrib/devtools/README.md#clang-format-diff.p
 
 Usage is exactly the same as [`clang-format-diff.py`](#format-ccprotobuf-diffs-with-clang-format-diffpy). You can get it [here](https://github.com/MarcoFalke/yapf-diff).
 
-Rebasing/Merging code
--------------
+## Rebasing/Merging code
 
 ### More conflict context with `merge.conflictstyle diff3`
 
@@ -141,7 +139,7 @@ theirs
 >>>
 ```
 
-  you will see
+you will see
 
 ```diff
 <<<
@@ -153,16 +151,15 @@ theirs
 >>>
 ```
 
-This may make it much clearer what caused the conflict. In this style, you can often just look at what changed between *original* and *theirs*, and mechanically apply that to *yours* (or the other way around).
+This may make it much clearer what caused the conflict. In this style, you can often just look at what changed between _original_ and _theirs_, and mechanically apply that to _yours_ (or the other way around).
 
-Reviewing code
---------------
+## Reviewing code
 
 ### Reduce mental load with `git diff` options
 
 When reviewing patches which change indentation in C++ files, use `git diff -w` and `git show -w`. This makes the diff algorithm ignore whitespace changes. This feature is also available on github.com, by adding `?w=1` at the end of any URL which shows a diff.
 
-When reviewing patches that change symbol names in many places, use `git diff --word-diff`. This will instead of showing the patch as deleted/added *lines*, show deleted/added *words*.
+When reviewing patches that change symbol names in many places, use `git diff --word-diff`. This will instead of showing the patch as deleted/added _lines_, show deleted/added _words_.
 
 When reviewing patches that move code around, try using `git diff --patience commit~:old/file.cpp commit:new/file/name.cpp`, and ignoring everything except the moved body of code which should show up as neither `+` or `-` lines. In case it was not a pure move, this may even work when combined with the `-w` or `--word-diff` options described above. `--color-moved=dimmed-zebra` will also dim the coloring of moved hunks in the diff on compatible terminals.
 
@@ -183,6 +180,7 @@ This will add an `upstream-pull` remote to your git repository, which can be fet
 It is very common for contributors to rebase their pull requests, or make changes to commits (perhaps in response to review) that are not at the head of their branch. This poses a problem for reviewers as when the contributor force pushes, the reviewer is no longer sure that his previous reviews of commits are still valid (as the commit hashes can now be different even though the diff is semantically the same). [git range-diff](https://git-scm.com/docs/git-range-diff) (Git >= 2.19) can help solve this problem by diffing the diffs.
 
 For example, to identify the differences between your previously reviewed diffs P1-5, and the new diffs P1-2,N3-4 as illustrated below:
+
 ```
        P1--P2--P3--P4--P5   <-- previously-reviewed-head
       /
@@ -192,6 +190,7 @@ For example, to identify the differences between your previously reviewed diffs 
 ```
 
 You can do:
+
 ```sh
 git range-diff master previously-reviewed-head new-head
 ```
@@ -210,7 +209,7 @@ PREV=P5 N=4 && git range-diff `git merge-base --all HEAD $PREV`...$PREV HEAD~$N.
 
 Where `P5` is the commit you last reviewed and `4` is the number of commits in the new version.
 
------
+---
 
 `git range-diff` also accepts normal `git diff` options, see [Reduce mental load with `git diff` options](#reduce-mental-load-with-git-diff-options) for useful `git diff` options.
 

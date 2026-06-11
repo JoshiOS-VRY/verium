@@ -23,11 +23,11 @@ Signing still happens locally; servers never receive mnemonics or private keys.
 
 ### Trust assumptions (light mode)
 
-| Data | Source | Risk if server is malicious |
-| --- | --- | --- |
-| UTXO set | Electrum index | Incorrect balance, withheld UTXOs, fee manipulation |
-| History | Electrum index | Incomplete or misleading history |
-| Chain tip | Electrum | Stale tip could delay confirmation visibility |
+| Data      | Source         | Risk if server is malicious                         |
+| --------- | -------------- | --------------------------------------------------- |
+| UTXO set  | Electrum index | Incorrect balance, withheld UTXOs, fee manipulation |
+| History   | Electrum index | Incomplete or misleading history                    |
+| Chain tip | Electrum       | Stale tip could delay confirmation visibility       |
 
 See [electrum-servers.md](./electrum-servers.md) for server list and TLS behavior.
 

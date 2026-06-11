@@ -1,22 +1,22 @@
-import { useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useUserPreferences } from "@/lib/user-preferences";
+import { useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useUserPreferences } from '@/lib/user-preferences';
 import {
   rpcGetBlockchainInfo,
   rpcGetStakingState,
   rpcGetWalletInfo,
   rpcStakingStart,
-} from "@/lib/rpc/client";
-import { useCoinWalletMode } from "@/hooks/useWalletMode";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { isWalletUnlocked } from "@/lib/wallet-unlock";
+} from '@/lib/rpc/client';
+import { useCoinWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { isWalletUnlocked } from '@/lib/wallet-unlock';
 
 const RETRY_MS = 10_000;
 /** Slow retry cadence while the window is hidden/idle. */
 const RETRY_MS_HIDDEN = 60_000;
-const VERICOIN = "vericoin" as const;
+const VERICOIN = 'vericoin' as const;
 
 let stoppedByUser = false;
 
@@ -37,50 +37,38 @@ export function wasStakingStoppedByUser(): boolean {
  * and the wallet is unlocked for minting.
  */
 export function useAutoStake() {
-  const { isLight } = useCoinWalletMode("vericoin");
+  const { isLight } = useCoinWalletMode('vericoin');
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
   const autoStake =
-    loaded &&
-    !isLight &&
-    prefs.auto_stake_on_open === true &&
-    prefs.vericoin_enabled !== false;
+    loaded && !isLight && prefs.auto_stake_on_open === true && prefs.vericoin_enabled !== false;
   const { data: status } = useDaemonStatus(VERICOIN, { enabled: autoStake });
   const visible = useWindowVisible();
   const lastErrorRef = useRef<string | null>(null);
 
   const blockchain = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "getblockchaininfo"),
+    queryKey: coinQueryKey(VERICOIN, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(VERICOIN),
     refetchInterval: false,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_stake_on_open === true &&
-      prefs.vericoin_enabled !== false,
+      !isLight && loaded && prefs.auto_stake_on_open === true && prefs.vericoin_enabled !== false,
   });
 
   const wallet = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "getwalletinfo"),
+    queryKey: coinQueryKey(VERICOIN, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(VERICOIN),
     refetchInterval: false,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_stake_on_open === true &&
-      prefs.vericoin_enabled !== false,
+      !isLight && loaded && prefs.auto_stake_on_open === true && prefs.vericoin_enabled !== false,
   });
 
   const stakingState = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "get_staking_state"),
+    queryKey: coinQueryKey(VERICOIN, 'get_staking_state'),
     queryFn: () => rpcGetStakingState(VERICOIN),
     refetchInterval: false,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_stake_on_open === true &&
-      prefs.vericoin_enabled !== false,
+      !isLight && loaded && prefs.auto_stake_on_open === true && prefs.vericoin_enabled !== false,
   });
 
   useEffect(() => {
@@ -100,7 +88,7 @@ export function useAutoStake() {
         await rpcStakingStart(VERICOIN);
         lastErrorRef.current = null;
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(VERICOIN, "get_staking_state"),
+          queryKey: coinQueryKey(VERICOIN, 'get_staking_state'),
         });
       } catch (e) {
         lastErrorRef.current = String(e);
@@ -108,10 +96,7 @@ export function useAutoStake() {
     };
 
     void tryStart();
-    const id = window.setInterval(
-      () => void tryStart(),
-      visible ? RETRY_MS : RETRY_MS_HIDDEN,
-    );
+    const id = window.setInterval(() => void tryStart(), visible ? RETRY_MS : RETRY_MS_HIDDEN);
     return () => window.clearInterval(id);
   }, [
     isLight,

@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { fetchExplorerStats } from "@/lib/explorer-api";
-import { chainSyncPhase, type ChainSyncPhase } from "@/lib/bootstrap-policy";
-import { useExplorerQueriesEnabled } from "@/lib/network-mode";
-import { rpcGetBlockchainInfo } from "@/lib/rpc/client";
+import { useQuery } from '@tanstack/react-query';
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { fetchExplorerStats } from '@/lib/explorer-api';
+import { chainSyncPhase, type ChainSyncPhase } from '@/lib/bootstrap-policy';
+import { useExplorerQueriesEnabled } from '@/lib/network-mode';
+import { rpcGetBlockchainInfo } from '@/lib/rpc/client';
 
 /** True when the local node is caught up to headers / network tip (within lag threshold). */
 export function useChainSynced(coin: CoinId): {
@@ -16,14 +16,14 @@ export function useChainSynced(coin: CoinId): {
   const connected = status?.connected === true;
 
   const blockchain = useQuery({
-    queryKey: coinQueryKey(coin, "getblockchaininfo"),
+    queryKey: coinQueryKey(coin, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(coin),
     refetchInterval: false,
     enabled: connected,
   });
 
   const explorer = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-stats"),
+    queryKey: coinQueryKey(coin, 'explorer-stats'),
     queryFn: () => fetchExplorerStats(coin),
     refetchInterval: false,
     enabled: explorerEnabled && connected,
@@ -36,5 +36,5 @@ export function useChainSynced(coin: CoinId): {
     networkTip: explorer.data?.height,
   });
 
-  return { synced: phase === "synced", phase };
+  return { synced: phase === 'synced', phase };
 }

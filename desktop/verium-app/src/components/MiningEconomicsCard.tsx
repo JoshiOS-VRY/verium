@@ -1,15 +1,9 @@
-import { useEffect } from "react";
-import { DollarSign } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { RevenuePeriodToggle } from "@/components/RevenuePeriodToggle";
-import { EXPLORER_PROFITABILITY } from "@/lib/verium-links";
+import { useEffect } from 'react';
+import { DollarSign } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { RevenuePeriodToggle } from '@/components/RevenuePeriodToggle';
+import { EXPLORER_PROFITABILITY } from '@/lib/verium-links';
 import {
   clampMiningCostPerKwh,
   clampMiningPowerWatts,
@@ -19,16 +13,16 @@ import {
   MINING_POWER_WATTS_MAX,
   MINING_VRM_PRICE_USD_MAX,
   parseOptionalBoundedNumber,
-} from "@/lib/mining-input-validation";
-import { useUserPreferences } from "@/lib/user-preferences";
+} from '@/lib/mining-input-validation';
+import { useUserPreferences } from '@/lib/user-preferences';
 import {
   estimateDailyElectricityCostUsd,
   revenuePeriodLabel,
   scaleDailyValue,
   type DailyMiningEstimate,
   type RevenuePeriod,
-} from "@/lib/mining-revenue";
-import { formatNumber } from "@/lib/utils";
+} from '@/lib/mining-revenue';
+import { formatNumber } from '@/lib/utils';
 
 interface MiningEconomicsCardProps {
   dailyEstimate: DailyMiningEstimate;
@@ -36,7 +30,7 @@ interface MiningEconomicsCardProps {
   onPeriodChange: (period: RevenuePeriod) => void;
   marketPriceUsd?: number;
   usingCustomVrmPrice: boolean;
-  statsSource?: "explorer" | "local";
+  statsSource?: 'explorer' | 'local';
 }
 
 export function MiningEconomicsCard({
@@ -53,10 +47,7 @@ export function MiningEconomicsCard({
   useEffect(() => {
     const fixes: Partial<typeof prefs> = {};
     const vrm = clampMiningVrmPriceUsd(prefs.mining_vrm_price_usd);
-    if (
-      prefs.mining_vrm_price_usd != null &&
-      vrm !== prefs.mining_vrm_price_usd
-    ) {
+    if (prefs.mining_vrm_price_usd != null && vrm !== prefs.mining_vrm_price_usd) {
       fixes.mining_vrm_price_usd = vrm;
     }
     const watts = clampMiningPowerWatts(prefs.mining_power_watts);
@@ -64,10 +55,7 @@ export function MiningEconomicsCard({
       fixes.mining_power_watts = watts;
     }
     const kwh = clampMiningCostPerKwh(prefs.mining_cost_per_kwh);
-    if (
-      prefs.mining_cost_per_kwh != null &&
-      kwh !== prefs.mining_cost_per_kwh
-    ) {
+    if (prefs.mining_cost_per_kwh != null && kwh !== prefs.mining_cost_per_kwh) {
       fixes.mining_cost_per_kwh = kwh;
     }
     if (Object.keys(fixes).length > 0) {
@@ -83,24 +71,18 @@ export function MiningEconomicsCard({
   const periodSuffix = revenuePeriodLabel(period);
   const dailyCost = estimateDailyElectricityCostUsd(
     prefs.mining_power_watts,
-    prefs.mining_cost_per_kwh,
+    prefs.mining_cost_per_kwh
   );
-  const periodCost =
-    dailyCost != null ? scaleDailyValue(dailyCost, period) : null;
+  const periodCost = dailyCost != null ? scaleDailyValue(dailyCost, period) : null;
   const periodGrossUsd =
-    dailyEstimate.usdPerDay != null
-      ? scaleDailyValue(dailyEstimate.usdPerDay, period)
-      : null;
-  const netUsd =
-    periodGrossUsd != null && periodCost != null
-      ? periodGrossUsd - periodCost
-      : null;
+    dailyEstimate.usdPerDay != null ? scaleDailyValue(dailyEstimate.usdPerDay, period) : null;
+  const netUsd = periodGrossUsd != null && periodCost != null ? periodGrossUsd - periodCost : null;
 
   const description = usingCustomVrmPrice
-    ? "Using your VRM price assumption for USD estimates."
-    : statsSource === "explorer"
-      ? "Live network stats from explorer."
-      : "Network stats from local node — USD/BTC need explorer prices.";
+    ? 'Using your VRM price assumption for USD estimates.'
+    : statsSource === 'explorer'
+      ? 'Live network stats from explorer.'
+      : 'Network stats from local node — USD/BTC need explorer prices.';
 
   return (
     <Card>
@@ -124,26 +106,19 @@ export function MiningEconomicsCard({
               max={MINING_VRM_PRICE_USD_MAX}
               step={0.0001}
               placeholder={
-                marketPriceUsd != null
-                  ? `Live: $${formatNumber(marketPriceUsd, 4)}`
-                  : "e.g. 0.07"
+                marketPriceUsd != null ? `Live: $${formatNumber(marketPriceUsd, 4)}` : 'e.g. 0.07'
               }
-              value={prefs.mining_vrm_price_usd ?? ""}
+              value={prefs.mining_vrm_price_usd ?? ''}
               onChange={(e) => {
-                const v = parseOptionalBoundedNumber(
-                  e.target.value,
-                  MINING_VRM_PRICE_USD_MAX,
-                );
+                const v = parseOptionalBoundedNumber(e.target.value, MINING_VRM_PRICE_USD_MAX);
                 void updatePrefs({ mining_vrm_price_usd: v });
               }}
               className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm tabular-nums outline-none focus:border-accent"
             />
             <p className="text-xs text-fg-subtle">
               Blank = live explorer
-              {marketPriceUsd != null
-                ? ` ($${formatNumber(marketPriceUsd, 4)})`
-                : ""}
-              . Max ${MINING_VRM_PRICE_USD_MAX.toLocaleString()}.
+              {marketPriceUsd != null ? ` ($${formatNumber(marketPriceUsd, 4)})` : ''}. Max $
+              {MINING_VRM_PRICE_USD_MAX.toLocaleString()}.
             </p>
           </div>
           <div className="flex flex-col gap-1 text-sm">
@@ -153,12 +128,9 @@ export function MiningEconomicsCard({
               min={0}
               max={MINING_POWER_WATTS_MAX}
               placeholder="e.g. 65"
-              value={prefs.mining_power_watts ?? ""}
+              value={prefs.mining_power_watts ?? ''}
               onChange={(e) => {
-                const v = parseOptionalBoundedNumber(
-                  e.target.value,
-                  MINING_POWER_WATTS_MAX,
-                );
+                const v = parseOptionalBoundedNumber(e.target.value, MINING_POWER_WATTS_MAX);
                 void updatePrefs({ mining_power_watts: v });
               }}
               className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm tabular-nums outline-none focus:border-accent"
@@ -175,75 +147,49 @@ export function MiningEconomicsCard({
               max={MINING_COST_PER_KWH_MAX}
               step={0.01}
               placeholder="e.g. 0.12"
-              value={prefs.mining_cost_per_kwh ?? ""}
+              value={prefs.mining_cost_per_kwh ?? ''}
               onChange={(e) => {
-                const v = parseOptionalBoundedNumber(
-                  e.target.value,
-                  MINING_COST_PER_KWH_MAX,
-                );
+                const v = parseOptionalBoundedNumber(e.target.value, MINING_COST_PER_KWH_MAX);
                 void updatePrefs({ mining_cost_per_kwh: v });
               }}
               className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm tabular-nums outline-none focus:border-accent"
             />
-            <p className="text-xs text-fg-subtle">
-              Max ${MINING_COST_PER_KWH_MAX}/kWh.
-            </p>
+            <p className="text-xs text-fg-subtle">Max ${MINING_COST_PER_KWH_MAX}/kWh.</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 border-t border-border pt-4 text-sm md:grid-cols-4">
           <div>
-            <div className="text-xs uppercase text-fg-subtle">
-              VRM / {periodSuffix}
-            </div>
+            <div className="text-xs uppercase text-fg-subtle">VRM / {periodSuffix}</div>
             <div className="text-xl font-semibold tabular-nums">
-              {formatNumber(
-                scaleDailyValue(dailyEstimate.vrmPerDay, period),
-                4,
-              )}
+              {formatNumber(scaleDailyValue(dailyEstimate.vrmPerDay, period), 4)}
             </div>
             <div className="mt-0.5 text-xs text-fg-subtle">
-              ~
-              {formatNumber(
-                scaleDailyValue(dailyEstimate.blocksPerDay, period),
-                3,
-              )}{" "}
-              blocks
+              ~{formatNumber(scaleDailyValue(dailyEstimate.blocksPerDay, period), 3)} blocks
             </div>
           </div>
           <div>
-            <div className="text-xs uppercase text-fg-subtle">
-              USD / {periodSuffix}
-            </div>
+            <div className="text-xs uppercase text-fg-subtle">USD / {periodSuffix}</div>
             <div className="text-xl font-semibold tabular-nums">
               {dailyEstimate.usdPerDay != null
-                ? formatMiningUsd(
-                    scaleDailyValue(dailyEstimate.usdPerDay, period),
-                  )
-                : "—"}
+                ? formatMiningUsd(scaleDailyValue(dailyEstimate.usdPerDay, period))
+                : '—'}
             </div>
           </div>
           <div>
-            <div className="text-xs uppercase text-fg-subtle">
-              BTC / {periodSuffix}
-            </div>
+            <div className="text-xs uppercase text-fg-subtle">BTC / {periodSuffix}</div>
             <div className="text-xl font-semibold tabular-nums">
               {dailyEstimate.btcPerDay != null
-                ? formatNumber(
-                    scaleDailyValue(dailyEstimate.btcPerDay, period),
-                    8,
-                  )
-                : "—"}
+                ? formatNumber(scaleDailyValue(dailyEstimate.btcPerDay, period), 8)
+                : '—'}
             </div>
           </div>
           <div>
-            <div className="text-xs uppercase text-fg-subtle">
-              Est. block time
-            </div>
+            <div className="text-xs uppercase text-fg-subtle">Est. block time</div>
             <div className="text-xl font-semibold tabular-nums">
               {dailyEstimate.hoursPerBlock != null
                 ? `${formatNumber(dailyEstimate.hoursPerBlock, 1)} h`
-                : "—"}
+                : '—'}
             </div>
           </div>
         </div>
@@ -252,9 +198,7 @@ export function MiningEconomicsCard({
           <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-bg-subtle/50 px-4 py-3 text-sm md:grid-cols-3">
             {periodCost != null && (
               <div>
-                <div className="text-xs uppercase text-fg-subtle">
-                  Electricity / {periodSuffix}
-                </div>
+                <div className="text-xs uppercase text-fg-subtle">Electricity / {periodSuffix}</div>
                 <div className="text-lg font-semibold tabular-nums">
                   {formatMiningUsd(periodCost)}
                 </div>
@@ -262,12 +206,10 @@ export function MiningEconomicsCard({
             )}
             {netUsd != null && (
               <div>
-                <div className="text-xs uppercase text-fg-subtle">
-                  Net USD / {periodSuffix}
-                </div>
+                <div className="text-xs uppercase text-fg-subtle">Net USD / {periodSuffix}</div>
                 <div
                   className={`text-lg font-semibold tabular-nums ${
-                    netUsd >= 0 ? "text-success" : "text-danger"
+                    netUsd >= 0 ? 'text-success' : 'text-danger'
                   }`}
                 >
                   {formatMiningUsd(netUsd)}
@@ -276,9 +218,7 @@ export function MiningEconomicsCard({
             )}
             {periodGrossUsd != null && periodCost != null && (
               <div>
-                <div className="text-xs uppercase text-fg-subtle">
-                  Gross USD / {periodSuffix}
-                </div>
+                <div className="text-xs uppercase text-fg-subtle">Gross USD / {periodSuffix}</div>
                 <div className="text-lg font-semibold tabular-nums">
                   {formatMiningUsd(periodGrossUsd)}
                 </div>
@@ -289,7 +229,7 @@ export function MiningEconomicsCard({
 
         <div className="flex justify-end border-t border-border pt-3">
           <ExplorerLink
-            target={{ kind: "raw", url: EXPLORER_PROFITABILITY }}
+            target={{ kind: 'raw', url: EXPLORER_PROFITABILITY }}
             label="Open profitability calculator"
           />
         </div>

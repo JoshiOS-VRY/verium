@@ -1,28 +1,24 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Eye, EyeOff, Lock } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useTwoFactorGate } from "@/hooks/useTwoFactorGate";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import {
-  recoveryExportSeed,
-  type RecoveryExportResult,
-} from "@/lib/security/client";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { AlertTriangle, Copy, Eye, EyeOff, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { recoveryExportSeed, type RecoveryExportResult } from '@/lib/security/client';
 
 export function ExportRecoveryPhrasePanel() {
   const coin = useActiveCoin();
   const { isLight } = useWalletMode();
   const twoFa = useTwoFactorGate(coin);
-  const [passphrase, setPassphrase] = useState("");
+  const [passphrase, setPassphrase] = useState('');
   const [revealed, setRevealed] = useState(false);
   const [exported, setExported] = useState<RecoveryExportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const exportSeed = useMutation({
-    mutationFn: (totpCode?: string) =>
-      recoveryExportSeed(coin, passphrase, totpCode),
+    mutationFn: (totpCode?: string) => recoveryExportSeed(coin, passphrase, totpCode),
     onSuccess: (result) => {
       setExported(result);
       setError(null);
@@ -35,24 +31,21 @@ export function ExportRecoveryPhrasePanel() {
   });
 
   const secretText =
-    exported?.kind === "mnemonic"
+    exported?.kind === 'mnemonic'
       ? exported.mnemonic
-      : exported?.kind === "hd_master_xprv"
+      : exported?.kind === 'hd_master_xprv'
         ? exported.xprv
-        : "";
+        : '';
 
-  const words =
-    exported?.kind === "mnemonic"
-      ? exported.mnemonic.split(/\s+/).filter(Boolean)
-      : [];
+  const words = exported?.kind === 'mnemonic' ? exported.mnemonic.split(/\s+/).filter(Boolean) : [];
 
   const startExport = () => {
     if (!passphrase.trim()) {
-      setError("Enter your wallet passphrase first.");
+      setError('Enter your wallet passphrase first.');
       return;
     }
-    void twoFa.gate("show_recovery_phrase", (code) => exportSeed.mutate(code), {
-      title: "Confirm export with 2FA",
+    void twoFa.gate('show_recovery_phrase', (code) => exportSeed.mutate(code), {
+      title: 'Confirm export with 2FA',
     });
   };
 
@@ -73,8 +66,8 @@ export function ExportRecoveryPhrasePanel() {
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
           <p>
             {isLight
-              ? "Decrypt and view your light wallet seed. Anyone with this material can spend your coins."
-              : "View your BIP39 phrase if it was saved when you upgraded to HD, or export the HD master key for light-wallet import."}
+              ? 'Decrypt and view your light wallet seed. Anyone with this material can spend your coins.'
+              : 'View your BIP39 phrase if it was saved when you upgraded to HD, or export the HD master key for light-wallet import.'}
           </p>
         </div>
 
@@ -97,7 +90,7 @@ export function ExportRecoveryPhrasePanel() {
               onClick={startExport}
               disabled={exportSeed.isPending || !passphrase.trim()}
             >
-              {exportSeed.isPending ? "Decrypting…" : "Export recovery material"}
+              {exportSeed.isPending ? 'Decrypting…' : 'Export recovery material'}
             </Button>
           </>
         )}
@@ -109,7 +102,7 @@ export function ExportRecoveryPhrasePanel() {
           </p>
         )}
 
-        {exported?.kind === "mnemonic" && (
+        {exported?.kind === 'mnemonic' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-fg">
@@ -120,17 +113,13 @@ export function ExportRecoveryPhrasePanel() {
                 onClick={() => setRevealed((v) => !v)}
                 className="flex items-center gap-1 text-xs text-fg-muted hover:text-fg"
               >
-                {revealed ? (
-                  <EyeOff className="h-3.5 w-3.5" />
-                ) : (
-                  <Eye className="h-3.5 w-3.5" />
-                )}
-                {revealed ? "Hide" : "Reveal"}
+                {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {revealed ? 'Hide' : 'Reveal'}
               </button>
             </div>
             <div
               className={`grid grid-cols-3 gap-2 rounded-lg border border-border p-4 ${
-                revealed ? "bg-bg" : "bg-bg blur-sm select-none"
+                revealed ? 'bg-bg' : 'bg-bg blur-sm select-none'
               }`}
             >
               {words.map((word, i) => (
@@ -145,10 +134,7 @@ export function ExportRecoveryPhrasePanel() {
                 variant="secondary"
                 onClick={() => {
                   void navigator.clipboard.writeText(secretText);
-                  window.setTimeout(
-                    () => void navigator.clipboard.writeText(""),
-                    30_000,
-                  );
+                  window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
                 }}
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -158,7 +144,7 @@ export function ExportRecoveryPhrasePanel() {
           </div>
         )}
 
-        {exported?.kind === "hd_master_xprv" && (
+        {exported?.kind === 'hd_master_xprv' && (
           <div className="flex flex-col gap-3">
             <p className="text-xs text-warning">{exported.message}</p>
             <div className="flex items-center justify-between">
@@ -168,24 +154,20 @@ export function ExportRecoveryPhrasePanel() {
                 onClick={() => setRevealed((v) => !v)}
                 className="flex items-center gap-1 text-xs text-fg-muted hover:text-fg"
               >
-                {revealed ? (
-                  <EyeOff className="h-3.5 w-3.5" />
-                ) : (
-                  <Eye className="h-3.5 w-3.5" />
-                )}
-                {revealed ? "Hide" : "Reveal"}
+                {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {revealed ? 'Hide' : 'Reveal'}
               </button>
             </div>
             <div
               className={`break-all rounded-lg border border-border p-3 font-mono text-xs ${
-                revealed ? "bg-bg" : "bg-bg blur-sm select-none"
+                revealed ? 'bg-bg' : 'bg-bg blur-sm select-none'
               }`}
             >
               {exported.xprv}
             </div>
             <p className="text-xs text-fg-muted">
-              In light-wallet setup or Settings → Wallet backup, choose Import and
-              paste this key instead of a 24-word phrase.
+              In light-wallet setup or Settings → Wallet backup, choose Import and paste this key
+              instead of a 24-word phrase.
             </p>
             {revealed && (
               <Button
@@ -193,10 +175,7 @@ export function ExportRecoveryPhrasePanel() {
                 variant="secondary"
                 onClick={() => {
                   void navigator.clipboard.writeText(secretText);
-                  window.setTimeout(
-                    () => void navigator.clipboard.writeText(""),
-                    30_000,
-                  );
+                  window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
                 }}
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -212,7 +191,7 @@ export function ExportRecoveryPhrasePanel() {
             variant="ghost"
             onClick={() => {
               setExported(null);
-              setPassphrase("");
+              setPassphrase('');
               setRevealed(false);
               setError(null);
             }}

@@ -1,12 +1,12 @@
-import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
-import type { CoinId } from "@/lib/coin/profile";
-import { migrateExplorerPrefs } from "@/lib/explorer-links";
-import { DEFAULT_TX_EXPLORER_TEMPLATE } from "@/lib/verium-links";
-import type { ThemeMode } from "@/lib/theme";
-import { DEFAULT_WALLET_UNLOCK_SECONDS } from "@/lib/wallet-unlock";
-import type { WalletMode } from "@/lib/light-wallet/client";
-import type { OnboardingCheckpoint } from "@/lib/wallet-profile";
+import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
+import type { CoinId } from '@/lib/coin/profile';
+import { migrateExplorerPrefs } from '@/lib/explorer-links';
+import { DEFAULT_TX_EXPLORER_TEMPLATE } from '@/lib/verium-links';
+import type { ThemeMode } from '@/lib/theme';
+import { DEFAULT_WALLET_UNLOCK_SECONDS } from '@/lib/wallet-unlock';
+import type { WalletMode } from '@/lib/light-wallet/client';
+import type { OnboardingCheckpoint } from '@/lib/wallet-profile';
 
 export interface UserPreferences {
   /** @deprecated use setup_completed_by_coin; kept for legacy prefs migration */
@@ -29,7 +29,7 @@ export interface UserPreferences {
   /** When true, thread count follows CPU topology; when false, uses auto_mine_threads. */
   auto_adjust_mine_threads?: boolean;
   /** "dynamic" (default) or "static" — how block rewards choose a payout address. */
-  mining_reward_address_mode?: "dynamic" | "static";
+  mining_reward_address_mode?: 'dynamic' | 'static';
   /** Wallet address for block rewards when mining_reward_address_mode is "static". */
   mining_reward_address?: string;
   auto_mine_threads?: number;
@@ -42,7 +42,7 @@ export interface UserPreferences {
   /** Worker suffix for public pool mining (ADDRESS.worker). */
   pool_worker_name?: string;
   /** Last selected mining tab on the Mining page. */
-  mining_mode?: "solo" | "pool";
+  mining_mode?: 'solo' | 'pool';
   theme_mode?: ThemeMode;
   /** @deprecated use wallet_unlock_duration_by_coin */
   wallet_unlock_duration_seconds?: number;
@@ -67,7 +67,7 @@ interface PrefsState {
 const DEFAULT_PREFS: UserPreferences = {
   setup_completed: false,
   explorer_tx_url_template: DEFAULT_TX_EXPLORER_TEMPLATE,
-  active_coin: "verium",
+  active_coin: 'verium',
   verium_enabled: true,
   vericoin_enabled: true,
   auto_mine_on_open: false,
@@ -77,13 +77,13 @@ const DEFAULT_PREFS: UserPreferences = {
   notify_on_vrm_received: true,
   notify_on_vrc_received: true,
   auto_adjust_mine_threads: true,
-  mining_reward_address_mode: "dynamic",
-  mining_reward_address: "",
+  mining_reward_address_mode: 'dynamic',
+  mining_reward_address: '',
   auto_mine_threads: 2,
-  pool_payout_address: "",
-  pool_worker_name: "wallet",
-  mining_mode: "pool",
-  theme_mode: "system",
+  pool_payout_address: '',
+  pool_worker_name: 'wallet',
+  mining_mode: 'pool',
+  theme_mode: 'system',
   wallet_unlock_duration_seconds: DEFAULT_WALLET_UNLOCK_SECONDS,
   wallet_unlock_duration_by_coin: {
     verium: DEFAULT_WALLET_UNLOCK_SECONDS,
@@ -96,10 +96,7 @@ let prefsWriteQueue: Promise<void> = Promise.resolve();
 /** Ignore superseded disk responses so fast typing cannot revert optimistic UI. */
 let prefsWriteGeneration = 0;
 
-function mergePrefs(
-  current: UserPreferences,
-  partial: Partial<UserPreferences>,
-): UserPreferences {
+function mergePrefs(current: UserPreferences, partial: Partial<UserPreferences>): UserPreferences {
   return {
     ...current,
     ...partial,
@@ -141,7 +138,7 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
   loaded: false,
   load: async () => {
     try {
-      const next = await invoke<UserPreferences>("get_user_preferences");
+      const next = await invoke<UserPreferences>('get_user_preferences');
       const merged = { ...DEFAULT_PREFS, ...next };
       if (
         merged.setup_completed &&
@@ -157,11 +154,11 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
       if (explorerMigration) {
         Object.assign(merged, explorerMigration);
         try {
-          await invoke<UserPreferences>("set_user_preferences", {
+          await invoke<UserPreferences>('set_user_preferences', {
             partial: explorerMigration,
           });
         } catch (e) {
-          console.warn("explorer prefs migration save failed", e);
+          console.warn('explorer prefs migration save failed', e);
         }
       }
       set({
@@ -180,13 +177,13 @@ export const useUserPreferences = create<PrefsState>((set, get) => ({
 
     const task = prefsWriteQueue.then(async () => {
       try {
-        const saved = await invoke<UserPreferences>("set_user_preferences", {
+        const saved = await invoke<UserPreferences>('set_user_preferences', {
           partial,
         });
         if (generation !== prefsWriteGeneration) return;
         set({ prefs: { ...DEFAULT_PREFS, ...saved } });
       } catch (e) {
-        console.warn("set_user_preferences failed", e);
+        console.warn('set_user_preferences failed', e);
       }
     });
     prefsWriteQueue = task.catch(() => undefined);

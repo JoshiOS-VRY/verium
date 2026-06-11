@@ -1,5 +1,5 @@
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { rpcListTransactions } from "@/lib/rpc/client";
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { rpcListTransactions } from '@/lib/rpc/client';
 
 /** Max rows for wallet tx poll (watchers + dashboard). Kept modest for memory. */
 export const WALLET_TX_POLL_COUNT = 80;
@@ -11,7 +11,7 @@ export const WALLET_TX_POLL_INTERVAL_MS = 45_000;
 export const WALLET_TX_BACKGROUND_POLL_MS = 120_000;
 
 export function walletTransactionsQueryKey(coin: CoinId) {
-  return coinQueryKey(coin, "listtransactions", "wallet");
+  return coinQueryKey(coin, 'listtransactions', 'wallet');
 }
 
 /**
@@ -20,7 +20,7 @@ export function walletTransactionsQueryKey(coin: CoinId) {
  * refreshes both from one place so they don't each need an aggressive poll.
  */
 export function walletTransactionsKeyPrefix(coin: CoinId) {
-  return coinQueryKey(coin, "listtransactions");
+  return coinQueryKey(coin, 'listtransactions');
 }
 
 export function fetchWalletTransactions(coin: CoinId) {

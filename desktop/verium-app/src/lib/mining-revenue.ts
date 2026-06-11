@@ -1,13 +1,13 @@
-import type { ExplorerStats } from "@/lib/explorer-api";
-import { clampMiningVrmPriceUsd } from "@/lib/mining-input-validation";
-import type { MiningInfo } from "@/lib/rpc/client";
+import type { ExplorerStats } from '@/lib/explorer-api';
+import { clampMiningVrmPriceUsd } from '@/lib/mining-input-validation';
+import type { MiningInfo } from '@/lib/rpc/client';
 
 /** Convert networkhashps (H/s) from getmininginfo to kH/m (explorer convention). */
 export function networkHashToKhm(networkHashPs: number): number {
   return (networkHashPs * 60) / 1000;
 }
 
-export type NetworkStatsSource = "explorer" | "local";
+export type NetworkStatsSource = 'explorer' | 'local';
 
 export interface NetworkStats {
   networkHash?: number;
@@ -22,15 +22,10 @@ export interface NetworkStats {
 /** Observed average block time (minutes), preferring last-hour block rate over RPC target spacing. */
 export function resolveBlockTimeMinutes(
   explorer: ExplorerStats | undefined | null,
-  mining: MiningInfo | undefined | null,
+  mining: MiningInfo | undefined | null
 ): number | null {
-  const blocksPerHour =
-    explorer?.blocks_per_hour ?? mining?.blocksperhour ?? undefined;
-  if (
-    blocksPerHour != null &&
-    Number.isFinite(blocksPerHour) &&
-    blocksPerHour > 0
-  ) {
+  const blocksPerHour = explorer?.blocks_per_hour ?? mining?.blocksperhour ?? undefined;
+  if (blocksPerHour != null && Number.isFinite(blocksPerHour) && blocksPerHour > 0) {
     return 60 / blocksPerHour;
   }
 
@@ -44,21 +39,14 @@ export function resolveBlockTimeMinutes(
 
 export function buildNetworkStats(
   explorer: ExplorerStats | undefined | null,
-  mining: MiningInfo | undefined | null,
+  mining: MiningInfo | undefined | null
 ): NetworkStats | null {
-  const networkHash =
-    explorer?.network_hash ?? mining?.networkhashps ?? undefined;
-  const blockReward =
-    explorer?.block_reward ?? mining?.blockreward ?? undefined;
-  const blocksPerHour =
-    explorer?.blocks_per_hour ?? mining?.blocksperhour ?? undefined;
+  const networkHash = explorer?.network_hash ?? mining?.networkhashps ?? undefined;
+  const blockReward = explorer?.block_reward ?? mining?.blockreward ?? undefined;
+  const blocksPerHour = explorer?.blocks_per_hour ?? mining?.blocksperhour ?? undefined;
   const blockTimeMin = resolveBlockTimeMinutes(explorer, mining) ?? undefined;
 
-  if (
-    networkHash === undefined ||
-    blockReward === undefined ||
-    blocksPerHour === undefined
-  ) {
+  if (networkHash === undefined || blockReward === undefined || blocksPerHour === undefined) {
     return null;
   }
 
@@ -69,13 +57,13 @@ export function buildNetworkStats(
     blockTimeMin,
     priceUsd: explorer?.price_usd,
     priceBtc: explorer?.price_btc,
-    source: explorer?.network_hash != null ? "explorer" : "local",
+    source: explorer?.network_hash != null ? 'explorer' : 'local',
   };
 }
 
 /** Average gap between consecutive blocks (minutes), from explorer block timestamps. */
 export function averageBlockTimeMinutes(
-  blocks: Array<{ time: number }> | undefined | null,
+  blocks: Array<{ time: number }> | undefined | null
 ): number | null {
   if (!blocks || blocks.length < 2) return null;
 
@@ -97,7 +85,7 @@ export function averageBlockTimeMinutes(
 
 export function networkSharePercent(
   localHashrateHm: number,
-  networkHashPs: number | undefined,
+  networkHashPs: number | undefined
 ): number | null {
   if (
     !Number.isFinite(localHashrateHm) ||
@@ -114,7 +102,7 @@ export function networkSharePercent(
 
 export function estimateHoursPerBlock(
   localHashrateHm: number,
-  networkStats: NetworkStats | null,
+  networkStats: NetworkStats | null
 ): number | null {
   if (!networkStats?.networkHash || localHashrateHm <= 0) return null;
   if (networkStats.blockTimeMin && networkStats.blockTimeMin > 0) {
@@ -130,7 +118,7 @@ export function estimateHoursPerBlock(
 
 export function effectiveMiningVrmPriceUsd(
   assumption: number | undefined,
-  marketPrice: number | undefined,
+  marketPrice: number | undefined
 ): number | undefined {
   const clamped = clampMiningVrmPriceUsd(assumption);
   if (clamped != null) {
@@ -155,14 +143,8 @@ export function estimateDailyMining(params: {
   priceUsd?: number;
   priceBtc?: number;
 }): DailyMiningEstimate | null {
-  const {
-    localHashrateHm,
-    networkHashrateHs,
-    blocksPerHour,
-    blockReward,
-    priceUsd,
-    priceBtc,
-  } = params;
+  const { localHashrateHm, networkHashrateHs, blocksPerHour, blockReward, priceUsd, priceBtc } =
+    params;
 
   if (
     !Number.isFinite(localHashrateHm) ||
@@ -187,20 +169,16 @@ export function estimateDailyMining(params: {
     blocksPerDay,
     vrmPerDay,
     usdPerDay:
-      priceUsd !== undefined && Number.isFinite(priceUsd)
-        ? vrmPerDay * priceUsd
-        : undefined,
+      priceUsd !== undefined && Number.isFinite(priceUsd) ? vrmPerDay * priceUsd : undefined,
     btcPerDay:
-      priceBtc !== undefined && Number.isFinite(priceBtc)
-        ? vrmPerDay * priceBtc
-        : undefined,
+      priceBtc !== undefined && Number.isFinite(priceBtc) ? vrmPerDay * priceBtc : undefined,
     hoursPerBlock,
   };
 }
 
 export function estimateDailyElectricityCostUsd(
   watts: number | undefined,
-  costPerKwh: number | undefined,
+  costPerKwh: number | undefined
 ): number | null {
   if (
     watts === undefined ||
@@ -228,19 +206,13 @@ export function suggestedThreadCount(performanceCores?: number): number {
   if (performanceCores != null && performanceCores > 0) {
     return Math.max(1, Math.min(64, performanceCores));
   }
-  const cores =
-    typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 4;
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 4;
   return Math.max(1, Math.min(64, (cores || 4) - 1));
 }
 
-export type RevenuePeriod = "day" | "week" | "month" | "year";
+export type RevenuePeriod = 'day' | 'week' | 'month' | 'year';
 
-export const REVENUE_PERIODS: RevenuePeriod[] = [
-  "day",
-  "week",
-  "month",
-  "year",
-];
+export const REVENUE_PERIODS: RevenuePeriod[] = ['day', 'week', 'month', 'year'];
 
 const PERIOD_DAYS: Record<RevenuePeriod, number> = {
   day: 1,
@@ -253,9 +225,6 @@ export function revenuePeriodLabel(period: RevenuePeriod): string {
   return period;
 }
 
-export function scaleDailyValue(
-  dailyValue: number,
-  period: RevenuePeriod,
-): number {
+export function scaleDailyValue(dailyValue: number, period: RevenuePeriod): number {
   return dailyValue * PERIOD_DAYS[period];
 }

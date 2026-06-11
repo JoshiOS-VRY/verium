@@ -20,17 +20,17 @@
  *   npm run fetch:sidecars:dace
  */
 
-const { spawnSync } = require("node:child_process");
-const path = require("node:path");
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 
-const ROOT = path.resolve(__dirname, "..");
+const ROOT = path.resolve(__dirname, '..');
 
 function run(label, args) {
   process.stdout.write(`[fetch-dace-sidecars] ${label}\n`);
   const r = spawnSync(process.execPath, args, {
     cwd: ROOT,
-    stdio: "inherit",
-    env: { ...process.env, DACE_DEV: "1" },
+    stdio: 'inherit',
+    env: { ...process.env, DACE_DEV: '1' },
   });
   if (r.status !== 0) {
     process.stderr.write(`[fetch-dace-sidecars] ${label} failed (exit ${r.status}).\n`);
@@ -38,12 +38,12 @@ function run(label, args) {
   }
 }
 
-process.env.VERIUMD_FORCE = process.env.VERIUMD_FORCE ?? "1";
-process.env.VERICOIND_FORCE = process.env.VERICOIND_FORCE ?? "1";
+process.env.VERIUMD_FORCE = process.env.VERIUMD_FORCE ?? '1';
+process.env.VERICOIND_FORCE = process.env.VERICOIND_FORCE ?? '1';
 
-run("installing DACE veriumd", [path.join("scripts", "fetch-veriumd.cjs")]);
-run("installing DACE vericoind", [path.join("scripts", "fetch-vericoind.cjs")]);
+run('installing DACE veriumd', [path.join('scripts', 'fetch-veriumd.cjs')]);
+run('installing DACE vericoind', [path.join('scripts', 'fetch-vericoind.cjs')]);
 
 process.stdout.write(
-  "[fetch-dace-sidecars] Done. Restart the wallet to pick up the new sidecars.\n",
+  '[fetch-dace-sidecars] Done. Restart the wallet to pick up the new sidecars.\n'
 );

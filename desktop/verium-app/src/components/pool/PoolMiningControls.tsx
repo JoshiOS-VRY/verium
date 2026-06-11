@@ -1,45 +1,30 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Cpu, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { AnimatedHashrate } from "@/components/AnimatedHashrate";
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Cpu, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { AnimatedHashrate } from '@/components/AnimatedHashrate';
 import {
   detectPoolMiner,
   fetchPoolMinerStatus,
   startPoolMiner,
   stopPoolMiner,
-} from "@/lib/pool-miner-api";
-import {
-  POOL_STRATUM_BACKUP_URL,
-  POOL_STRATUM_URL,
-  poolWorkerUsername,
-} from "@/lib/verium-pool";
-import { MiningThreadControls } from "@/components/MiningThreadControls";
-import { PoolPayoutAddressControls } from "@/components/pool/PoolPayoutAddressControls";
-import { poolPayoutAddressConfigured } from "@/lib/pool-dashboard-address";
-import {
-  normalizePoolPayoutAddress,
-  normalizePoolWorkerName,
-} from "@/lib/pool-mining-prefs";
-import type { CpuTopology } from "@/lib/mining-opt";
-import { cn } from "@/lib/utils";
+} from '@/lib/pool-miner-api';
+import { POOL_STRATUM_BACKUP_URL, POOL_STRATUM_URL, poolWorkerUsername } from '@/lib/verium-pool';
+import { MiningThreadControls } from '@/components/MiningThreadControls';
+import { PoolPayoutAddressControls } from '@/components/pool/PoolPayoutAddressControls';
+import { poolPayoutAddressConfigured } from '@/lib/pool-dashboard-address';
+import { normalizePoolPayoutAddress, normalizePoolWorkerName } from '@/lib/pool-mining-prefs';
+import type { CpuTopology } from '@/lib/mining-opt';
+import { cn } from '@/lib/utils';
 
 const POOL_IDENTITY_SAVE_MS = 450;
 
 function formatPoolMinerError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   const text = String(error).trim();
-  return text && text !== "[object Object]"
-    ? text
-    : "Pool miner failed to start";
+  return text && text !== '[object Object]' ? text : 'Pool miner failed to start';
 }
 
 export function PoolMiningControls({
@@ -83,7 +68,7 @@ export function PoolMiningControls({
   const queryClient = useQueryClient();
 
   const detect = useQuery({
-    queryKey: ["pool-miner", "detect"],
+    queryKey: ['pool-miner', 'detect'],
     queryFn: detectPoolMiner,
     enabled: nodeRpcConnected,
     staleTime: 60_000,
@@ -95,13 +80,12 @@ export function PoolMiningControls({
     },
   });
 
-  const usesSidecar = detect.data?.source === "sidecar";
+  const usesSidecar = detect.data?.source === 'sidecar';
 
   const status = useQuery({
-    queryKey: ["pool-miner", "status"],
+    queryKey: ['pool-miner', 'status'],
     queryFn: fetchPoolMinerStatus,
-    enabled:
-      nodeRpcConnected && (usesSidecar || (detect.data?.rpcReady ?? false)),
+    enabled: nodeRpcConnected && (usesSidecar || (detect.data?.rpcReady ?? false)),
     refetchInterval: false,
     gcTime: 60_000,
   });
@@ -134,10 +118,7 @@ export function PoolMiningControls({
   }, []);
 
   const flushIdentity = (address: string, worker: string) => {
-    onPoolIdentityChange(
-      normalizePoolPayoutAddress(address),
-      normalizePoolWorkerName(worker),
-    );
+    onPoolIdentityChange(normalizePoolPayoutAddress(address), normalizePoolWorkerName(worker));
   };
 
   const scheduleIdentitySave = (address: string, worker: string) => {
@@ -149,11 +130,7 @@ export function PoolMiningControls({
     }, POOL_IDENTITY_SAVE_MS);
   };
 
-  const applyIdentity = (
-    address: string,
-    worker: string,
-    options?: { immediate?: boolean },
-  ) => {
+  const applyIdentity = (address: string, worker: string, options?: { immediate?: boolean }) => {
     setLocalPayout(address);
     setLocalWorker(worker);
     if (options?.immediate) {
@@ -167,10 +144,7 @@ export function PoolMiningControls({
     scheduleIdentitySave(address, worker);
   };
 
-  const username = poolWorkerUsername(
-    localPayout,
-    localWorker.trim() || "wallet",
-  );
+  const username = poolWorkerUsername(localPayout, localWorker.trim() || 'wallet');
 
   const start = useMutation({
     mutationFn: async () => {
@@ -181,13 +155,11 @@ export function PoolMiningControls({
       // IBD-aware cap: while the node is still syncing, leave headroom for the
       // sidecar to mine without starving node validation.
       const effectiveThreads =
-        usesSidecar && !chainSynced
-          ? Math.max(1, Math.floor(threads / 2))
-          : threads;
+        usesSidecar && !chainSynced ? Math.max(1, Math.floor(threads / 2)) : threads;
       await startPoolMiner({
         stratumUrl: POOL_STRATUM_URL,
         username,
-        password: "x",
+        password: 'x',
         threads: effectiveThreads,
         backupUrl: POOL_STRATUM_BACKUP_URL || undefined,
       });
@@ -195,7 +167,7 @@ export function PoolMiningControls({
     onSuccess: () => {
       onStartPool();
       void queryClient.invalidateQueries({
-        queryKey: ["pool-miner", "status"],
+        queryKey: ['pool-miner', 'status'],
       });
     },
   });
@@ -204,7 +176,7 @@ export function PoolMiningControls({
     mutationFn: stopPoolMiner,
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["pool-miner", "status"],
+        queryKey: ['pool-miner', 'status'],
       });
     },
   });
@@ -220,22 +192,18 @@ export function PoolMiningControls({
     !start.isPending;
 
   return (
-    <Card className={cn(running && "ring-1 ring-accent/25")}>
+    <Card className={cn(running && 'ring-1 ring-accent/25')}>
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <Cpu className="h-4 w-4 text-accent" aria-hidden />
           <CardTitle className="normal-case">Mine on the public pool</CardTitle>
-          {running ? (
-            <Badge tone="success">Mining</Badge>
-          ) : (
-            <Badge tone="neutral">Stopped</Badge>
-          )}
+          {running ? <Badge tone="success">Mining</Badge> : <Badge tone="neutral">Stopped</Badge>}
         </div>
         {!usesSidecar && !poolMinerRpcReady && !running ? (
           <CardDescription>
             {poolMinerBundled
-              ? "Restart the Verium node to enable pool mining."
-              : "Update veriumd to enable pool mining."}
+              ? 'Restart the Verium node to enable pool mining.'
+              : 'Update veriumd to enable pool mining.'}
           </CardDescription>
         ) : null}
       </CardHeader>
@@ -278,9 +246,7 @@ export function PoolMiningControls({
           maxThreads={maxThreads}
           topology={topology}
           logicalCpus={logicalCpus}
-          activeThreads={
-            running ? (status.data?.activeThreads ?? threads) : undefined
-          }
+          activeThreads={running ? (status.data?.activeThreads ?? threads) : undefined}
           isMining={running}
           liveAdaptive={false}
           disabled={running}
@@ -290,9 +256,7 @@ export function PoolMiningControls({
 
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-fg-subtle">
-              Local hashrate
-            </p>
+            <p className="text-xs uppercase tracking-wide text-fg-subtle">Local hashrate</p>
             <p className="text-2xl font-bold tabular-nums">
               {running ? (
                 <AnimatedHashrate
@@ -307,9 +271,7 @@ export function PoolMiningControls({
             {usesSidecar && running ? (
               <p className="mt-1 text-xs text-fg-subtle tabular-nums">
                 {acceptedShares} accepted · {rejectedShares} rejected
-                {status.data?.connectionState
-                  ? ` · ${status.data.connectionState}`
-                  : ""}
+                {status.data?.connectionState ? ` · ${status.data.connectionState}` : ''}
               </p>
             ) : null}
           </div>
@@ -322,9 +284,7 @@ export function PoolMiningControls({
                 disabled={stop.isPending}
                 onClick={() => stop.mutate()}
               >
-                {stop.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : null}
+                {stop.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                 Stop pool mining
               </Button>
             ) : (
@@ -334,9 +294,7 @@ export function PoolMiningControls({
                 disabled={!canStart}
                 onClick={() => start.mutate()}
               >
-                {start.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : null}
+                {start.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                 Start pool mining
               </Button>
             )}
@@ -344,14 +302,12 @@ export function PoolMiningControls({
         </div>
 
         {start.error ? (
-          <p className="text-sm text-danger">
-            {formatPoolMinerError(start.error)}
-          </p>
+          <p className="text-sm text-danger">{formatPoolMinerError(start.error)}</p>
         ) : null}
         {showRejectWarning ? (
           <p className="text-sm text-warning">
-            High reject rate ({(rejectRate * 100).toFixed(1)}%). Check your
-            connection or lower the thread count if this persists.
+            High reject rate ({(rejectRate * 100).toFixed(1)}%). Check your connection or lower the
+            thread count if this persists.
           </p>
         ) : null}
         {!usesSidecar && !chainSynced && !syncStalled ? (
@@ -366,7 +322,7 @@ export function PoolMiningControls({
 
 export function usePoolMinerRunning(nodeRpcConnected = false): boolean {
   const status = useQuery({
-    queryKey: ["pool-miner", "status"],
+    queryKey: ['pool-miner', 'status'],
     queryFn: fetchPoolMinerStatus,
     enabled: nodeRpcConnected,
     refetchInterval: false,

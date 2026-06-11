@@ -1,19 +1,19 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, Lock } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useInvalidateWalletMode, useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletUnlock } from "@/lib/light-wallet/client";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { rpcGetWalletInfo, rpcWalletUnlock } from "@/lib/rpc/client";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Loader2, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useInvalidateWalletMode, useWalletMode } from '@/hooks/useWalletMode';
+import { lightWalletUnlock } from '@/lib/light-wallet/client';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { rpcGetWalletInfo, rpcWalletUnlock } from '@/lib/rpc/client';
 import {
   optimisticLightWalletUnlockPatch,
   rpcUnlockTimeoutSeconds,
   shouldUnlockMintingOnly,
-} from "@/lib/wallet-unlock";
-import { cn } from "@/lib/utils";
+} from '@/lib/wallet-unlock';
+import { cn } from '@/lib/utils';
 
 interface WalletUnlockFormProps {
   title?: string;
@@ -28,14 +28,14 @@ interface WalletUnlockFormProps {
 function formatUnlockError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   const text = String(error).trim();
-  return text && text !== "[object Object]"
+  return text && text !== '[object Object]'
     ? text
-    : "Unlock failed — check your light-wallet passphrase (from import), not your full-node wallet passphrase.";
+    : 'Unlock failed — check your light-wallet passphrase (from import), not your full-node wallet passphrase.';
 }
 
 export function WalletUnlockForm({
-  title = "Unlock wallet",
-  description = "Enter your wallet passphrase to continue. Your passphrase is never stored.",
+  title = 'Unlock wallet',
+  description = 'Enter your wallet passphrase to continue. Your passphrase is never stored.',
   onUnlocked,
   mintingOnly = false,
   className,
@@ -46,16 +46,16 @@ export function WalletUnlockForm({
   const { isLight } = useWalletMode();
   const invalidateWalletMode = useInvalidateWalletMode();
   const queryClient = useQueryClient();
-  const [passphrase, setPassphrase] = useState("");
+  const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "verifying" | "applied">("idle");
+  const [status, setStatus] = useState<'idle' | 'verifying' | 'applied'>('idle');
 
   // Full-node unlock uses wallet.dat RPC; leftover light-wallet files must not switch paths.
   const useLightUnlock = isLight;
 
   const unlock = useMutation({
     mutationFn: async () => {
-      setStatus("verifying");
+      setStatus('verifying');
       if (useLightUnlock) {
         await lightWalletUnlock(coin, passphrase, rpcUnlockTimeoutSeconds());
         return;
@@ -64,64 +64,62 @@ export function WalletUnlockForm({
         coin,
         passphrase,
         rpcUnlockTimeoutSeconds(),
-        shouldUnlockMintingOnly(coin, mintingOnly) ? true : undefined,
+        shouldUnlockMintingOnly(coin, mintingOnly) ? true : undefined
       );
     },
     onSuccess: async () => {
-      setPassphrase("");
+      setPassphrase('');
       setError(null);
 
       if (useLightUnlock) {
-        setStatus("applied");
-        queryClient.setQueryData(
-          coinQueryKey(coin, "getwalletinfo"),
-          (prev) =>
-            optimisticLightWalletUnlockPatch(
-              prev as Awaited<ReturnType<typeof rpcGetWalletInfo>>,
-              coin,
-              rpcUnlockTimeoutSeconds(),
-            ),
+        setStatus('applied');
+        queryClient.setQueryData(coinQueryKey(coin, 'getwalletinfo'), (prev) =>
+          optimisticLightWalletUnlockPatch(
+            prev as Awaited<ReturnType<typeof rpcGetWalletInfo>>,
+            coin,
+            rpcUnlockTimeoutSeconds()
+          )
         );
         invalidateWalletMode();
       } else {
-        setStatus("idle");
+        setStatus('idle');
       }
 
       if (!useLightUnlock) {
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "getwalletinfo"),
+          queryKey: coinQueryKey(coin, 'getwalletinfo'),
         });
       }
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "light-wallet-exists"),
+        queryKey: coinQueryKey(coin, 'light-wallet-exists'),
       });
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "light-server-status"),
+        queryKey: coinQueryKey(coin, 'light-server-status'),
       });
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "listtransactions"),
+        queryKey: coinQueryKey(coin, 'listtransactions'),
       });
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "listunspent"),
+        queryKey: coinQueryKey(coin, 'listunspent'),
       });
-      void queryClient.invalidateQueries({ queryKey: ["wallet-mode-status"] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet-mode-status'] });
 
       if (useLightUnlock) {
-        setTimeout(() => setStatus("idle"), 1500);
+        setTimeout(() => setStatus('idle'), 1500);
       }
 
       onUnlocked?.();
     },
     onError: (e) => {
-      setStatus("idle");
+      setStatus('idle');
       setError(formatUnlockError(e));
     },
   });
 
-  const busy = unlock.isPending || status === "applied";
+  const busy = unlock.isPending || status === 'applied';
 
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div className={cn('flex flex-col gap-4', className)}>
       <div className="flex items-start gap-3">
         <div className="rounded-lg border border-border bg-bg-subtle p-2.5">
           <Lock className="h-5 w-5 text-accent" />
@@ -129,10 +127,9 @@ export function WalletUnlockForm({
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
           <p className="mt-1 text-sm text-fg-muted">{description}</p>
-          {mintingOnly && coin === "vericoin" && (
+          {mintingOnly && coin === 'vericoin' && (
             <p className="mt-1 text-xs text-fg-subtle">
-              Stake-only unlock — coins stay locked for sending until you unlock
-              fully.
+              Stake-only unlock — coins stay locked for sending until you unlock fully.
             </p>
           )}
         </div>
@@ -161,20 +158,18 @@ export function WalletUnlockForm({
           />
         </div>
 
-        {status === "applied" && (
+        {status === 'applied' && (
           <div className="flex items-start gap-2 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs text-fg-muted">
             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
             <span>
-              <strong className="font-medium text-fg">
-                {lightWalletCopy.unlockApplied}
-              </strong>
-              {" — "}
+              <strong className="font-medium text-fg">{lightWalletCopy.unlockApplied}</strong>
+              {' — '}
               {lightWalletCopy.unlockRefreshingBalance}
             </span>
           </div>
         )}
 
-        {unlock.isPending && useLightUnlock && status === "verifying" && (
+        {unlock.isPending && useLightUnlock && status === 'verifying' && (
           <div className="flex items-center gap-2 text-xs text-fg-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
             {lightWalletCopy.unlockVerifying}
@@ -194,10 +189,10 @@ export function WalletUnlockForm({
           {unlock.isPending
             ? useLightUnlock
               ? lightWalletCopy.unlockVerifying
-              : "Unlocking…"
-            : status === "applied"
+              : 'Unlocking…'
+            : status === 'applied'
               ? lightWalletCopy.unlockApplied
-              : "Unlock wallet"}
+              : 'Unlock wallet'}
         </Button>
       </form>
     </div>

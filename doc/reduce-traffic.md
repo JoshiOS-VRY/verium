@@ -1,5 +1,4 @@
-Reduce Traffic
-==============
+# Reduce Traffic
 
 Some node operators need to deal with bandwidth caps imposed by their ISPs.
 
@@ -15,7 +14,7 @@ Ways to reduce traffic:
 A major component of the traffic is caused by serving historic blocks to other nodes
 during the initial blocks download phase (syncing up a new node).
 This option can be specified in MiB per day and is turned off by default.
-This is *not* a hard limit; only a threshold to minimize the outbound
+This is _not_ a hard limit; only a threshold to minimize the outbound
 traffic. When the limit is about to be reached, the uploaded data is cut by no
 longer serving historic blocks (blocks older than one week).
 Keep in mind that new nodes require other nodes that are willing to serve

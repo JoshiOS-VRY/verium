@@ -1,15 +1,12 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { coinQueryKey } from "@/lib/coin/profile";
-import {
-  rpcGetNewAddress,
-  rpcListAddressGroupings,
-} from "@/lib/rpc/client";
-import type { MiningRewardAddressMode } from "@/lib/mining-reward-address";
-import { cn } from "@/lib/utils";
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { rpcGetNewAddress, rpcListAddressGroupings } from '@/lib/rpc/client';
+import type { MiningRewardAddressMode } from '@/lib/mining-reward-address';
+import { cn } from '@/lib/utils';
 
-const VERIUM = "verium" as const;
+const VERIUM = 'verium' as const;
 
 interface MiningRewardAddressControlsProps {
   mode: MiningRewardAddressMode;
@@ -28,10 +25,10 @@ export function MiningRewardAddressControls({
   onModeChange,
   onAddressChange,
 }: MiningRewardAddressControlsProps) {
-  const staticMode = mode === "static";
+  const staticMode = mode === 'static';
 
   const addresses = useQuery({
-    queryKey: coinQueryKey(VERIUM, "listaddressgroupings"),
+    queryKey: coinQueryKey(VERIUM, 'listaddressgroupings'),
     queryFn: () => rpcListAddressGroupings(VERIUM),
     staleTime: 30_000,
     enabled: staticMode,
@@ -45,15 +42,8 @@ export function MiningRewardAddressControls({
   });
 
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-3",
-        compact ? "text-xs" : "text-sm",
-      )}
-    >
-      <p className={cn("font-medium text-fg", compact && "text-xs")}>
-        Mining reward address
-      </p>
+    <div className={cn('flex flex-col gap-3', compact ? 'text-xs' : 'text-sm')}>
+      <p className={cn('font-medium text-fg', compact && 'text-xs')}>Mining reward address</p>
       <div className="flex flex-col gap-2">
         <label className="flex cursor-pointer items-start gap-2">
           <input
@@ -61,7 +51,7 @@ export function MiningRewardAddressControls({
             name="mining-reward-mode"
             checked={!staticMode}
             disabled={disabled}
-            onChange={() => onModeChange("dynamic")}
+            onChange={() => onModeChange('dynamic')}
             className="mt-0.5 accent-accent"
           />
           <span>
@@ -77,7 +67,7 @@ export function MiningRewardAddressControls({
             name="mining-reward-mode"
             checked={staticMode}
             disabled={disabled}
-            onChange={() => onModeChange("static")}
+            onChange={() => onModeChange('static')}
             className="mt-0.5 accent-accent"
           />
           <span>

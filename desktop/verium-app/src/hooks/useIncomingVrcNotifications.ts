@@ -1,12 +1,9 @@
-import { useEffect } from "react";
-import {
-  subscribeIncomingVrc,
-  type IncomingVrcBatch,
-} from "@/hooks/useIncomingVrcWatcher";
-import { playReceivedVrmSound } from "@/lib/received-vrm-sound";
-import { pushToast } from "@/lib/toast-store";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { formatNumber } from "@/lib/utils";
+import { useEffect } from 'react';
+import { subscribeIncomingVrc, type IncomingVrcBatch } from '@/hooks/useIncomingVrcWatcher';
+import { playReceivedVrmSound } from '@/lib/received-vrm-sound';
+import { pushToast } from '@/lib/toast-store';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { formatNumber } from '@/lib/utils';
 
 function formatBatchMessage(batch: IncomingVrcBatch): {
   title: string;
@@ -18,7 +15,7 @@ function formatBatchMessage(batch: IncomingVrcBatch): {
   if (count === 1) {
     return {
       title: `Received ${amount} VRC`,
-      description: "",
+      description: '',
     };
   }
 
@@ -30,9 +27,7 @@ function formatBatchMessage(batch: IncomingVrcBatch): {
 
 /** Shows toast + plays chime when incoming VRC is detected (if enabled). */
 export function useIncomingVrcNotifications(): void {
-  const enabled = useUserPreferences(
-    (s) => s.prefs.notify_on_vrc_received !== false,
-  );
+  const enabled = useUserPreferences((s) => s.prefs.notify_on_vrc_received !== false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -42,7 +37,7 @@ export function useIncomingVrcNotifications(): void {
       pushToast({
         title,
         description,
-        tone: "success",
+        tone: 'success',
         durationMs: batch.events.length > 1 ? 8_000 : 6_000,
       });
       void playReceivedVrmSound();

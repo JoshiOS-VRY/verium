@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Power } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { tauriQuitWallet } from "@/lib/rpc/client";
+import { useState } from 'react';
+import { Power } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { tauriQuitWallet } from '@/lib/rpc/client';
 
 export function QuitWalletButton() {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -14,7 +14,7 @@ export function QuitWalletButton() {
       await tauriQuitWallet();
     } catch (err) {
       setQuitting(false);
-      console.error("quit_wallet failed:", err);
+      console.error('quit_wallet failed:', err);
     }
   };
 
@@ -28,7 +28,7 @@ export function QuitWalletButton() {
         disabled={quitting}
       >
         <Power className="h-3.5 w-3.5" />
-        {quitting ? "Quitting…" : "Quit wallet"}
+        {quitting ? 'Quitting…' : 'Quit wallet'}
       </Button>
 
       {confirmOpen && (
@@ -36,15 +36,11 @@ export function QuitWalletButton() {
           <div className="max-w-md w-full rounded-lg border border-border bg-bg-panel p-6 space-y-4">
             <h4 className="text-lg font-semibold">Quit Vericonomy Wallet?</h4>
             <p className="text-sm text-fg-muted">
-              This stops CPU mining and staking, shuts down veriumd and
-              vericoind, locks your wallets, and closes the application.
+              This stops CPU mining and staking, shuts down veriumd and vericoind, locks your
+              wallets, and closes the application.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setConfirmOpen(false)}
-              >
+              <Button variant="secondary" size="sm" onClick={() => setConfirmOpen(false)}>
                 Cancel
               </Button>
               <Button variant="danger" size="sm" onClick={onQuit}>

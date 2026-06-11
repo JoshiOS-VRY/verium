@@ -1,12 +1,12 @@
-import { useCallback, useEffect } from "react";
-import { useUserPreferences } from "@/lib/user-preferences";
+import { useCallback, useEffect } from 'react';
+import { useUserPreferences } from '@/lib/user-preferences';
 import {
   applyTheme,
   cacheThemeMode,
   readCachedThemeMode,
   resolveTheme,
   type ThemeMode,
-} from "@/lib/theme";
+} from '@/lib/theme';
 
 /**
  * Keeps the document theme in sync with the persisted preference and the OS
@@ -18,7 +18,7 @@ export function useTheme() {
   const loaded = useUserPreferences((s) => s.loaded);
   const updatePrefs = useUserPreferences((s) => s.update);
 
-  const mode: ThemeMode = prefs.theme_mode ?? "system";
+  const mode: ThemeMode = prefs.theme_mode ?? 'system';
 
   useEffect(() => {
     if (!loaded) return;
@@ -27,12 +27,12 @@ export function useTheme() {
   }, [loaded, mode]);
 
   useEffect(() => {
-    if (mode !== "system") return;
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => applyTheme(resolveTheme("system"));
-    media.addEventListener("change", handler);
-    return () => media.removeEventListener("change", handler);
+    if (mode !== 'system') return;
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => applyTheme(resolveTheme('system'));
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
   }, [mode]);
 
   const setMode = useCallback(
@@ -41,7 +41,7 @@ export function useTheme() {
       applyTheme(resolveTheme(next));
       await updatePrefs({ theme_mode: next });
     },
-    [updatePrefs],
+    [updatePrefs]
   );
 
   return { mode, setMode };
@@ -54,6 +54,6 @@ export function useTheme() {
  * places that re-render before `loaded` flips true.
  */
 export function syncThemeFromCache(): void {
-  const cached = readCachedThemeMode() ?? "system";
+  const cached = readCachedThemeMode() ?? 'system';
   applyTheme(resolveTheme(cached));
 }

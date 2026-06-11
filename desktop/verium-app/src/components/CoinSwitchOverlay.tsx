@@ -1,6 +1,6 @@
-import { Loader2 } from "lucide-react";
-import { useAppCoinSwitchTransition } from "@/hooks/useAppCoinSwitchTransition";
-import { useCoinProfile } from "@/lib/coin/context";
+import { Loader2 } from 'lucide-react';
+import { useAppCoinSwitchTransition } from '@/hooks/useAppCoinSwitchTransition';
+import { useCoinProfile } from '@/lib/coin/context';
 
 /** Covers main content while core queries load after a coin switch. */
 export function CoinSwitchOverlay() {
@@ -18,9 +18,7 @@ export function CoinSwitchOverlay() {
       aria-label={`Switching to ${profile.displayName}`}
     >
       <Loader2 className="h-7 w-7 animate-spin text-accent" aria-hidden />
-      <span className="text-sm font-medium text-fg">
-        Switching to {profile.displayName}…
-      </span>
+      <span className="text-sm font-medium text-fg">Switching to {profile.displayName}…</span>
     </div>
   );
 }

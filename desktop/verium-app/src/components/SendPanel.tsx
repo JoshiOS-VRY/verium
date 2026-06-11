@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookUser,
   ClipboardPaste,
@@ -9,49 +9,43 @@ import {
   Loader2,
   SendHorizontal,
   X,
-} from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import {
-  SendConfirmDialog,
-  type SendConfirmRecipient,
-} from "@/components/SendConfirmDialog";
-import { AddressBookPicker } from "@/components/AddressBookPicker";
-import {
-  CoinControlDialog,
-  type SelectedUtxoSet,
-} from "@/components/CoinControlDialog";
-import { FeeRateDialog } from "@/components/FeeRateDialog";
-import { QrScanModal } from "@/components/QrScanModal";
-import { TwoFactorPrompt } from "@/components/TwoFactorPrompt";
-import { SendPassphrasePrompt } from "@/components/SendPassphrasePrompt";
-import { ExplorerLink } from "@/components/ExplorerLink";
+} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { SendConfirmDialog, type SendConfirmRecipient } from '@/components/SendConfirmDialog';
+import { AddressBookPicker } from '@/components/AddressBookPicker';
+import { CoinControlDialog, type SelectedUtxoSet } from '@/components/CoinControlDialog';
+import { FeeRateDialog } from '@/components/FeeRateDialog';
+import { QrScanModal } from '@/components/QrScanModal';
+import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
+import { SendPassphrasePrompt } from '@/components/SendPassphrasePrompt';
+import { ExplorerLink } from '@/components/ExplorerLink';
 import {
   rpcGetWalletInfo,
   rpcSendToAddress,
   rpcWalletSendWithInputs,
   rpcWalletSetTxFee,
-} from "@/lib/rpc/client";
-import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
-import { coinQueryKey, getCoinProfile, type CoinId } from "@/lib/coin/profile";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { coinSymbol, formatCoinAmount } from "@/lib/units";
-import { cn } from "@/lib/utils";
-import { listAddressBookEntries, upsertAddressBookEntry } from "@/lib/address-book";
-import { validateSendAddress } from "@/lib/address-validation";
+} from '@/lib/rpc/client';
+import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
+import { coinQueryKey, getCoinProfile, type CoinId } from '@/lib/coin/profile';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { coinSymbol, formatCoinAmount } from '@/lib/units';
+import { cn } from '@/lib/utils';
+import { listAddressBookEntries, upsertAddressBookEntry } from '@/lib/address-book';
+import { validateSendAddress } from '@/lib/address-validation';
 import {
   auditLogRecord,
   spendingControlsCheckAllowlist,
   spendingControlsCheckSend,
   spendingControlsGet,
   twoFactorIsGated,
-} from "@/lib/security/client";
+} from '@/lib/security/client';
 
 const EXAMPLE_ADDRESSES: Partial<Record<CoinId, string>> = {
-  verium: "VRq98Nm2P6anLHPgnHdb6NnibJ6GoG3Jm9",
+  verium: 'VRq98Nm2P6anLHPgnHdb6NnibJ6GoG3Jm9',
 };
 const DEFAULT_FEE_RATE = 0.001;
 /** ~2 recipient cards visible; additional rows scroll inside the panel. */
-const RECIPIENTS_SCROLL_MAX_CLASS = "max-h-[min(22rem,42vh)]";
+const RECIPIENTS_SCROLL_MAX_CLASS = 'max-h-[min(22rem,42vh)]';
 
 interface SendRecipient {
   id: string;
@@ -63,9 +57,9 @@ interface SendRecipient {
 function newRecipient(): SendRecipient {
   return {
     id: crypto.randomUUID(),
-    address: "",
-    label: "",
-    amount: "",
+    address: '',
+    label: '',
+    amount: '',
   };
 }
 
@@ -108,15 +102,10 @@ function SendSuccessBanner({
         </button>
       </div>
       <p className="mt-1 tabular-nums text-fg">
-        Total sent:{" "}
-        <span className="font-semibold">
-          {formatCoinAmount(result.totalAmount, coin, 8)}
-        </span>
+        Total sent:{' '}
+        <span className="font-semibold">{formatCoinAmount(result.totalAmount, coin, 8)}</span>
         {result.recipients.length > 1 && (
-          <span className="text-fg-muted">
-            {" "}
-            · {result.recipients.length} recipients
-          </span>
+          <span className="text-fg-muted"> · {result.recipients.length} recipients</span>
         )}
       </p>
       <ul className="mt-2 space-y-2 border-t border-success/20 pt-2">
@@ -125,25 +114,19 @@ function SendSuccessBanner({
           return (
             <li key={`${recipient.address}-${index}`} className="text-fg">
               <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                <span className="text-[11px] break-all">
-                  {recipient.address}
-                </span>
+                <span className="text-[11px] break-all">{recipient.address}</span>
                 <span className="shrink-0 tabular-nums font-medium">
                   {formatCoinAmount(recipient.amount, coin, 8)}
                 </span>
               </div>
-              {recipient.label && (
-                <p className="mt-0.5 text-fg-muted">{recipient.label}</p>
-              )}
+              {recipient.label && <p className="mt-0.5 text-fg-muted">{recipient.label}</p>}
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 {txid && (
                   <>
-                    <span className="text-[10px] text-fg-muted break-all">
-                      {txid}
-                    </span>
+                    <span className="text-[10px] text-fg-muted break-all">{txid}</span>
                     <ExplorerLink
                       coin={coin}
-                      target={{ kind: "tx", txid }}
+                      target={{ kind: 'tx', txid }}
                       label="View tx"
                       className="text-accent"
                     />
@@ -151,7 +134,7 @@ function SendSuccessBanner({
                 )}
                 <ExplorerLink
                   coin={coin}
-                  target={{ kind: "address", address: recipient.address }}
+                  target={{ kind: 'address', address: recipient.address }}
                   label="View address"
                   className="text-accent"
                 />
@@ -164,15 +147,14 @@ function SendSuccessBanner({
         <div className="mt-2 border-t border-success/20 pt-2">
           <ExplorerLink
             coin={coin}
-            target={{ kind: "tx", txid: result.txids[0]! }}
+            target={{ kind: 'tx', txid: result.txids[0]! }}
             label={`View combined transaction on ${symbol} explorer`}
             className="text-accent"
           />
         </div>
       )}
       <p className="mt-2 text-[10px] text-fg-muted">
-        Submitted {new Date(result.completedAt).toLocaleString()} — awaiting network
-        confirmation.
+        Submitted {new Date(result.completedAt).toLocaleString()} — awaiting network confirmation.
       </p>
     </div>
   );
@@ -199,18 +181,14 @@ export function SendPanel({
   const prefs = useUserPreferences((s) => s.prefs);
   const updatePrefs = useUserPreferences((s) => s.update);
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
 
-  const [recipients, setRecipients] = useState<SendRecipient[]>([
-    newRecipient(),
-  ]);
+  const [recipients, setRecipients] = useState<SendRecipient[]>([newRecipient()]);
   const [subtractFee, setSubtractFee] = useState(false);
-  const [feeRate, setFeeRate] = useState<number>(
-    prefs.tx_fee_rate_vrm_per_kb ?? DEFAULT_FEE_RATE,
-  );
+  const [feeRate, setFeeRate] = useState<number>(prefs.tx_fee_rate_vrm_per_kb ?? DEFAULT_FEE_RATE);
   const [feeDialogOpen, setFeeDialogOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [addressBookFor, setAddressBookFor] = useState<string | null>(null);
@@ -220,8 +198,8 @@ export function SendPanel({
   const [qrTargetId, setQrTargetId] = useState<string | null>(null);
   const [twoFaOpen, setTwoFaOpen] = useState(false);
   const [passphrasePromptOpen, setPassphrasePromptOpen] = useState(false);
-  const sendTotpCodeRef = useRef<string>("");
-  const sendPassphraseRef = useRef<string>("");
+  const sendTotpCodeRef = useRef<string>('');
+  const sendPassphraseRef = useRef<string>('');
   const [clipboardGuardError, setClipboardGuardError] = useState<string | null>(null);
   const [spendWarning, setSpendWarning] = useState<string | null>(null);
   const [extraConfirmDelay, setExtraConfirmDelay] = useState(false);
@@ -232,7 +210,7 @@ export function SendPanel({
   const prevRecipientCountRef = useRef(recipients.length);
 
   const spendingCfg = useQuery({
-    queryKey: ["spending-controls"],
+    queryKey: ['spending-controls'],
     queryFn: spendingControlsGet,
   });
 
@@ -241,9 +219,9 @@ export function SendPanel({
     setRecipients([
       {
         ...newRecipient(),
-        address: initialAddress ?? "",
-        amount: initialAmount ?? "",
-        label: initialLabel ?? "",
+        address: initialAddress ?? '',
+        amount: initialAmount ?? '',
+        label: initialLabel ?? '',
       },
     ]);
   }, [initialAddress, initialAmount, initialLabel]);
@@ -256,7 +234,7 @@ export function SendPanel({
 
     const scrollEl = recipientsScrollRef.current;
     if (scrollEl) {
-      scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
+      scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: 'smooth' });
     }
     prevRecipientCountRef.current = recipients.length;
   }, [recipients.length]);
@@ -271,19 +249,14 @@ export function SendPanel({
   const balance = wallet.data?.balance ?? 0;
   const coinControlTotal = coinControl.reduce((sum, u) => sum + u.amount, 0);
 
-  const updateRecipient = useCallback(
-    (id: string, patch: Partial<SendRecipient>) => {
-      setRecipients((rows) =>
-        rows.map((row) => (row.id === id ? { ...row, ...patch } : row)),
-      );
-    },
-    [],
-  );
+  const updateRecipient = useCallback((id: string, patch: Partial<SendRecipient>) => {
+    setRecipients((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  }, []);
 
   const removeRecipient = useCallback((id: string) => {
     setRecipients((rows) => {
       if (rows.length <= 1) {
-        return [{ ...rows[0]!, address: "", label: "", amount: "" }];
+        return [{ ...rows[0]!, address: '', label: '', amount: '' }];
       }
       return rows.filter((row) => row.id !== id);
     });
@@ -298,17 +271,20 @@ export function SendPanel({
     setRecipients((rows) => [...rows, newRecipient()]);
   }, []);
 
-  const pasteAddress = useCallback(async (id: string) => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text.trim()) {
-        clipboardSnapshot.current.set(id, text.trim());
-        updateRecipient(id, { address: text.trim() });
+  const pasteAddress = useCallback(
+    async (id: string) => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text.trim()) {
+          clipboardSnapshot.current.set(id, text.trim());
+          updateRecipient(id, { address: text.trim() });
+        }
+      } catch {
+        // Clipboard unavailable
       }
-    } catch {
-      // Clipboard unavailable
-    }
-  }, [updateRecipient]);
+    },
+    [updateRecipient]
+  );
 
   const useAvailableBalance = useCallback(
     (id: string) => {
@@ -317,15 +293,13 @@ export function SendPanel({
       const spendable = Math.max(0, balance - feeBuffer);
       updateRecipient(id, { amount: spendable.toFixed(8) });
     },
-    [balance, feeRate, subtractFee, updateRecipient],
+    [balance, feeRate, subtractFee, updateRecipient]
   );
 
   const validRows = recipients.filter((row) => {
     const address = row.address.trim();
     return (
-      address.length > 0 &&
-      validateSendAddress(address) == null &&
-      parseAmount(row.amount) != null
+      address.length > 0 && validateSendAddress(address) == null && parseAmount(row.amount) != null
     );
   });
 
@@ -361,7 +335,7 @@ export function SendPanel({
           undefined,
           feeRate,
           totpCode,
-          walletPassphrase,
+          walletPassphrase
         );
         txids = [txid];
       } else {
@@ -374,7 +348,7 @@ export function SendPanel({
             amount,
             row.label.trim() || undefined,
             totpCode,
-            walletPassphrase,
+            walletPassphrase
           );
           txids.push(txid);
         }
@@ -393,33 +367,33 @@ export function SendPanel({
       setLastSend(result);
       clearAll();
       setCoinControl([]);
-      sendTotpCodeRef.current = "";
-      sendPassphraseRef.current = "";
+      sendTotpCodeRef.current = '';
+      sendPassphraseRef.current = '';
       for (const row of result.recipients) {
         if (row.label?.trim()) {
           await upsertAddressBookEntry(coin, {
-            id: "",
+            id: '',
             address: row.address,
             label: row.label,
-            notes: "",
-            category: "send",
+            notes: '',
+            category: 'send',
           });
         }
         await auditLogRecord(
-          "send",
-          `Sent ${formatCoinAmount(row.amount, coin, 8)} to ${row.address} tx ${result.txids[0] ?? ""}`,
-          coin,
+          'send',
+          `Sent ${formatCoinAmount(row.amount, coin, 8)} to ${row.address} tx ${result.txids[0] ?? ''}`,
+          coin
         );
       }
-      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, "listtransactions") });
-      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, "getwalletinfo") });
-      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, "listunspent") });
-      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, "address-book") });
-      queryClient.invalidateQueries({ queryKey: ["spending-controls"] });
+      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'listtransactions') });
+      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'getwalletinfo') });
+      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'listunspent') });
+      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'address-book') });
+      queryClient.invalidateQueries({ queryKey: ['spending-controls'] });
     },
     onError: () => {
-      sendTotpCodeRef.current = "";
-      sendPassphraseRef.current = "";
+      sendTotpCodeRef.current = '';
+      sendPassphraseRef.current = '';
     },
   });
 
@@ -429,9 +403,9 @@ export function SendPanel({
 
   const requestSendAuth = async () => {
     const total = validRows.reduce((s, r) => s + parseAmount(r.amount)!, 0);
-    const gated = await twoFactorIsGated("send", coin, total);
-    sendTotpCodeRef.current = "";
-    sendPassphraseRef.current = "";
+    const gated = await twoFactorIsGated('send', coin, total);
+    sendTotpCodeRef.current = '';
+    sendPassphraseRef.current = '';
     if (gated) {
       setTwoFaOpen(true);
       return;
@@ -439,8 +413,7 @@ export function SendPanel({
     setPassphrasePromptOpen(true);
   };
 
-  const canSend =
-    validRows.length > 0 && !send.isPending && !preparingConfirm;
+  const canSend = validRows.length > 0 && !send.isPending && !preparingConfirm;
 
   const openConfirm = async () => {
     if (preparingConfirm || send.isPending) return;
@@ -465,7 +438,7 @@ export function SendPanel({
           const snap = clipboardSnapshot.current.get(row.id);
           if (snap && snap !== row.address.trim()) {
             setClipboardGuardError(
-              "Clipboard contents changed since paste — possible hijack. Re-paste the address.",
+              'Clipboard contents changed since paste — possible hijack. Re-paste the address.'
             );
             return;
           }
@@ -474,15 +447,13 @@ export function SendPanel({
 
       if (spendingCfg.data?.allowlist_only) {
         const book = await listAddressBookEntries(coin);
-        const allowlist = book
-          .filter((e) => e.category === "send")
-          .map((e) => e.address);
+        const allowlist = book.filter((e) => e.category === 'send').map((e) => e.address);
         for (const row of validRows) {
           const addr = row.address.trim();
           const ok = await spendingControlsCheckAllowlist(addr, allowlist);
           if (!ok) {
             setSpendWarning(
-              `Allowlist mode: add ${addr.slice(0, 12)}… to Address book (Send) first.`,
+              `Allowlist mode: add ${addr.slice(0, 12)}… to Address book (Send) first.`
             );
             return;
           }
@@ -491,13 +462,9 @@ export function SendPanel({
 
       const total = validRows.reduce((s, r) => s + parseAmount(r.amount)!, 0);
 
-      const capCheck = await spendingControlsCheckSend(
-        total,
-        coin,
-        validRows[0]!.address.trim(),
-      );
+      const capCheck = await spendingControlsCheckSend(total, coin, validRows[0]!.address.trim());
       if (!capCheck.allowed) {
-        setSpendWarning(capCheck.reason ?? "Send blocked by spending controls.");
+        setSpendWarning(capCheck.reason ?? 'Send blocked by spending controls.');
         return;
       }
 
@@ -521,7 +488,7 @@ export function SendPanel({
   };
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn('flex flex-col', className)}>
       <TwoFactorPrompt
         open={twoFaOpen}
         title="Confirm send with 2FA"
@@ -607,16 +574,9 @@ export function SendPanel({
       <div className="flex min-h-0 flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-fg-muted">
-            {recipients.length === 1
-              ? "1 recipient"
-              : `${recipients.length} recipients`}
+            {recipients.length === 1 ? '1 recipient' : `${recipients.length} recipients`}
           </p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={addRecipient}
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={addRecipient}>
             <Plus className="h-4 w-4" />
             Add Recipient
           </Button>
@@ -625,184 +585,168 @@ export function SendPanel({
         <div
           ref={recipientsScrollRef}
           className={cn(
-            "flex flex-col gap-3 overflow-y-auto overscroll-y-contain rounded-lg border border-border bg-bg-subtle/40 p-2 pr-1",
-            RECIPIENTS_SCROLL_MAX_CLASS,
+            'flex flex-col gap-3 overflow-y-auto overscroll-y-contain rounded-lg border border-border bg-bg-subtle/40 p-2 pr-1',
+            RECIPIENTS_SCROLL_MAX_CLASS
           )}
         >
-        {recipients.map((row, index) => {
-          const addressError = row.address.trim()
-            ? validateSendAddress(row.address.trim())
-            : null;
-          return (
-          <div
-            key={row.id}
-            className="rounded-lg border border-border bg-bg-subtle/80 p-4"
-          >
-            {recipients.length > 1 && (
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
-                Recipient {index + 1}
-              </p>
-            )}
-            <div className="grid gap-3">
-              <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-start">
-                <label
-                  htmlFor={`pay-to-${row.id}`}
-                  className="text-sm font-medium text-fg-muted sm:text-right sm:pt-2"
-                >
-                  Pay To
-                </label>
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <div className="flex min-w-0 gap-1">
-                  <input
-                    id={`pay-to-${row.id}`}
-                    type="text"
-                    spellCheck={false}
-                    value={row.address}
-                    onChange={(e) =>
-                      updateRecipient(row.id, { address: e.target.value })
-                    }
-                    placeholder={
-                      exampleAddress
-                        ? `Enter a ${profile.displayName} address (e.g. ${exampleAddress})`
-                        : `Enter a ${profile.displayName} address`
-                    }
-                    className={cn(
-                      "h-10 min-w-0 flex-1 rounded-md border bg-bg-panel px-3 text-xs outline-none focus:border-accent",
-                      addressError ? "border-danger" : "border-border",
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-10 w-10 shrink-0 px-0"
-                    title="Pick from address book"
-                    onClick={() => setAddressBookFor(row.id)}
-                  >
-                    <BookUser className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-10 w-10 shrink-0 px-0"
-                    title="Paste from clipboard"
-                    onClick={() => void pasteAddress(row.id)}
-                  >
-                    <ClipboardPaste className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-10 w-10 shrink-0 px-0"
-                    title="Scan QR code"
-                    onClick={() => {
-                      setQrTargetId(row.id);
-                      setQrOpen(true);
-                    }}
-                  >
-                    <QrCode className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-10 w-10 shrink-0 px-0"
-                    title={recipients.length > 1 ? "Remove recipient" : "Clear"}
-                    onClick={() => removeRecipient(row.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  </div>
-                  {addressError && (
-                    <p className="text-xs text-danger">{addressError}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
-                <label
-                  htmlFor={`label-${row.id}`}
-                  className="text-sm font-medium text-fg-muted sm:text-right"
-                >
-                  Label
-                </label>
-                <input
-                  id={`label-${row.id}`}
-                  type="text"
-                  value={row.label}
-                  onChange={(e) =>
-                    updateRecipient(row.id, { label: e.target.value })
-                  }
-                  placeholder="Enter a label for this address to add it to your address book"
-                  className="h-10 rounded-md border border-border bg-bg-panel px-3 text-sm outline-none focus:border-accent"
-                />
-              </div>
-
-              <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
-                <label
-                  htmlFor={`amount-${row.id}`}
-                  className="text-sm font-medium text-fg-muted sm:text-right"
-                >
-                  Amount
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    id={`amount-${row.id}`}
-                    type="number"
-                    min={0}
-                    step="0.00000001"
-                    value={row.amount}
-                    onChange={(e) =>
-                      updateRecipient(row.id, { amount: e.target.value })
-                    }
-                    className="h-10 w-36 rounded-md border border-border bg-bg-panel px-3 text-sm tabular-nums outline-none focus:border-accent"
-                  />
-             
-                  {index === 0 && (
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
-                      <input
-                        type="checkbox"
-                        checked={subtractFee}
-                        onChange={(e) => setSubtractFee(e.target.checked)}
-                        className="h-3.5 w-3.5 rounded accent-accent"
-                      />
-                      Subtract fee from amount
+          {recipients.map((row, index) => {
+            const addressError = row.address.trim()
+              ? validateSendAddress(row.address.trim())
+              : null;
+            return (
+              <div key={row.id} className="rounded-lg border border-border bg-bg-subtle/80 p-4">
+                {recipients.length > 1 && (
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
+                    Recipient {index + 1}
+                  </p>
+                )}
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-start">
+                    <label
+                      htmlFor={`pay-to-${row.id}`}
+                      className="text-sm font-medium text-fg-muted sm:text-right sm:pt-2"
+                    >
+                      Pay To
                     </label>
-                  )}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="ml-auto shrink-0"
-                    onClick={() => useAvailableBalance(row.id)}
-                    disabled={balance <= 0}
-                  >
-                    Use available balance
-                  </Button>
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <div className="flex min-w-0 gap-1">
+                        <input
+                          id={`pay-to-${row.id}`}
+                          type="text"
+                          spellCheck={false}
+                          value={row.address}
+                          onChange={(e) => updateRecipient(row.id, { address: e.target.value })}
+                          placeholder={
+                            exampleAddress
+                              ? `Enter a ${profile.displayName} address (e.g. ${exampleAddress})`
+                              : `Enter a ${profile.displayName} address`
+                          }
+                          className={cn(
+                            'h-10 min-w-0 flex-1 rounded-md border bg-bg-panel px-3 text-xs outline-none focus:border-accent',
+                            addressError ? 'border-danger' : 'border-border'
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-10 w-10 shrink-0 px-0"
+                          title="Pick from address book"
+                          onClick={() => setAddressBookFor(row.id)}
+                        >
+                          <BookUser className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-10 w-10 shrink-0 px-0"
+                          title="Paste from clipboard"
+                          onClick={() => void pasteAddress(row.id)}
+                        >
+                          <ClipboardPaste className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-10 w-10 shrink-0 px-0"
+                          title="Scan QR code"
+                          onClick={() => {
+                            setQrTargetId(row.id);
+                            setQrOpen(true);
+                          }}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-10 w-10 shrink-0 px-0"
+                          title={recipients.length > 1 ? 'Remove recipient' : 'Clear'}
+                          onClick={() => removeRecipient(row.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {addressError && <p className="text-xs text-danger">{addressError}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
+                    <label
+                      htmlFor={`label-${row.id}`}
+                      className="text-sm font-medium text-fg-muted sm:text-right"
+                    >
+                      Label
+                    </label>
+                    <input
+                      id={`label-${row.id}`}
+                      type="text"
+                      value={row.label}
+                      onChange={(e) => updateRecipient(row.id, { label: e.target.value })}
+                      placeholder="Enter a label for this address to add it to your address book"
+                      className="h-10 rounded-md border border-border bg-bg-panel px-3 text-sm outline-none focus:border-accent"
+                    />
+                  </div>
+
+                  <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
+                    <label
+                      htmlFor={`amount-${row.id}`}
+                      className="text-sm font-medium text-fg-muted sm:text-right"
+                    >
+                      Amount
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        id={`amount-${row.id}`}
+                        type="number"
+                        min={0}
+                        step="0.00000001"
+                        value={row.amount}
+                        onChange={(e) => updateRecipient(row.id, { amount: e.target.value })}
+                        className="h-10 w-36 rounded-md border border-border bg-bg-panel px-3 text-sm tabular-nums outline-none focus:border-accent"
+                      />
+
+                      {index === 0 && (
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+                          <input
+                            type="checkbox"
+                            checked={subtractFee}
+                            onChange={(e) => setSubtractFee(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded accent-accent"
+                          />
+                          Subtract fee from amount
+                        </label>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="ml-auto shrink-0"
+                        onClick={() => useAvailableBalance(row.id)}
+                        disabled={balance <= 0}
+                      >
+                        Use available balance
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        );
-        })}
+            );
+          })}
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
         <span className="text-fg-muted">
-          Transaction Fee:{" "}
+          Transaction Fee:{' '}
           <span className="font-medium tabular-nums text-fg">
             {feeRate.toFixed(8)} {symbol}/kB
           </span>
         </span>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => setFeeDialogOpen(true)}
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={() => setFeeDialogOpen(true)}>
           Choose…
         </Button>
         <Button
@@ -821,11 +765,11 @@ export function SendPanel({
         </Button>
         {coinControl.length > 0 && (
           <span className="text-xs text-fg-muted">
-            Selected inputs:{" "}
+            Selected inputs:{' '}
             <span className="font-medium tabular-nums text-fg">
               {formatCoinAmount(coinControlTotal, coin, 8)}
-            </span>{" "}
-            ·{" "}
+            </span>{' '}
+            ·{' '}
             <button
               type="button"
               className="text-accent underline"
@@ -847,15 +791,9 @@ export function SendPanel({
           {spendWarning}
         </div>
       )}
-      {send.error && (
-        <div className="mt-3 text-xs text-danger">{String(send.error)}</div>
-      )}
+      {send.error && <div className="mt-3 text-xs text-danger">{String(send.error)}</div>}
       {lastSend && (
-        <SendSuccessBanner
-          result={lastSend}
-          coin={coin}
-          onDismiss={() => setLastSend(null)}
-        />
+        <SendSuccessBanner result={lastSend} coin={coin} onDismiss={() => setLastSend(null)} />
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-accent px-4 py-3 text-accent-fg">
@@ -871,7 +809,7 @@ export function SendPanel({
             {preparingConfirm || send.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                {preparingConfirm ? "Checking…" : "Sending…"}
+                {preparingConfirm ? 'Checking…' : 'Sending…'}
               </>
             ) : (
               <>

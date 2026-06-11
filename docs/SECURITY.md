@@ -6,16 +6,16 @@ covered separately by the core repository.
 
 ## What the wallet stores
 
-| Data | Location | Encrypted? |
-| --- | --- | --- |
-| Private keys (`wallet.dat`) | `<data-dir>/wallet.dat` | Yes — AES-256 with your passphrase, performed by `veriumd` |
-| Chain state, blocks | `<data-dir>/blocks/`, `<data-dir>/chainstate/` | No (public chain data) |
-| RPC credentials | `<data-dir>/vericonomy.conf` (`[verium]` / `[vericoin]` section) | No — auto-generated random username (`wallet_*`) and UUID password; never shown in UI after first run |
-| App preferences | Encrypted blob in `<config-dir>/Verium/desktop-app/secure/` | Yes — AES-256-GCM, key in OS keychain |
-| Address book | Encrypted blob in `secure/` | Yes |
-| Receive request history | Encrypted blob in `secure/` | Yes |
-| 2FA secrets, audit log, backup hashes | Encrypted blob in `secure/` | Yes |
-| RPC console history | Browser `localStorage` inside the WebView | No |
+| Data                                  | Location                                                         | Encrypted?                                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Private keys (`wallet.dat`)           | `<data-dir>/wallet.dat`                                          | Yes — AES-256 with your passphrase, performed by `veriumd`                                            |
+| Chain state, blocks                   | `<data-dir>/blocks/`, `<data-dir>/chainstate/`                   | No (public chain data)                                                                                |
+| RPC credentials                       | `<data-dir>/vericonomy.conf` (`[verium]` / `[vericoin]` section) | No — auto-generated random username (`wallet_*`) and UUID password; never shown in UI after first run |
+| App preferences                       | Encrypted blob in `<config-dir>/Verium/desktop-app/secure/`      | Yes — AES-256-GCM, key in OS keychain                                                                 |
+| Address book                          | Encrypted blob in `secure/`                                      | Yes                                                                                                   |
+| Receive request history               | Encrypted blob in `secure/`                                      | Yes                                                                                                   |
+| 2FA secrets, audit log, backup hashes | Encrypted blob in `secure/`                                      | Yes                                                                                                   |
+| RPC console history                   | Browser `localStorage` inside the WebView                        | No                                                                                                    |
 
 Default `<data-dir>`:
 

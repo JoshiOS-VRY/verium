@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Button } from "@/components/ui/Button";
+import { useEffect } from 'react';
+import { Button } from '@/components/ui/Button';
 
 interface OkDialogProps {
   open: boolean;
@@ -10,20 +10,14 @@ interface OkDialogProps {
 }
 
 /** Modal with a single acknowledge button (no cancel). */
-export function OkDialog({
-  open,
-  title,
-  message,
-  okLabel = "OK",
-  onOk,
-}: OkDialogProps) {
+export function OkDialog({ open, title, message, okLabel = 'OK', onOk }: OkDialogProps) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Enter" || event.key === "Escape") onOk();
+      if (event.key === 'Enter' || event.key === 'Escape') onOk();
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onOk]);
 
   if (!open) return null;

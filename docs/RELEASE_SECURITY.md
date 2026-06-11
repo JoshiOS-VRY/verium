@@ -33,10 +33,10 @@ cosign verify-blob --certificate-oidc-issuer-regexp ".*" \
 
 Production releases should be:
 
-| Platform | Expected signature |
-| --- | --- |
-| Windows | Authenticode (Publisher: Vericonomy) |
-| macOS | Developer ID + notarization |
+| Platform     | Expected signature                   |
+| ------------ | ------------------------------------ |
+| Windows      | Authenticode (Publisher: Vericonomy) |
+| macOS        | Developer ID + notarization          |
 | Linux `.deb` | GPG package signature (when enabled) |
 
 Alpha builds may be unsigned; verify hashes and cosign instead.
@@ -57,11 +57,11 @@ The wallet embeds `release-hashes.json` for bundled sidecar SHA-256 checks. Use 
 
 ## Maintainer CI secrets
 
-| Secret | Purpose |
-| --- | --- |
-| `TAURI_SIGNING_PRIVATE_KEY` | Tauri updater + bundle signing |
+| Secret                                 | Purpose                              |
+| -------------------------------------- | ------------------------------------ |
+| `TAURI_SIGNING_PRIVATE_KEY`            | Tauri updater + bundle signing       |
 | `APPLE_CERTIFICATE` / `APPLE_PASSWORD` | macOS notarization (when configured) |
-| `WINDOWS_CERTIFICATE` | Authenticode (when configured) |
-| Cosign OIDC (GitHub Actions) | Release blob attestation |
+| `WINDOWS_CERTIFICATE`                  | Authenticode (when configured)       |
+| Cosign OIDC (GitHub Actions)           | Release blob attestation             |
 
 Never commit private keys or passphrases to the repository.

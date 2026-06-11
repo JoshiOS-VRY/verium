@@ -1,27 +1,23 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useActiveCoin } from "@/lib/coin/context";
-import type { CoinId } from "@/lib/coin/profile";
-import { LIGHT_WALLET_ENABLED } from "@/lib/features";
-import {
-  walletModeGetForCoin,
-  type WalletModeStatus,
-} from "@/lib/light-wallet/client";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useActiveCoin } from '@/lib/coin/context';
+import type { CoinId } from '@/lib/coin/profile';
+import { LIGHT_WALLET_ENABLED } from '@/lib/features';
+import { walletModeGetForCoin, type WalletModeStatus } from '@/lib/light-wallet/client';
 
 /** Prefix for invalidating wallet-mode queries (all coins). */
-export const WALLET_MODE_QUERY_KEY = ["wallet-mode-status"] as const;
+export const WALLET_MODE_QUERY_KEY = ['wallet-mode-status'] as const;
 
 export function walletModeQueryKey(coin: CoinId) {
   return [...WALLET_MODE_QUERY_KEY, coin] as const;
 }
 
 function modeFromStatus(data: WalletModeStatus | undefined) {
-  const lightWalletEnabled =
-    LIGHT_WALLET_ENABLED || data?.light_wallet_enabled === true;
-  const isLight = lightWalletEnabled && data?.mode === "light";
+  const lightWalletEnabled = LIGHT_WALLET_ENABLED || data?.light_wallet_enabled === true;
+  const isLight = lightWalletEnabled && data?.mode === 'light';
   return {
     isLight,
     isFullNode: !isLight,
-    mode: data?.mode ?? ("full_node" as const),
+    mode: data?.mode ?? ('full_node' as const),
     lightWalletEnabled,
     lightWalletExists: data?.light_wallet_exists ?? false,
     electrumServers: data?.electrum_servers ?? [],

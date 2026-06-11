@@ -1,17 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { rpcGetWalletInfo } from "@/lib/rpc/client";
+import { useQuery } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
 
 /** Shown while the wallet is performing its initial Electrum gap scan after unlock. */
 export function LightWalletSyncBanner() {
   const coin = useActiveCoin();
   const { isLight } = useWalletMode();
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     enabled: isLight,
   });
@@ -26,7 +26,7 @@ export function LightWalletSyncBanner() {
       <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
       <span>
         {balanceReady
-          ? "Address scan still running in the background. Confirmed balance is available — you can send now."
+          ? 'Address scan still running in the background. Confirmed balance is available — you can send now.'
           : lightWalletCopy.unlockRefreshingBalance}
       </span>
     </div>

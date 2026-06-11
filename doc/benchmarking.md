@@ -1,16 +1,16 @@
-Benchmarking
-============
+# Benchmarking
 
 Verium has an internal benchmarking framework, with benchmarks
 for cryptographic algorithms such as SHA1, SHA256, SHA512 and RIPEMD160. As well as the rolling bloom filter.
 
-Running
----------------------
+## Running
+
 After compiling verium-core, the benchmarks can be run with:
 
     src/bench/bench_verium
 
 The output will look similar to:
+
 ```
 # Benchmark, evals, iterations, total, min, max, median
 Base58CheckEncode, 5, 320000, 120.772, 7.49351e-05, 7.59374e-05, 7.54759e-05
@@ -39,15 +39,16 @@ Trig, 5, 12000000, 5.95494, 9.78115e-08, 1.04354e-07, 9.80682e-08
 VerifyScriptBench, 5, 6300, 9.02493, 0.000285566, 0.000288433, 0.000286175
 ```
 
-Help
----------------------
+## Help
+
 `-?` will print a list of options and exit:
 
     src/bench/bench_verium -?
 
-Notes
----------------------
+## Notes
+
 More benchmarks are needed for, in no particular order:
+
 - Script Validation
 - CCoinDBView caching
 - Coins database

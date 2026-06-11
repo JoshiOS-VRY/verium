@@ -1,26 +1,20 @@
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey, getCoinProfile } from "@/lib/coin/profile";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { YourMiningPanel } from "@/components/YourMiningPanel";
-import { fetchExplorerStats, isExplorerApiEnabled } from "@/lib/explorer-api";
-import { networkHashToKhm } from "@/lib/mining-revenue";
-import { rpcGetMiningInfo, rpcGetWalletInfo } from "@/lib/rpc/client";
-import { formatCoinAmount } from "@/lib/units";
-import { cn, formatNumber } from "@/lib/utils";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { lockedWalletBalanceClass, walletInfoForMode } from "@/lib/wallet-unlock";
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey, getCoinProfile } from '@/lib/coin/profile';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { YourMiningPanel } from '@/components/YourMiningPanel';
+import { fetchExplorerStats, isExplorerApiEnabled } from '@/lib/explorer-api';
+import { networkHashToKhm } from '@/lib/mining-revenue';
+import { rpcGetMiningInfo, rpcGetWalletInfo } from '@/lib/rpc/client';
+import { formatCoinAmount } from '@/lib/units';
+import { cn, formatNumber } from '@/lib/utils';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { lockedWalletBalanceClass, walletInfoForMode } from '@/lib/wallet-unlock';
 
 function formatUsd(value?: number): string {
-  if (value === undefined || value === null) return "—";
+  if (value === undefined || value === null) return '—';
   if (value >= 1_000_000) return `$${formatNumber(value / 1_000_000, 2)}M`;
   if (value >= 1_000) return `$${formatNumber(value / 1_000, 2)}K`;
   return `$${formatNumber(value, 4)}`;
@@ -36,29 +30,29 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
   const visible = useWindowVisible();
   const { isLight } = useWalletMode();
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
   const effectiveWallet = walletInfoForMode(isLight, wallet.data);
   const explorerEnabled = useQuery({
-    queryKey: ["explorer-api-enabled"],
+    queryKey: ['explorer-api-enabled'],
     queryFn: isExplorerApiEnabled,
     staleTime: Infinity,
   });
   const stats = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-stats"),
+    queryKey: coinQueryKey(coin, 'explorer-stats'),
     queryFn: () => fetchExplorerStats(coin),
     enabled: explorerEnabled.data === true,
     refetchInterval: false,
     retry: 0,
   });
   const mining = useQuery({
-    queryKey: coinQueryKey(coin, "getmininginfo"),
+    queryKey: coinQueryKey(coin, 'getmininginfo'),
     queryFn: () => rpcGetMiningInfo(coin),
     enabled:
       visible &&
-      coin === "verium" &&
+      coin === 'verium' &&
       explorerEnabled.data === true &&
       stats.data?.network_hash == null,
     staleTime: 60_000,
@@ -67,9 +61,7 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
 
   const explorerHeight = stats.data?.height;
   const heightDelta =
-    localHeight != null && explorerHeight != null
-      ? localHeight - explorerHeight
-      : undefined;
+    localHeight != null && explorerHeight != null ? localHeight - explorerHeight : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -83,34 +75,26 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
         <CardContent className="grid grid-cols-2 gap-3 text-sm">
           <MiniStat
             label="Balance"
-            value={
-              effectiveWallet
-                ? formatCoinAmount(effectiveWallet.balance, coin, 4)
-                : "—"
-            }
+            value={effectiveWallet ? formatCoinAmount(effectiveWallet.balance, coin, 4) : '—'}
             valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
           <MiniStat
             label="Unconfirmed"
             value={
-              effectiveWallet
-                ? formatCoinAmount(effectiveWallet.unconfirmed_balance, coin, 4)
-                : "—"
+              effectiveWallet ? formatCoinAmount(effectiveWallet.unconfirmed_balance, coin, 4) : '—'
             }
             valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
           <MiniStat
             label="Immature"
             value={
-              effectiveWallet
-                ? formatCoinAmount(effectiveWallet.immature_balance, coin, 4)
-                : "—"
+              effectiveWallet ? formatCoinAmount(effectiveWallet.immature_balance, coin, 4) : '—'
             }
             valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
           <MiniStat
             label="Transactions"
-            value={effectiveWallet ? formatNumber(effectiveWallet.txcount, 0) : "—"}
+            value={effectiveWallet ? formatNumber(effectiveWallet.txcount, 0) : '—'}
             valueClassName={lockedWalletBalanceClass(effectiveWallet)}
           />
         </CardContent>
@@ -120,40 +104,26 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
         <Card>
           <CardHeader className="flex-row items-start justify-between pb-2">
             <CardTitle className="text-base">Market</CardTitle>
-            <ExplorerLink
-              coin={coin}
-              target={{ kind: "home" }}
-              label="Explorer"
-            />
+            <ExplorerLink coin={coin} target={{ kind: 'home' }} label="Explorer" />
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-2 text-sm">
+            <MiniStat label={profile.symbol} value={formatUsd(stats.data?.price_usd)} />
+            <MiniStat label="24h vol" value={formatUsd(stats.data?.volume_24h_usd)} />
             <MiniStat
-              label={profile.symbol}
-              value={formatUsd(stats.data?.price_usd)}
-            />
-            <MiniStat
-              label="24h vol"
-              value={formatUsd(stats.data?.volume_24h_usd)}
-            />
-            <MiniStat
-              label={coin === "vericoin" ? "Interest rate" : "Block reward"}
+              label={coin === 'vericoin' ? 'Interest rate' : 'Block reward'}
               value={
-                coin === "vericoin"
+                coin === 'vericoin'
                   ? stats.data?.stake_interest != null
                     ? `${formatNumber(stats.data.stake_interest, 2)}%`
-                    : "—"
+                    : '—'
                   : stats.data?.block_reward != null
                     ? `${formatNumber(stats.data.block_reward, 4)} ${profile.symbol}`
-                    : "—"
+                    : '—'
               }
             />
             <MiniStat
               label="Supply"
-              value={
-                stats.data?.supply != null
-                  ? `${formatNumber(stats.data.supply, 0)}`
-                  : "—"
-              }
+              value={stats.data?.supply != null ? `${formatNumber(stats.data.supply, 0)}` : '—'}
             />
           </CardContent>
         </Card>
@@ -167,20 +137,18 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
           <CardContent className="flex flex-col gap-2 text-sm">
             <Row
               label="Local height"
-              value={localHeight != null ? formatNumber(localHeight) : "—"}
+              value={localHeight != null ? formatNumber(localHeight) : '—'}
             />
             <Row
               label="Explorer height"
-              value={
-                explorerHeight != null ? formatNumber(explorerHeight) : "—"
-              }
+              value={explorerHeight != null ? formatNumber(explorerHeight) : '—'}
             />
             <Row
               label="Delta"
               value={
                 heightDelta != null
-                  ? `${heightDelta >= 0 ? "+" : ""}${formatNumber(heightDelta)}`
-                  : "—"
+                  ? `${heightDelta >= 0 ? '+' : ''}${formatNumber(heightDelta)}`
+                  : '—'
               }
             />
             <Row
@@ -190,7 +158,7 @@ export function DashboardSidebar({ localHeight }: DashboardSidebarProps) {
                   ? `${formatNumber(networkHashToKhm(stats.data.network_hash), 1)} kH/m`
                   : mining.data
                     ? `${formatNumber(networkHashToKhm(mining.data.networkhashps), 1)} kH/m`
-                    : "—"
+                    : '—'
               }
             />
           </CardContent>
@@ -212,7 +180,7 @@ function MiniStat({
   return (
     <div>
       <div className="text-xs text-fg-subtle">{label}</div>
-      <div className={cn("font-semibold tabular-nums", valueClassName)}>{value}</div>
+      <div className={cn('font-semibold tabular-nums', valueClassName)}>{value}</div>
     </div>
   );
 }

@@ -1,13 +1,13 @@
-import { Link, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletExists } from "@/lib/light-wallet/client";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { rpcGetWalletInfo } from "@/lib/rpc/client";
-import { walletInfoForMode } from "@/lib/wallet-unlock";
+import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle } from 'lucide-react';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { lightWalletExists } from '@/lib/light-wallet/client';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import { walletInfoForMode } from '@/lib/wallet-unlock';
 
 /** Shown in light mode when no encrypted keystore exists for the active chain. */
 export function LightWalletMissingBanner() {
@@ -15,14 +15,14 @@ export function LightWalletMissingBanner() {
   const location = useLocation();
   const { isLight } = useWalletMode();
   const exists = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryKey: coinQueryKey(coin, 'light-wallet-exists'),
     queryFn: () => lightWalletExists(coin),
     enabled: isLight,
     staleTime: 0,
-    refetchOnMount: "always",
+    refetchOnMount: 'always',
   });
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     enabled: isLight && exists.data !== false,
     refetchInterval: false,

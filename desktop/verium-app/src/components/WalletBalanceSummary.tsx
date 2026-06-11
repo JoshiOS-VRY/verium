@@ -1,17 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { rpcGetWalletInfo } from "@/lib/rpc/client";
-import { formatCoinAmount } from "@/lib/units";
-import { coinMaturityConfirmations } from "@/lib/units";
-import { cn } from "@/lib/utils";
-import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
+import { useQuery } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import { formatCoinAmount } from '@/lib/units';
+import { coinMaturityConfirmations } from '@/lib/units';
+import { cn } from '@/lib/utils';
+import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';
 
 export function WalletBalanceSummary() {
   const coin = useActiveCoin();
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
@@ -22,8 +22,7 @@ export function WalletBalanceSummary() {
   const unconfirmed = wallet.data.unconfirmed_balance;
   const immature = wallet.data.immature_balance;
   const total = spendable + unconfirmed + immature;
-  const scanning =
-    typeof wallet.data.scanning === "object" ? wallet.data.scanning : null;
+  const scanning = typeof wallet.data.scanning === 'object' ? wallet.data.scanning : null;
   const mature = coinMaturityConfirmations(coin);
   const blurClass = lockedWalletBalanceClass(wallet.data);
 
@@ -32,26 +31,26 @@ export function WalletBalanceSummary() {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <span className="text-fg-muted">Wallet total </span>
-          <span className={cn("text-lg font-semibold tabular-nums", blurClass)}>
+          <span className={cn('text-lg font-semibold tabular-nums', blurClass)}>
             {formatCoinAmount(total, coin, 4)}
           </span>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
           <span>
-            Spendable{" "}
-            <span className={cn("font-medium tabular-nums text-fg", blurClass)}>
+            Spendable{' '}
+            <span className={cn('font-medium tabular-nums text-fg', blurClass)}>
               {formatCoinAmount(spendable, coin, 4)}
             </span>
           </span>
           <span>
-            Unconfirmed{" "}
-            <span className={cn("font-medium tabular-nums text-fg", blurClass)}>
+            Unconfirmed{' '}
+            <span className={cn('font-medium tabular-nums text-fg', blurClass)}>
               {formatCoinAmount(unconfirmed, coin, 4)}
             </span>
           </span>
           <span>
-            Immature{" "}
-            <span className={cn("font-medium tabular-nums text-fg", blurClass)}>
+            Immature{' '}
+            <span className={cn('font-medium tabular-nums text-fg', blurClass)}>
               {formatCoinAmount(immature, coin, 4)}
             </span>
           </span>
@@ -60,8 +59,7 @@ export function WalletBalanceSummary() {
       {scanning && (
         <div className="mt-2 flex items-center gap-2 text-xs text-warning">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Rescanning wallet…{" "}
-          {Math.round((scanning.progress ?? 0) * 100)}% complete
+          Rescanning wallet… {Math.round((scanning.progress ?? 0) * 100)}% complete
         </div>
       )}
       <p className="mt-2 text-xs text-fg-subtle">

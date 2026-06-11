@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Coins, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { rpcWalletListUnspent } from "@/lib/rpc/client";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { formatCoinAmount } from "@/lib/units";
-import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Coins, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { rpcWalletListUnspent } from '@/lib/rpc/client';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { formatCoinAmount } from '@/lib/units';
+import { cn } from '@/lib/utils';
 
 interface CoinControlDialogProps {
   open: boolean;
@@ -28,22 +28,15 @@ function keyOf(u: { txid: string; vout: number }): string {
   return `${u.txid}:${u.vout}`;
 }
 
-export function CoinControlDialog({
-  open,
-  selected,
-  onClose,
-  onApply,
-}: CoinControlDialogProps) {
+export function CoinControlDialog({ open, selected, onClose, onApply }: CoinControlDialogProps) {
   const coin = useActiveCoin();
   const utxos = useQuery({
-    queryKey: coinQueryKey(coin, "listunspent"),
+    queryKey: coinQueryKey(coin, 'listunspent'),
     queryFn: () => rpcWalletListUnspent(coin, 1, 500),
     enabled: open,
   });
 
-  const [picked, setPicked] = useState<Set<string>>(
-    new Set(selected.map(keyOf)),
-  );
+  const [picked, setPicked] = useState<Set<string>>(new Set(selected.map(keyOf)));
 
   useEffect(() => {
     if (open) setPicked(new Set(selected.map(keyOf)));
@@ -52,10 +45,10 @@ export function CoinControlDialog({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   const rows = utxos.data ?? [];
@@ -97,17 +90,11 @@ export function CoinControlDialog({
 
         <div className="max-h-[60vh] overflow-y-auto">
           {utxos.isLoading ? (
-            <div className="px-5 py-8 text-center text-xs text-fg-muted">
-              Loading UTXOs…
-            </div>
+            <div className="px-5 py-8 text-center text-xs text-fg-muted">Loading UTXOs…</div>
           ) : utxos.isError ? (
-            <div className="px-5 py-8 text-center text-xs text-danger">
-              {String(utxos.error)}
-            </div>
+            <div className="px-5 py-8 text-center text-xs text-danger">{String(utxos.error)}</div>
           ) : rows.length === 0 ? (
-            <div className="px-5 py-8 text-center text-xs text-fg-muted">
-              No spendable UTXOs.
-            </div>
+            <div className="px-5 py-8 text-center text-xs text-fg-muted">No spendable UTXOs.</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-panel text-xs uppercase text-fg-subtle">
@@ -126,8 +113,8 @@ export function CoinControlDialog({
                     <tr
                       key={k}
                       className={cn(
-                        "cursor-pointer border-t border-border hover:bg-bg-subtle/60",
-                        checked && "bg-accent/5",
+                        'cursor-pointer border-t border-border hover:bg-bg-subtle/60',
+                        checked && 'bg-accent/5'
                       )}
                       onClick={() => {
                         setPicked((prev) => {
@@ -146,15 +133,11 @@ export function CoinControlDialog({
                           className="h-3.5 w-3.5 accent-accent"
                         />
                       </td>
-                      <td className="break-all px-3 py-2 text-[11px]">
-                        {u.address ?? "—"}
-                      </td>
+                      <td className="break-all px-3 py-2 text-[11px]">{u.address ?? '—'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {formatCoinAmount(u.amount, coin, 8)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {u.confirmations}
-                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{u.confirmations}</td>
                     </tr>
                   );
                 })}
@@ -165,11 +148,8 @@ export function CoinControlDialog({
 
         <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm">
           <div className="text-fg-muted">
-            Selected{" "}
-            <span className="font-semibold tabular-nums text-fg">
-              {picked.size}
-            </span>{" "}
-            UTXOs ·{" "}
+            Selected <span className="font-semibold tabular-nums text-fg">{picked.size}</span> UTXOs
+            ·{' '}
             <span className="font-semibold tabular-nums text-fg">
               {formatCoinAmount(totalSelected, coin, 8)}
             </span>

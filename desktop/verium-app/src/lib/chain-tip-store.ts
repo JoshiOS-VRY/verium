@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import type { CoinId } from "@/lib/coin/profile";
-import type { ExplorerBlock } from "@/lib/explorer-api";
-import { isPlaceholderTipHash } from "@/lib/tip-block-time";
+import type { CoinId } from '@/lib/coin/profile';
+import type { ExplorerBlock } from '@/lib/explorer-api';
+import { isPlaceholderTipHash } from '@/lib/tip-block-time';
 
 /** Latest chain tip pushed from the local node watcher (`chain-tip-changed`). */
 export interface ChainTip {
@@ -46,19 +46,14 @@ function applyChainTip(tip: ChainTip): void {
   if (prev.tip?.hash === tip.hash) return;
 
   const blockTime =
-    tip.time > 0
-      ? tip.time
-      : isPlaceholderTipHash(tip.hash)
-        ? 0
-        : Math.floor(Date.now() / 1000);
+    tip.time > 0 ? tip.time : isPlaceholderTipHash(tip.hash) ? 0 : Math.floor(Date.now() / 1000);
 
-  const block: ExplorerBlock =
-    tip.block ?? {
-      id: tip.height,
-      hash: tip.hash,
-      height: tip.height,
-      time: blockTime,
-    };
+  const block: ExplorerBlock = tip.block ?? {
+    id: tip.height,
+    hash: tip.hash,
+    height: tip.height,
+    time: blockTime,
+  };
 
   const recentBlocks = [block, ...prev.recentBlocks.filter((b) => b.height !== block.height)]
     .sort((a, b) => b.height - a.height)
@@ -97,6 +92,6 @@ export function subscribeChainTip(coin: CoinId, listener: () => void): () => voi
 export function useChainTip(coin: CoinId): ChainTipSnapshot {
   return useSyncExternalStore(
     (cb) => subscribeChainTip(coin, cb),
-    () => getSnapshot(coin),
+    () => getSnapshot(coin)
   );
 }

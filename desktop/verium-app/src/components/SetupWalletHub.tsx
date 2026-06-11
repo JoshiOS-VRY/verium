@@ -1,35 +1,32 @@
-import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Loader2 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   ALL_COINS,
   COIN_LOGO_URLS,
   COIN_PROFILES,
   coinQueryKey,
   type CoinId,
-} from "@/lib/coin/profile";
-import { useEnabledCoins } from "@/lib/coin/context";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
+} from '@/lib/coin/profile';
+import { useEnabledCoins } from '@/lib/coin/context';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
 import {
   getHubCardState,
   needsLightWalletRecovery,
   isProfileOpenable,
   type WalletModeChoice,
-} from "@/lib/setup";
-import { LIGHT_WALLET_ENABLED } from "@/lib/features";
-import {
-  profileWalletPresence,
-  useSetupHubProfile,
-} from "@/hooks/useSetupHubProfiles";
-import { ThemeSegmented } from "@/components/ThemeSegmented";
-import { Button } from "@/components/ui/Button";
-import { useTheme } from "@/hooks/useTheme";
-import { cn } from "@/lib/utils";
+} from '@/lib/setup';
+import { LIGHT_WALLET_ENABLED } from '@/lib/features';
+import { profileWalletPresence, useSetupHubProfile } from '@/hooks/useSetupHubProfiles';
+import { ThemeSegmented } from '@/components/ThemeSegmented';
+import { Button } from '@/components/ui/Button';
+import { useTheme } from '@/hooks/useTheme';
+import { cn } from '@/lib/utils';
 import {
   secretStoreQuarantineOrphaned,
   secretStoreStatus,
   type WalletProfile,
-} from "@/lib/wallet-profile";
+} from '@/lib/wallet-profile';
 
 interface SetupWalletHubProps {
   walletMode: WalletModeChoice;
@@ -87,8 +84,8 @@ function CoinHubCard({
             <span className="font-semibold text-fg">{coinProfile.displayName}</span>
             <span
               className={cn(
-                "rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                coinProfile.accentClass,
+                'rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                coinProfile.accentClass
               )}
             >
               {coinProfile.symbol}
@@ -104,17 +101,8 @@ function CoinHubCard({
         </p>
       )}
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span
-          className={cn(
-            "flex items-center gap-1.5",
-            ready ? "text-success" : "text-fg-muted",
-          )}
-        >
-          {ready ? (
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          ) : (
-            <Circle className="h-3.5 w-3.5" />
-          )}
+        <span className={cn('flex items-center gap-1.5', ready ? 'text-success' : 'text-fg-muted')}>
+          {ready ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
           {statusLabel}
         </span>
         <span className="flex items-center gap-1 font-medium text-accent">
@@ -145,7 +133,7 @@ export function SetupWalletHub({
   const queryClient = useQueryClient();
   const [quarantining, setQuarantining] = useState(false);
   const secretStore = useQuery({
-    queryKey: ["secret-store-status"],
+    queryKey: ['secret-store-status'],
     queryFn: secretStoreStatus,
     staleTime: 30_000,
   });
@@ -153,19 +141,10 @@ export function SetupWalletHub({
   const { mode: themeMode, setMode: setThemeMode } = useTheme();
   const options = ALL_COINS.filter((coin) => enabledCoins.includes(coin));
 
-  const veriumProfile = useSetupHubProfile(
-    "verium",
-    options.includes("verium"),
-  );
-  const vericoinProfile = useSetupHubProfile(
-    "vericoin",
-    options.includes("vericoin"),
-  );
+  const veriumProfile = useSetupHubProfile('verium', options.includes('verium'));
+  const vericoinProfile = useSetupHubProfile('vericoin', options.includes('vericoin'));
 
-  const profileByCoin: Record<
-    CoinId,
-    ReturnType<typeof useSetupHubProfile>
-  > = {
+  const profileByCoin: Record<CoinId, ReturnType<typeof useSetupHubProfile>> = {
     verium: veriumProfile,
     vericoin: vericoinProfile,
   };
@@ -176,26 +155,26 @@ export function SetupWalletHub({
     (coin) =>
       profileByCoin[coin].data &&
       isProfileOpenable(profileByCoin[coin].data) &&
-      !needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
+      !needsLightWalletRecovery(profileByCoin[coin].data, walletMode)
   );
   const allComplete = options.every(
     (coin) =>
       profileByCoin[coin].data &&
       isProfileOpenable(profileByCoin[coin].data) &&
-      !needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
+      !needsLightWalletRecovery(profileByCoin[coin].data, walletMode)
   );
 
   const profileErrorMessage =
-    "Could not read wallet status. Check Windows Credential Manager (service: com.vericonomy.wallet.desktop) and restart the app.";
+    'Could not read wallet status. Check Windows Credential Manager (service: com.vericonomy.wallet.desktop) and restart the app.';
 
   const anyNeedsLightRecovery = options.some((coin) =>
-    needsLightWalletRecovery(profileByCoin[coin].data, walletMode),
+    needsLightWalletRecovery(profileByCoin[coin].data, walletMode)
   );
 
   async function handleQuarantineOrphaned() {
     const confirmed = window.confirm(
-      "This moves encrypted wallet files aside and creates a new Windows Credential Manager key. " +
-        "Existing light wallets will not unlock until you import your recovery phrase. Continue?",
+      'This moves encrypted wallet files aside and creates a new Windows Credential Manager key. ' +
+        'Existing light wallets will not unlock until you import your recovery phrase. Continue?'
     );
     if (!confirmed) return;
     setQuarantining(true);
@@ -204,14 +183,12 @@ export function SetupWalletHub({
       await secretStore.refetch();
       for (const coin of options) {
         await queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "wallet-profile"),
+          queryKey: coinQueryKey(coin, 'wallet-profile'),
         });
       }
     } catch (e) {
-      console.warn("secret store quarantine failed", e);
-      window.alert(
-        e instanceof Error ? e.message : "Could not reset encrypted storage.",
-      );
+      console.warn('secret store quarantine failed', e);
+      window.alert(e instanceof Error ? e.message : 'Could not reset encrypted storage.');
     } finally {
       setQuarantining(false);
     }
@@ -220,8 +197,8 @@ export function SetupWalletHub({
   return (
     <div className="flex flex-col gap-5 text-sm">
       <p className="text-fg-muted">
-        Choose Verium or Vericoin to set up or continue onboarding. You can
-        return here anytime from setup to switch chains or open the dashboard.
+        Choose Verium or Vericoin to set up or continue onboarding. You can return here anytime from
+        setup to switch chains or open the dashboard.
       </p>
 
       {profileLoadError && (
@@ -236,13 +213,10 @@ export function SetupWalletHub({
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <div className="flex flex-col gap-1.5">
-              <p className="font-medium text-fg">
-                Encrypted wallet data cannot be unlocked
-              </p>
+              <p className="font-medium text-fg">Encrypted wallet data cannot be unlocked</p>
               <p>
-                Windows Credential Manager cannot decrypt older app settings.
-                Your light wallet is stored separately and is not affected once
-                you import your recovery phrase below.
+                Windows Credential Manager cannot decrypt older app settings. Your light wallet is
+                stored separately and is not affected once you import your recovery phrase below.
               </p>
             </div>
           </div>
@@ -254,7 +228,7 @@ export function SetupWalletHub({
               disabled={quarantining}
               onClick={() => void handleQuarantineOrphaned()}
             >
-              {quarantining ? "Resetting…" : "Reset encrypted storage (advanced)"}
+              {quarantining ? 'Resetting…' : 'Reset encrypted storage (advanced)'}
             </Button>
           )}
         </div>
@@ -272,19 +246,19 @@ export function SetupWalletHub({
         <div className="flex flex-col gap-2 rounded-md border border-border bg-bg-subtle p-3">
           <p className="text-xs font-medium text-fg">Default wallet mode</p>
           <p className="text-[11px] text-fg-subtle">
-            Sets the tier for new chains. You can switch any chain
-            independently later from its wallet settings.
+            Sets the tier for new chains. You can switch any chain independently later from its
+            wallet settings.
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
               className={cn(
-                "rounded border p-3 text-left text-xs",
-                walletMode === "full_node"
-                  ? "border-accent bg-accent/10"
-                  : "border-border hover:border-accent/50",
+                'rounded border p-3 text-left text-xs',
+                walletMode === 'full_node'
+                  ? 'border-accent bg-accent/10'
+                  : 'border-border hover:border-accent/50'
               )}
-              onClick={() => onWalletModeChange("full_node")}
+              onClick={() => onWalletModeChange('full_node')}
             >
               <strong>Full node (recommended)</strong>
               <br />
@@ -293,22 +267,20 @@ export function SetupWalletHub({
             <button
               type="button"
               className={cn(
-                "rounded border p-3 text-left text-xs",
-                walletMode === "light"
-                  ? "border-warning bg-warning/10"
-                  : "border-border hover:border-accent/50",
+                'rounded border p-3 text-left text-xs',
+                walletMode === 'light'
+                  ? 'border-warning bg-warning/10'
+                  : 'border-border hover:border-accent/50'
               )}
-              onClick={() => onWalletModeChange("light")}
+              onClick={() => onWalletModeChange('light')}
             >
               <strong>Light wallet (convenience)</strong>
               <br />
               {lightWalletCopy.setupWelcomeLight}
             </button>
           </div>
-          {walletMode === "light" && (
-            <p className="text-xs text-warning">
-              {lightWalletCopy.lightConvenienceWarning}
-            </p>
+          {walletMode === 'light' && (
+            <p className="text-xs text-warning">{lightWalletCopy.lightConvenienceWarning}</p>
           )}
         </div>
       )}
@@ -326,9 +298,8 @@ export function SetupWalletHub({
               errorMessage={
                 query.isError
                   ? profileErrorMessage
-                  : query.data &&
-                      needsLightWalletRecovery(query.data, walletMode)
-                    ? "Encrypted keys unreadable — import recovery phrase."
+                  : query.data && needsLightWalletRecovery(query.data, walletMode)
+                    ? 'Encrypted keys unreadable — import recovery phrase.'
                     : null
               }
               onSelect={onSelectCoin}
@@ -341,14 +312,11 @@ export function SetupWalletHub({
       {anyComplete && (
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
           <Button size="sm" variant="secondary" onClick={onOpenDashboard}>
-            {allComplete
-              ? "Open dashboard"
-              : "Open dashboard (skip remaining setup)"}
+            {allComplete ? 'Open dashboard' : 'Open dashboard (skip remaining setup)'}
           </Button>
           {!allComplete && (
             <p className="text-xs text-fg-subtle">
-              You can finish the other chain later from Settings → Chains or by
-              returning here.
+              You can finish the other chain later from Settings → Chains or by returning here.
             </p>
           )}
         </div>

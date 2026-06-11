@@ -1,19 +1,17 @@
 Verium Vault version 1.3.0 is now available from:
 
-  https://vericonomy.com
+https://vericonomy.com
 
 This is a new major version release, bringing both new features and
 bug fixes.
 
 Please report bugs using the issue tracker at github:
 
-  https://github.com/VeriumReserve/Verium
+https://github.com/VeriumReserve/Verium
 
-Upgrading and downgrading
-=========================
+# Upgrading and downgrading
 
-How to Upgrade
---------------
+## How to Upgrade
 
 If you are running an older version, shut it down. Wait until it has completely
 shut down (which might take a few minutes for older versions), uninstall all
@@ -25,17 +23,14 @@ If you are upgrading from version 1.2 or earlier, the first time you run
 1.3.0 your blockchain files will be re-indexed, which will take anywhere from
 5 minutes to several hours, depending on the speed of your machine.
 
-Windows 64-bit installer
--------------------------
+## Windows 64-bit installer
 
 New in 1.3.0 is the Windows 64-bit version of the client. There have been
 frequent reports of users running out of virtual memory on 32-bit systems
 during the initial sync. Because of this it is recommended to install the
 64-bit version if your system supports it.
 
-
-Downgrading warnings
---------------------
+## Downgrading warnings
 
 The 'chainstate' for this release is not always compatible with previous
 releases, so if you run 1.3.0 and then decide to switch back to a
@@ -50,11 +45,9 @@ Also, the first time you run a 1.2.x release on a 1.3.0 wallet it will rescan
 the blockchain for missing spent coins, which will take a long time (tens
 of minutes on a typical machine).
 
-Notable changes
-===============
+# Notable changes
 
-Autotools build system
------------------------
+## Autotools build system
 
 For 1.3.0 we switched to an autotools-based build system instead of individual
 (q)makefiles.
@@ -63,18 +56,16 @@ Using the standard "./autogen.sh; ./configure; make" to build Verium-Qt and
 veriumd makes it easier for experienced open source developers to contribute
 to the project.
 
-Be sure to check doc/build-*.md for your platform before building from source.
+Be sure to check doc/build-\*.md for your platform before building from source.
 
-Verium-cli
--------------
+## Verium-cli
 
 Another change in the 1.3.0 release is moving away from the veriumd executable
 functioning both as a server and as a RPC client. The RPC client functionality
 ("tell the running verium daemon to do THIS") was split into a separate
 executable, 'verium-cli'.
 
-`walletpassphrase` RPC
------------------------
+## `walletpassphrase` RPC
 
 The behavior of the `walletpassphrase` RPC when the wallet is already unlocked
 has changed between 1.2.x and 1.3.0.
@@ -94,8 +85,7 @@ the old one:
     > walletpassphrase 10
     walletunlocktime = now + 10 (overriding the old unlock time)
 
-Faster synchronization
-----------------------
+## Faster synchronization
 
 Verium now uses 'headers-first synchronization'. This means that we first
 ask peers for block headers and validate those.
@@ -110,15 +100,15 @@ very first few minutes, when headers are still being fetched and verified, but
 it should gain speed afterwards.
 
 A few RPCs were added/updated as a result of this:
-- `getblockchaininfo` now returns the number of validated headers in addition to
-the number of validated blocks.
-- `getpeerinfo` lists both the number of blocks and headers we know we have in
-common with each peer. While synchronizing, the heights of the blocks that we
-have requested from peers (but haven't received yet) are also listed as
-'inflight'.
 
-RPC access control changes
---------------------------
+- `getblockchaininfo` now returns the number of validated headers in addition to
+  the number of validated blocks.
+- `getpeerinfo` lists both the number of blocks and headers we know we have in
+  common with each peer. While synchronizing, the heights of the blocks that we
+  have requested from peers (but haven't received yet) are also listed as
+  'inflight'.
+
+## RPC access control changes
 
 Subnet matching for the purpose of access control is now done
 by matching the binary network address, instead of with string wildcard matching.
@@ -133,20 +123,18 @@ matches one of them.
 
 For example:
 
-| 1.2.x and before                           | 1.3.x                                |
-|--------------------------------------------|---------------------------------------|
-| `-rpcallowip=192.168.1.1`                  | `-rpcallowip=192.168.1.1` (unchanged) |
-| `-rpcallowip=192.168.1.*`                  | `-rpcallowip=192.168.1.0/24`          |
-| `-rpcallowip=192.168.*`                    | `-rpcallowip=192.168.0.0/16`          |
-| `-rpcallowip=*` (dangerous!)               | `-rpcallowip=::/0` (still dangerous!) |
+| 1.2.x and before             | 1.3.x                                 |
+| ---------------------------- | ------------------------------------- |
+| `-rpcallowip=192.168.1.1`    | `-rpcallowip=192.168.1.1` (unchanged) |
+| `-rpcallowip=192.168.1.*`    | `-rpcallowip=192.168.1.0/24`          |
+| `-rpcallowip=192.168.*`      | `-rpcallowip=192.168.0.0/16`          |
+| `-rpcallowip=*` (dangerous!) | `-rpcallowip=::/0` (still dangerous!) |
 
 Using wildcards will result in the rule being rejected with the following error in debug.log:
 
     Error: Invalid -rpcallowip subnet specification: *. Valid are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24).
 
-
-REST interface
---------------
+## REST interface
 
 A new HTTP API is exposed when running with the `-rest` flag, which allows
 unauthenticated access to public node data.
@@ -155,29 +143,28 @@ It is served on the same port as RPC, but does not need a password, and uses
 plain HTTP instead of JSON-RPC.
 
 Assuming a local RPC server running on port 33987, it is possible to request:
-- Blocks: http://localhost:33987/rest/block/*HASH*.*EXT*
-- Blocks without transactions: http://localhost:33987/rest/block/notxdetails/*HASH*.*EXT*
-- Transactions (requires `-txindex`): http://localhost:33987/rest/tx/*HASH*.*EXT*
 
-In every case, *EXT* can be `bin` (for raw binary data), `hex` (for hex-encoded
+- Blocks: http://localhost:33987/rest/block/_HASH_._EXT_
+- Blocks without transactions: http://localhost:33987/rest/block/notxdetails/_HASH_._EXT_
+- Transactions (requires `-txindex`): http://localhost:33987/rest/tx/_HASH_._EXT_
+
+In every case, _EXT_ can be `bin` (for raw binary data), `hex` (for hex-encoded
 binary) or `json`.
 
 For more details, see the `doc/REST-interface.md` document in the repository.
 
-RPC Server "Warm-Up" Mode
--------------------------
+## RPC Server "Warm-Up" Mode
 
 The RPC server is started earlier now, before most of the expensive
-intialisations like loading the block index.  It is available now almost
-immediately after starting the process.  However, until all initialisations
+intialisations like loading the block index. It is available now almost
+immediately after starting the process. However, until all initialisations
 are done, it always returns an immediate error with code -28 to all calls.
 
 This new behaviour can be useful for clients to know that a server is already
 started and will be available soon (for instance, so that they do not
 have to start it themselves).
 
-Improved signing security
--------------------------
+## Improved signing security
 
 For 1.3.0 the security of signing against unusual attacks has been
 improved by making the signatures constant time and deterministic.
@@ -205,8 +192,7 @@ than the implementation in OpenSSL.
 
 [1] https://eprint.iacr.org/2014/161.pdf
 
-Watch-only wallet support
--------------------------
+## Watch-only wallet support
 
 The wallet can now track transactions to and from wallets for which you know
 all addresses (or scripts), even without the private keys.
@@ -217,7 +203,7 @@ of multisig transactions where you are only one of the signers.
 
 One new RPC, `importaddress`, is added which functions similarly to
 `importprivkey`, but instead takes an address or script (in hexadecimal) as
-argument.  After using it, outputs credited to this address or script are
+argument. After using it, outputs credited to this address or script are
 considered to be received, and transactions consuming these outputs will be
 considered to be sent.
 
@@ -231,8 +217,7 @@ Compared to using `getrawtransaction`, this mechanism does not require
 with future block chain pruning functionality. It does mean that all relevant
 addresses need to added to the wallet before the payment, though.
 
-Consensus library
------------------
+## Consensus library
 
 Starting from 1.3.0, the Verium distribution includes a consensus library.
 
@@ -245,14 +230,13 @@ Its interface is defined in the C header [bitcoinconsensus.h](https://github.com
 In its initial version the API includes two functions:
 
 - `bitcoinconsensus_verify_script` verifies a script. It returns whether the indicated input of the provided serialized transaction
-correctly spends the passed scriptPubKey under additional constraints indicated by flags
+  correctly spends the passed scriptPubKey under additional constraints indicated by flags
 - `bitcoinconsensus_version` returns the API version, currently at an experimental `0`
 
 The functionality is planned to be extended to e.g. UTXO management in upcoming releases, but the interface
 for existing methods should remain stable.
 
-verium-tx
-----------
+## verium-tx
 
 It has been observed that many of the RPC functions offered by veriumd are
 "pure functions", and operate independently of the veriumd wallet. This
@@ -272,8 +256,7 @@ multi-party transactions, and many other uses. Long term, the goal is to
 deprecate and remove "pure function" RPC API calls, as those do not require a
 server round-trip to execute.
 
-Fix buffer overflow in bundled upnp
-------------------------------------
+## Fix buffer overflow in bundled upnp
 
 Bundled miniupnpc was updated to 1.9.20151008. This fixes a buffer overflow in
 the XML parser during initial network discovery.
@@ -287,8 +270,7 @@ Additionally, upnp has been disabled by default. This may result in a lower
 number of reachable nodes on IPv4, however this prevents future libupnpc
 vulnerabilities from being a structural risk to the network
 
-Block file pruning
-----------------------
+## Block file pruning
 
 This release supports running a fully validating node without maintaining a copy
 of the raw block and undo data on disk. To recap, there are four types of data
@@ -317,7 +299,7 @@ the user specifies 550MB, once that level is reached the program will begin
 deleting the oldest block and undo files, while continuing to download the
 blockchain.
 
-For now, block pruning disables block relay.  In the future, nodes with block
+For now, block pruning disables block relay. In the future, nodes with block
 pruning will at a minimum relay "new" blocks, meaning blocks that extend their
 active chain.
 
@@ -344,22 +326,20 @@ Modified RPC calls:
 
 - `getblockchaininfo` now includes whether we are in pruned mode or not.
 - `getblock` will check if the block's data has been pruned and if so, return an
-error.
+  error.
 - `getrawtransaction` will no longer be able to locate a transaction that has a
-UTXO but where its block file has been pruned.
+  UTXO but where its block file has been pruned.
 
 Pruning is disabled by default.
 
-Big endian support
---------------------
+## Big endian support
 
 Experimental support for big-endian CPU architectures was added in this
 release. All little-endian specific code was replaced with endian-neutral
 constructs. This has been tested on at least MIPS and PPC hosts. The build
 system will automatically detect the endianness of the target.
 
-Memory usage optimization
---------------------------
+## Memory usage optimization
 
 There have been many changes in this release to reduce the default memory usage
 of a node, among which:
@@ -371,8 +351,7 @@ of a node, among which:
 - Reduce the number of threads; lowers the amount of (esp.
   virtual) memory needed
 
-Privacy: Stream isolation for Tor
-----------------------------------
+## Privacy: Stream isolation for Tor
 
 This release adds functionality to create a new circuit for every peer
 connection, when the software is used with Tor. The new option,
@@ -390,16 +369,14 @@ connections. A user and password is sent where they weren't before. This setup
 is exceedingly rare, but in this case `-proxyrandomize=0` can be passed to
 disable the behavior.
 
-Other P2P Changes
------------------
+## Other P2P Changes
 
 The list of banned peers is now stored on disk rather than in memory.
 Restarting veriumd will no longer clear out the list of banned peers; instead
-a new RPC call (`clearbanned`) can be used to manually clear the list.  The new
+a new RPC call (`clearbanned`) can be used to manually clear the list. The new
 `setban` RPC call can also be used to manually ban or unban a peer.
 
-Mining Code Changes
--------------------
+## Mining Code Changes
 
 The mining code in 1.3.0 has been optimized to be significantly faster and use less
 memory. As part of these changes, consensus critical calculations are cached on a
@@ -407,16 +384,14 @@ transaction's acceptance into the mempool and the mining code now relies on the
 consistency of the mempool to assemble blocks. However all blocks are still tested
 for validity after assembly.
 
-Option parsing behavior
------------------------
+## Option parsing behavior
 
 Command line options are now parsed strictly in the order in which they are
 specified. It used to be the case that `-X -noX` ends up, unintuitively, with X
 set, as `-X` had precedence over `-noX`. This is no longer the case. Like for
 other software, the last specified value for an option will hold.
 
-Signature validation using libsecp256k1
----------------------------------------
+## Signature validation using libsecp256k1
 
 ECDSA signatures inside Verium transactions now use validation using
 [libsecp256k1](https://github.com/bitcoin-core/secp256k1) instead of OpenSSL.
@@ -430,21 +405,20 @@ Libsecp256k1 has undergone very extensive testing and validation.
 
 A side effect of this change is that libconsensus no longer depends on OpenSSL.
 
-Reduce upload traffic
----------------------
+## Reduce upload traffic
 
 A major part of the outbound traffic is caused by serving historic blocks to
 other nodes in initial block download state.
 
 It is now possible to reduce the total upload traffic via the `-maxuploadtarget`
-parameter. This is *not* a hard limit but a threshold to minimize the outbound
+parameter. This is _not_ a hard limit but a threshold to minimize the outbound
 traffic. When the limit is about to be reached, the uploaded data is cut by not
 serving historic blocks (blocks older than one week).
 Moreover, any SPV peer is disconnected when they request a filtered block.
 
 This option can be specified in MiB per day and is turned off by default
 (`-maxuploadtarget=0`).
-The recommended minimum is 144 * MAX_BLOCK_SIZE (currently 144MB) per day.
+The recommended minimum is 144 \* MAX_BLOCK_SIZE (currently 144MB) per day.
 
 Whitelisted peers will never be disconnected, although their traffic counts for
 calculating the target.
@@ -452,8 +426,7 @@ calculating the target.
 A more detailed documentation about keeping traffic low can be found in
 [/doc/reduce-traffic.md](/doc/reduce-traffic.md).
 
-RPC: Random-cookie RPC authentication
--------------------------------------
+## RPC: Random-cookie RPC authentication
 
 When no `-rpcpassword` is specified, the daemon now uses a special 'cookie'
 file for authentication. This file is generated with random content when the
@@ -467,8 +440,7 @@ https://www.torproject.org/docs/tor-manual.html.en
 
 This allows running veriumd without having to do any manual configuration.
 
-Relay: Any sequence of pushdatas in OP_RETURN outputs now allowed
------------------------------------------------------------------
+## Relay: Any sequence of pushdatas in OP_RETURN outputs now allowed
 
 Previously OP_RETURN outputs with a payload were only relayed and mined if they
 had a single pushdata. This restriction has been lifted to allow any
@@ -477,16 +449,14 @@ the OP_RETURN. The limit on OP_RETURN output size is now applied to the entire
 serialized scriptPubKey, 83 bytes by default. (the previous 80 byte default plus
 three bytes overhead)
 
-Relay: New and only new blocks relayed when pruning
----------------------------------------------------
+## Relay: New and only new blocks relayed when pruning
 
 When running in pruned mode, the client will now relay new blocks. When
 responding to the `getblocks` message, only hashes of blocks that are on disk
 and are likely to remain there for some reasonable time window (1 hour) will be
 returned (previously all relevant hashes were returned).
 
-Automatically use Tor hidden services
--------------------------------------
+## Automatically use Tor hidden services
 
 Starting with Tor version 0.2.7.1 it is possible, through Tor's control socket
 API, to create and destroy 'ephemeral' hidden services programmatically.
@@ -503,8 +473,7 @@ a connection to Tor can be made. It can be configured with the `-listenonion`,
 `-torcontrol` and `-torpassword` settings. To show verbose debugging
 information, pass `-debug=tor`.
 
-Notifications through ZMQ
--------------------------
+## Notifications through ZMQ
 
 Veriumd can now (optionally) asynchronously notify clients through a
 ZMQ-based PUB socket of the arrival of new transactions and blocks.
@@ -512,8 +481,7 @@ This feature requires installation of the ZMQ C API library 4.x and
 configuring its use through the command line or configuration file.
 Please see [docs/zmq.md](/doc/zmq.md) for details of operation.
 
-Database cache memory increased
---------------------------------
+## Database cache memory increased
 
 As a result of growth of the UTXO set, performance with the prior default
 database cache of 100 MiB has suffered.
@@ -528,8 +496,7 @@ For nodes on low-memory systems, the database cache can be changed back to
 Note that the database cache setting has the most performance impact
 during initial sync of a node, and when catching up after downtime.
 
-verium-cli: arguments privacy
-------------------------------
+## verium-cli: arguments privacy
 
 The RPC command line client gained a new argument, `-stdin`
 to read extra arguments from standard input, one per line until EOF/Ctrl-D.
@@ -545,9 +512,7 @@ It is recommended to use this for sensitive information such as wallet
 passphrases, as command-line arguments can usually be read from the process
 table by any user on the system.
 
-
-C++11 and Python 3
-------------------
+## C++11 and Python 3
 
 Various code modernizations have been done. The Verium code base has
 started using C++11. This means that a C++11-capable compiler is now needed for
@@ -559,9 +524,7 @@ When cross-compiling for a target that doesn't have C++11 libraries, configure w
 For running the functional tests in `qa/rpc-tests`, Python3.4 or higher is now
 required.
 
-
-Linux ARM builds
-----------------
+## Linux ARM builds
 
 Due to popular request, Linux ARM builds have been added to the uploaded
 executables.
@@ -585,8 +548,7 @@ ARMv6 architecture devices that are not compatible with ARMv7-A or ARMv8-A.
 Note that Android is not considered ARM Linux in this context. The executables
 are not expected to work out of the box on Android.
 
-Reindexing changes
-------------------
+## Reindexing changes
 
 In earlier versions, reindexing did validation while reading through the block
 files on disk. These two have now been split up, so that all blocks are known
@@ -603,8 +565,7 @@ using the command line option `-reindex-chainstate` (in addition to
 are assumed to be fine, but the chainstate is still corrupted. It is also
 useful for benchmarks.
 
-Manual Pruning
---------------
+## Manual Pruning
 
 Verium Vault has supported automatically pruning the blockchain since 1.3.0 Pruning
 the blockchain allows for significant storage space savings as the vast majority of
@@ -615,43 +576,40 @@ Manual block pruning can now be enabled by setting `-prune=1`. Once that is set,
 the RPC command `pruneblockchain` can be used to prune the blockchain up to the
 specified height or timestamp.
 
-`getinfo` Deprecated
---------------------
+## `getinfo` Deprecated
 
 The `getinfo` RPC command has been deprecated. Each field in the RPC call
 has been moved to another command's output with that command also giving
 additional information that `getinfo` did not provide. The following table
 shows where each field has been moved to:
 
-|`getinfo` field   | Moved to                                  |
-|------------------|-------------------------------------------|
-`"version"`	   | `getnetworkinfo()["version"]`
-`"protocolversion"`| `getnetworkinfo()["protocolversion"]`
-`"walletversion"`  | `getwalletinfo()["walletversion"]`
-`"balance"`	   | `getwalletinfo()["balance"]`
-`"blocks"`	   | `getblockchaininfo()["blocks"]`
-`"timeoffset"`	   | `getnetworkinfo()["timeoffset"]`
-`"connections"`	   | `getnetworkinfo()["connections"]`
-`"proxy"`	   | `getnetworkinfo()["networks"][0]["proxy"]`
-`"difficulty"`	   | `getblockchaininfo()["difficulty"]`
-`"testnet"`	   | `getblockchaininfo()["chain"] == "test"`
-`"keypoololdest"`  | `getwalletinfo()["keypoololdest"]`
-`"keypoolsize"`	   | `getwalletinfo()["keypoolsize"]`
-`"unlocked_until"` | `getwalletinfo()["unlocked_until"]`
-`"paytxfee"`	   | `getwalletinfo()["paytxfee"]`
-`"relayfee"`	   | `getnetworkinfo()["relayfee"]`
-`"errors"`	   | `getnetworkinfo()["warnings"]`
+| `getinfo` field     | Moved to                                   |
+| ------------------- | ------------------------------------------ |
+| `"version"`         | `getnetworkinfo()["version"]`              |
+| `"protocolversion"` | `getnetworkinfo()["protocolversion"]`      |
+| `"walletversion"`   | `getwalletinfo()["walletversion"]`         |
+| `"balance"`         | `getwalletinfo()["balance"]`               |
+| `"blocks"`          | `getblockchaininfo()["blocks"]`            |
+| `"timeoffset"`      | `getnetworkinfo()["timeoffset"]`           |
+| `"connections"`     | `getnetworkinfo()["connections"]`          |
+| `"proxy"`           | `getnetworkinfo()["networks"][0]["proxy"]` |
+| `"difficulty"`      | `getblockchaininfo()["difficulty"]`        |
+| `"testnet"`         | `getblockchaininfo()["chain"] == "test"`   |
+| `"keypoololdest"`   | `getwalletinfo()["keypoololdest"]`         |
+| `"keypoolsize"`     | `getwalletinfo()["keypoolsize"]`           |
+| `"unlocked_until"`  | `getwalletinfo()["unlocked_until"]`        |
+| `"paytxfee"`        | `getwalletinfo()["paytxfee"]`              |
+| `"relayfee"`        | `getnetworkinfo()["relayfee"]`             |
+| `"errors"`          | `getnetworkinfo()["warnings"]`             |
 
-ZMQ On Windows
---------------
+## ZMQ On Windows
 
 Previously the ZeroMQ notification system was unavailable on Windows
 due to various issues with ZMQ. These have been fixed upstream and
 now ZMQ can be used on Windows. Please see [this document](https://github.com/VeriumReserve/verium/blob/master/doc/zmq.md) for
 help with using ZMQ in general.
 
-Nested RPC Commands in Debug Console
-------------------------------------
+## Nested RPC Commands in Debug Console
 
 The ability to nest RPC commands has been added to the debug console. This
 allows users to have the output of a command become the input to another
@@ -664,8 +622,7 @@ array index or a non-quoted string (i.e. `listunspent()[0][txid]`). Both
 commas and spaces can be used to separate parameters in both the bracket syntax
 and normal RPC command syntax.
 
-Network Activity Toggle
------------------------
+## Network Activity Toggle
 
 A RPC command and GUI toggle have been added to enable or disable all p2p
 network activity. The network status icon in the bottom right hand corner
@@ -677,8 +634,7 @@ Additionally the `setnetworkactive` RPC command has been added which does
 the same thing as the GUI icon. The command takes one boolean parameter,
 `true` enables networking and `false` disables it.
 
-Out-of-sync Modal Info Layer
-----------------------------
+## Out-of-sync Modal Info Layer
 
 When Verium is out-of-sync on startup, a semi-transparent information
 layer will be shown over top of the normal display. This layer contains
@@ -686,8 +642,7 @@ details about the current sync progress and estimates the amount of time
 remaining to finish syncing. This layer can also be hidden and subsequently
 unhidden by clicking on the progress bar at the bottom of the window.
 
-P2P connection management
---------------------------
+## P2P connection management
 
 - Peers manually added through the `-addnode` option or `addnode` RPC now have their own
   limit of eight connections which does not compete with other inbound or outbound
@@ -696,9 +651,7 @@ P2P connection management
 
 - New connections to manually added peers are performed more quickly.
 
-
-Support for JSON-RPC Named Arguments
-------------------------------------
+## Support for JSON-RPC Named Arguments
 
 Commands sent over the JSON-RPC interface and through the `verium-cli` binary
 can now use named arguments. This follows the [JSON-RPC specification](http://www.jsonrpc.org/specification)
@@ -722,8 +675,7 @@ expected to land in a later release.
 
 The RPC server remains fully backwards compatible with positional arguments.
 
-Sensitive Data Is No Longer Stored In Debug Console History
------------------------------------------------------------
+## Sensitive Data Is No Longer Stored In Debug Console History
 
 The debug console maintains a history of previously entered commands that can be
 accessed by pressing the Up-arrow key so that users can easily reuse previously
@@ -731,14 +683,14 @@ entered commands. Commands which have sensitive information such as passphrases 
 private keys will now have a `(...)` in place of the parameters when accessed through
 the history.
 
-Changed configuration options
------------------------------
+## Changed configuration options
 
 - `-includeconf=<file>` can be used to include additional configuration files.
   Only works inside the `verium.conf` file, not inside included files or from
   command-line. Multiple files may be included. Can be disabled from command-
   line via `-noincludeconf`. Note that multi-argument commands like
   `-includeconf` will override preceding `-noincludeconf`, i.e.
+
   ```
   noincludeconf=1
   includeconf=relative.conf
@@ -746,15 +698,12 @@ Changed configuration options
 
   as verium.conf will still include `relative.conf`.
 
-
-External wallet files
----------------------
+## External wallet files
 
 The `-wallet=<path>` option now accepts full paths instead of requiring wallets
 to be located in the -walletdir directory.
 
-Newly created wallet format
----------------------------
+## Newly created wallet format
 
 If `-wallet=<path>` is specified with a path that does not exist, it will now
 create a wallet directory at the specified location (containing a wallet.dat
@@ -768,8 +717,7 @@ For backwards compatibility, wallet paths that are names of existing data files
 in the `-walletdir` directory will continue to be accepted and interpreted the
 same as before.
 
-Dynamic loading and creation of wallets
----------------------------------------
+## Dynamic loading and creation of wallets
 
 Previously, wallets could only be loaded or created at startup, by specifying `-wallet` parameters on the command line or in the verium.conf file. It is now possible to load, create and unload wallets dynamically at runtime:
 
@@ -779,13 +727,12 @@ Previously, wallets could only be loaded or created at startup, by specifying `-
 
 This feature is currently only available through the RPC interface.
 
-Documentation
--------------
+## Documentation
 
 - A new short [document](https://github.com/VeriumReserve/verium/blob/master/doc/JSON-RPC-interface.md)
   about the JSON-RPC interface describes cases where the results of an
   RPC might contain inconsistencies between data sourced from different
-  subsystems, such as wallet state and mempool state.  A note is added
+  subsystems, such as wallet state and mempool state. A note is added
   to the [REST interface documentation](https://github.com/VeriumReserve/verium/blob/master/doc/REST-interface.md)
   indicating that the same rules apply.
 
@@ -797,8 +744,7 @@ Documentation
   about the `verium.conf` file describes how to use it to configure
   Verium.
 
-systemd init file
------------------
+## systemd init file
 
 The systemd init file (`contrib/init/veriumd.service`) has been changed
 to use `/var/lib/veriumd` as the data directory instead of
@@ -817,15 +763,13 @@ This is because the command line arguments specified in the init files
 take precedence over the options specified in
 `/etc/verium/verium.conf`.
 
-New GUI
--------------
+## New GUI
 
 The Verium Vault User interface have been totally rewrote. The main goal
 is to improve the user experience and to make it compatible with more
 screen resolution.
 
-Verium Core
--------------
+## Verium Core
 
 Verium 1.2 was based on Bitcoin Core 0.8. The Verium Vault 1.3 is based on
 Bitcoin Core 0.19. A big part of the previous listed change are part of it.
@@ -833,8 +777,7 @@ In the future we will try to stick more to the Bitcoin Core Version in
 order to make most verium apps compatible with Verium Vault. Due to that
 huge version bump it was impossible to list all the change in that Changelog
 
-1.3.0 Change log
-=======================
+# 1.3.0 Change log
 
 RPC:
 
@@ -947,8 +890,9 @@ Block-chain handling and storage:
 - ...
 
 Block and transaction handling:
+
 - ProcessGetData(): abort if a block file is missing from disk
-- LoadBlockIndexDB(): Require block db reindex if any blk*.dat files are missing
+- LoadBlockIndexDB(): Require block db reindex if any blk\*.dat files are missing
 - Push cs_mains down in ProcessBlock
 - Avoid undefined behavior using CFlatData in CScript serialization
 - Relax IsStandard rules for pay-to-script-hash transactions
@@ -1008,6 +952,7 @@ Mining:
 - ...
 
 Protocol and network:
+
 - New 'reject' P2P message (BIP 0061, see
   https://gist.github.com/gavinandresen/7079034 for draft)
 - Relay OP_RETURN data TxOut as standard transaction type
@@ -1111,10 +1056,10 @@ Miscellaneous:
 - Fix CScriptID(const CScript& in) in empty script case
 - Move from Bitcoin Core 0.8 code base to 0.19
 
-Credits
---------
+## Credits
 
 Thanks to everyone who contributed to this release:
+
 - Bitcoin Core Team
 - Sinetek
 - hd4r

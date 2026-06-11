@@ -5,25 +5,19 @@
 // Network mode toggle card for the Settings page. Lets the user switch
 // between mainnet and the isolated Binary Chain v3 (DACE) test network.
 
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { BINARYTEST_ENABLED } from "@/lib/features";
+import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { BINARYTEST_ENABLED } from '@/lib/features';
 import {
   type NetworkMode,
   useNetworkMode,
   useNetworkModePreview,
   useSetNetworkMode,
-} from "@/lib/network-mode";
-import { cn } from "@/lib/utils";
+} from '@/lib/network-mode';
+import { cn } from '@/lib/utils';
 
 const DACE_BUILD_HINT = `# Windows (PowerShell, from repo root):
 .\\vericoin\\build-dace.ps1
@@ -66,10 +60,7 @@ function MainnetNetworkCard() {
       </CardHeader>
       {current.data && (
         <CardContent>
-          <EndpointList
-            title="Active endpoints"
-            endpoints={current.data.coin_endpoints}
-          />
+          <EndpointList title="Active endpoints" endpoints={current.data.coin_endpoints} />
         </CardContent>
       )}
     </Card>
@@ -90,7 +81,7 @@ function NetworkModeCardWithBinarytest() {
   const [pending, setPending] = useState<NetworkMode | null>(null);
   const preview = useNetworkModePreview(pending);
 
-  const activeMode = current.data?.mode ?? "mainnet";
+  const activeMode = current.data?.mode ?? 'mainnet';
   const isTest = current.data?.is_test ?? false;
 
   const onRequestSwitch = (target: NetworkMode) => {
@@ -102,17 +93,17 @@ function NetworkModeCardWithBinarytest() {
     if (!pending) return;
     try {
       await setMode.mutateAsync(pending);
-      for (const coin of ["verium", "vericoin"]) {
+      for (const coin of ['verium', 'vericoin']) {
         try {
-          await invoke("stop_daemon", { coin });
+          await invoke('stop_daemon', { coin });
         } catch {
           /* ignore */
         }
       }
       await new Promise((r) => setTimeout(r, 1500));
-      for (const coin of ["verium", "vericoin"]) {
+      for (const coin of ['verium', 'vericoin']) {
         try {
-          await invoke("start_daemon", { coin });
+          await invoke('start_daemon', { coin });
         } catch {
           /* ignore */
         }
@@ -130,9 +121,8 @@ function NetworkModeCardWithBinarytest() {
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <CardTitle>Network</CardTitle>
             <CardDescription>
-              Mainnet uses real coins. Binarytest is an isolated DACE test
-              network — play money, distinct ports and datadirs, cannot peer
-              with mainnet.
+              Mainnet uses real coins. Binarytest is an isolated DACE test network — play money,
+              distinct ports and datadirs, cannot peer with mainnet.
             </CardDescription>
           </div>
           {isTest && <Badge tone="warning">Binarytest</Badge>}
@@ -147,42 +137,38 @@ function NetworkModeCardWithBinarytest() {
             <button
               type="button"
               role="radio"
-              aria-checked={activeMode === "mainnet"}
-              onClick={() => onRequestSwitch("mainnet")}
+              aria-checked={activeMode === 'mainnet'}
+              onClick={() => onRequestSwitch('mainnet')}
               className={cn(
-                "rounded-md border px-3 py-2.5 text-left text-sm transition-colors",
-                activeMode === "mainnet"
-                  ? "border-accent bg-accent/10"
-                  : "border-border bg-bg-subtle hover:border-border-strong hover:bg-bg-panel",
+                'rounded-md border px-3 py-2.5 text-left text-sm transition-colors',
+                activeMode === 'mainnet'
+                  ? 'border-accent bg-accent/10'
+                  : 'border-border bg-bg-subtle hover:border-border-strong hover:bg-bg-panel'
               )}
             >
               <div className="font-medium text-fg">Mainnet</div>
-              <div className="mt-0.5 text-xs text-fg-subtle">
-                Real coins · standard ports
-              </div>
+              <div className="mt-0.5 text-xs text-fg-subtle">Real coins · standard ports</div>
             </button>
             <button
               type="button"
               role="radio"
-              aria-checked={activeMode === "binarytest"}
-              onClick={() => onRequestSwitch("binarytest")}
+              aria-checked={activeMode === 'binarytest'}
+              onClick={() => onRequestSwitch('binarytest')}
               disabled={!current.data?.dace_ready}
               title={
                 current.data?.dace_ready
                   ? undefined
-                  : (current.data?.dace_missing_hint ?? "DACE daemons required")
+                  : (current.data?.dace_missing_hint ?? 'DACE daemons required')
               }
               className={cn(
-                "rounded-md border px-3 py-2.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                activeMode === "binarytest"
-                  ? "border-warning bg-warning/10"
-                  : "border-border bg-bg-subtle hover:border-border-strong hover:bg-bg-panel",
+                'rounded-md border px-3 py-2.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                activeMode === 'binarytest'
+                  ? 'border-warning bg-warning/10'
+                  : 'border-border bg-bg-subtle hover:border-border-strong hover:bg-bg-panel'
               )}
             >
               <div className="font-medium text-fg">Binarytest (DACE)</div>
-              <div className="mt-0.5 text-xs text-fg-subtle">
-                Play money · ports 41683 / 41987
-              </div>
+              <div className="mt-0.5 text-xs text-fg-subtle">Play money · ports 41683 / 41987</div>
             </button>
           </div>
 
@@ -197,10 +183,7 @@ function NetworkModeCardWithBinarytest() {
           )}
 
           {current.data && (
-            <EndpointList
-              title="Active endpoints"
-              endpoints={current.data.coin_endpoints}
-            />
+            <EndpointList title="Active endpoints" endpoints={current.data.coin_endpoints} />
           )}
         </CardContent>
       </Card>
@@ -220,12 +203,8 @@ function NetworkModeCardWithBinarytest() {
             className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-bg-panel shadow-2xl"
           >
             <div className="border-b border-border px-5 py-3">
-              <h4
-                id="network-mode-confirm-title"
-                className="text-base font-semibold text-fg"
-              >
-                Switch to{" "}
-                {pending === "binarytest" ? "Binarytest (DACE)" : "Mainnet"}?
+              <h4 id="network-mode-confirm-title" className="text-base font-semibold text-fg">
+                Switch to {pending === 'binarytest' ? 'Binarytest (DACE)' : 'Mainnet'}?
               </h4>
             </div>
 
@@ -233,49 +212,40 @@ function NetworkModeCardWithBinarytest() {
               {preview.data.warning && (
                 <p className="text-sm text-warning">{preview.data.warning}</p>
               )}
-              {!preview.data.dace_ready && pending === "binarytest" && (
+              {!preview.data.dace_ready && pending === 'binarytest' && (
                 <p className="text-sm text-danger">
                   {preview.data.dace_missing_hint ??
-                    "Install DACE-capable daemons before switching."}
+                    'Install DACE-capable daemons before switching.'}
                 </p>
               )}
 
-              <EndpointList
-                title="After switching"
-                endpoints={preview.data.coin_endpoints}
-              />
+              <EndpointList title="After switching" endpoints={preview.data.coin_endpoints} />
 
               <p className="text-xs text-fg-subtle">
-                The wallet will write a new daemon config, persist the choice in
-                preferences, and restart both daemons. No coins move between
-                networks; addresses are not cross-compatible.
+                The wallet will write a new daemon config, persist the choice in preferences, and
+                restart both daemons. No coins move between networks; addresses are not
+                cross-compatible.
               </p>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setPending(null)}
-              >
+              <Button type="button" variant="secondary" size="sm" onClick={() => setPending(null)}>
                 Cancel
               </Button>
               <Button
                 type="button"
                 size="sm"
                 className={
-                  pending === "binarytest"
-                    ? "bg-warning text-white hover:bg-warning/90 focus-visible:ring-warning"
+                  pending === 'binarytest'
+                    ? 'bg-warning text-white hover:bg-warning/90 focus-visible:ring-warning'
                     : undefined
                 }
                 onClick={() => void onConfirm()}
                 disabled={
-                  setMode.isPending ||
-                  (pending === "binarytest" && !preview.data.dace_ready)
+                  setMode.isPending || (pending === 'binarytest' && !preview.data.dace_ready)
                 }
               >
-                {setMode.isPending ? "Switching…" : "Confirm switch"}
+                {setMode.isPending ? 'Switching…' : 'Confirm switch'}
               </Button>
             </div>
           </div>

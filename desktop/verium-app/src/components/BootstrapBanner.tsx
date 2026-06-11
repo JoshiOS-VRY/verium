@@ -1,22 +1,22 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { HardDriveDownload, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { BootstrapDialog } from "@/components/BootstrapDialog";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useActiveCoin } from "@/lib/coin/context";
-import { rpcGetBlockchainInfo, rpcGetPeerInfo } from "@/lib/rpc/client";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { HardDriveDownload, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { BootstrapDialog } from '@/components/BootstrapDialog';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useActiveCoin } from '@/lib/coin/context';
+import { rpcGetBlockchainInfo, rpcGetPeerInfo } from '@/lib/rpc/client';
 import {
   blocksBehindNetwork,
   shouldOfferBootstrap,
   syncTargetHeight,
-} from "@/lib/bootstrap-policy";
-import { fetchExplorerStats } from "@/lib/explorer-api";
-import { useIsTestNetwork } from "@/lib/network-mode";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { formatNumber, formatPercent } from "@/lib/utils";
+} from '@/lib/bootstrap-policy';
+import { fetchExplorerStats } from '@/lib/explorer-api';
+import { useIsTestNetwork } from '@/lib/network-mode';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { formatNumber, formatPercent } from '@/lib/utils';
 
 export function BootstrapBanner() {
   const coin = useActiveCoin();
@@ -28,19 +28,19 @@ export function BootstrapBanner() {
   const updatePrefs = useUserPreferences((s) => s.update);
 
   const blockchain = useQuery({
-    queryKey: coinQueryKey(coin, "getblockchaininfo"),
+    queryKey: coinQueryKey(coin, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(coin),
     refetchInterval: false,
     enabled: !isLight && !isTestNetwork,
   });
   const peers = useQuery({
-    queryKey: coinQueryKey(coin, "getpeerinfo"),
+    queryKey: coinQueryKey(coin, 'getpeerinfo'),
     queryFn: () => rpcGetPeerInfo(coin),
     refetchInterval: visible ? 30_000 : false,
     enabled: !isLight && !isTestNetwork,
   });
   const explorer = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-stats"),
+    queryKey: coinQueryKey(coin, 'explorer-stats'),
     queryFn: () => fetchExplorerStats(coin),
     refetchInterval: false,
     retry: 0,
@@ -55,7 +55,7 @@ export function BootstrapBanner() {
     blockchain.data,
     peers.data,
     prefs.bootstrap_dismissed_at,
-    networkTip,
+    networkTip
   );
 
   if (!offer) return null;
@@ -71,21 +71,16 @@ export function BootstrapBanner() {
       <div className="flex flex-1 flex-col gap-2">
         <div className="space-y-1 text-warning">
           <div>
-            Your chain is far behind the network. Importing the official
-            bootstrap snapshot can jump you ahead faster than catching up over
-            P2P. Dashboard block counts show your local verified height until
-            sync completes.
+            Your chain is far behind the network. Importing the official bootstrap snapshot can jump
+            you ahead faster than catching up over P2P. Dashboard block counts show your local
+            verified height until sync completes.
           </div>
           {localBlocks != null && (
             <div className="text-xs text-fg-muted">
               Local block #{formatNumber(localBlocks, 0)}
-              {target != null && (
-                <> · network tip ~#{formatNumber(target, 0)}</>
-              )}
-              {behind != null && behind > 0 && (
-                <> · ~{formatNumber(behind, 0)} blocks remaining</>
-              )}
-              {" · "}
+              {target != null && <> · network tip ~#{formatNumber(target, 0)}</>}
+              {behind != null && behind > 0 && <> · ~{formatNumber(behind, 0)} blocks remaining</>}
+              {' · '}
               {formatPercent(progress, 0)} verified
             </div>
           )}
@@ -107,11 +102,7 @@ export function BootstrapBanner() {
           </Button>
         </div>
       </div>
-      <BootstrapDialog
-        coin={coin}
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-      />
+      <BootstrapDialog coin={coin} open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </div>
   );
 }

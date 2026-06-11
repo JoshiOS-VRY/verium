@@ -1,24 +1,24 @@
-import { useMemo, useState, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, QrCode, Trash2, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { QrCodeDisplay } from "@/components/QrCodeDisplay";
-import { rpcGetNewAddress } from "@/lib/rpc/client";
-import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { formatCoinAmount } from "@/lib/units";
+import { useMemo, useState, useEffect } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Copy, QrCode, Trash2, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { QrCodeDisplay } from '@/components/QrCodeDisplay';
+import { rpcGetNewAddress } from '@/lib/rpc/client';
+import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { formatCoinAmount } from '@/lib/units';
 import {
   receiveRequestsAppend,
   receiveRequestsDelete,
   receiveRequestsList,
-} from "@/lib/security/client";
-import { cn } from "@/lib/utils";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useIsTestNetwork } from "@/lib/network-mode";
+} from '@/lib/security/client';
+import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useIsTestNetwork } from '@/lib/network-mode';
 
 interface ReceivePanelProps {
   className?: string;
@@ -31,9 +31,9 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const { isLight } = useWalletMode();
   const { data: nodeStatus } = useDaemonStatus(coin);
   const queryClient = useQueryClient();
-  const [label, setLabel] = useState("");
-  const [amount, setAmount] = useState("");
-  const [message, setMessage] = useState("");
+  const [label, setLabel] = useState('');
+  const [amount, setAmount] = useState('');
+  const [message, setMessage] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   } = useCopyToClipboard();
 
   const requestsQuery = useQuery({
-    queryKey: coinQueryKey(coin, "receive-requests"),
+    queryKey: coinQueryKey(coin, 'receive-requests'),
     queryFn: () => receiveRequestsList(coin),
   });
 
@@ -58,9 +58,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
         label: label.trim(),
         message: message.trim(),
         amount:
-          parsedAmount != null &&
-          Number.isFinite(parsedAmount) &&
-          parsedAmount > 0
+          parsedAmount != null && Number.isFinite(parsedAmount) && parsedAmount > 0
             ? parsedAmount
             : null,
         address,
@@ -68,18 +66,18 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
     },
     onSuccess: (entry) => {
       queryClient.setQueryData(
-        coinQueryKey(coin, "receive-requests"),
+        coinQueryKey(coin, 'receive-requests'),
         (prev: typeof requestsQuery.data) => {
           const list = prev ?? [];
           if (list.some((r) => r.id === entry.id)) return list;
           return [entry, ...list];
-        },
+        }
       );
       setSelectedId(entry.id);
       setShowDetail(true);
-      setLabel("");
-      setAmount("");
-      setMessage("");
+      setLabel('');
+      setAmount('');
+      setMessage('');
     },
   });
 
@@ -87,9 +85,8 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
     mutationFn: (id: string) => receiveRequestsDelete(coin, id),
     onSuccess: (_result, id) => {
       queryClient.setQueryData(
-        coinQueryKey(coin, "receive-requests"),
-        (prev: typeof requestsQuery.data) =>
-          (prev ?? []).filter((r) => r.id !== id),
+        coinQueryKey(coin, 'receive-requests'),
+        (prev: typeof requestsQuery.data) => (prev ?? []).filter((r) => r.id !== id)
       );
       setSelectedId(null);
       setShowDetail(false);
@@ -99,7 +96,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
 
   const selected = useMemo(
     () => requests.find((r) => r.id === selectedId) ?? null,
-    [requests, selectedId],
+    [requests, selectedId]
   );
 
   useEffect(() => {
@@ -107,53 +104,49 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   }, [selected?.address, resetAddressCopyFeedback]);
 
   const clearForm = () => {
-    setLabel("");
-    setAmount("");
-    setMessage("");
+    setLabel('');
+    setAmount('');
+    setMessage('');
   };
 
   const networkReceiveBlocked =
     !isLight &&
-    coin === "vericoin" &&
+    coin === 'vericoin' &&
     nodeStatus?.connected === true &&
-    (nodeStatus.txindex_network_paused === true ||
-      nodeStatus.network_active === false);
+    (nodeStatus.txindex_network_paused === true || nodeStatus.network_active === false);
 
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div className={cn('flex flex-col gap-4', className)}>
       {networkReceiveBlocked && (
         <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-fg">
-          <p className="font-medium text-warning">
-            Incoming {profile.symbol} payments are paused
-          </p>
+          <p className="font-medium text-warning">Incoming {profile.symbol} payments are paused</p>
           <p className="mt-1 text-xs text-fg-muted">
-            Your Vericoin node has temporarily disabled peer connections while
-            it rebuilds the transaction index. Payments sent now may not appear
-            until network activity resumes. Check the dashboard or Network page
-            for progress — this usually clears within a few minutes.
+            Your Vericoin node has temporarily disabled peer connections while it rebuilds the
+            transaction index. Payments sent now may not appear until network activity resumes.
+            Check the dashboard or Network page for progress — this usually clears within a few
+            minutes.
           </p>
         </div>
       )}
       {isTestNetwork && (
         <div className="rounded-lg border border-border bg-bg-subtle px-4 py-3 text-xs text-fg-muted">
-          You are on the <span className="font-medium">Binarytest</span> network.
-          Only send {profile.symbol} from another wallet also set to Binarytest —
-          mainnet addresses will not receive funds here.
+          You are on the <span className="font-medium">Binarytest</span> network. Only send{' '}
+          {profile.symbol} from another wallet also set to Binarytest — mainnet addresses will not
+          receive funds here.
         </div>
       )}
-      {coin === "vericoin" && (
+      {coin === 'vericoin' && (
         <div className="rounded-lg border border-border bg-bg-subtle px-4 py-3 text-xs text-fg-muted">
-          Vericoin and Verium legacy addresses both start with{" "}
-          <span className="font-mono">V</span> on mainnet. Sending{" "}
-          <span className="font-medium">VRM</span> to this address only credits your
-          Verium wallet on the Verium chain — it does not prove this is a valid{" "}
-          <span className="font-medium">VRC</span> receive. Test with a small VRC
-          payment on the Vericoin network instead.
+          Vericoin and Verium legacy addresses both start with <span className="font-mono">V</span>{' '}
+          on mainnet. Sending <span className="font-medium">VRM</span> to this address only credits
+          your Verium wallet on the Verium chain — it does not prove this is a valid{' '}
+          <span className="font-medium">VRC</span> receive. Test with a small VRC payment on the
+          Vericoin network instead.
         </div>
       )}
       <div className="rounded-lg border border-border bg-bg-subtle/80 p-4">
         <p className="mb-3 text-sm text-fg-muted">
-          Create new receiving address{" "}
+          Create new receiving address{' '}
           <span className="text-fg-subtle">(All fields are optional)</span>
         </p>
 
@@ -193,7 +186,6 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
                 placeholder="Optional amount to request"
                 className="h-10 w-36 rounded-md border border-border bg-bg-panel px-3 text-sm tabular-nums outline-none focus:border-accent"
               />
-
             </div>
           </div>
 
@@ -223,7 +215,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
             className="min-w-[12rem]"
           >
             <QrCode className="h-4 w-4" />
-            {create.isPending ? "Creating…" : "Create new receiving address"}
+            {create.isPending ? 'Creating…' : 'Create new receiving address'}
           </Button>
           <Button type="button" variant="danger" onClick={clearForm}>
             <X className="h-4 w-4" />
@@ -231,9 +223,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
           </Button>
         </div>
 
-        {create.error && (
-          <div className="mt-3 text-xs text-danger">{String(create.error)}</div>
-        )}
+        {create.error && <div className="mt-3 text-xs text-danger">{String(create.error)}</div>}
       </div>
 
       <div className="rounded-lg border border-border bg-bg-panel/40">
@@ -243,8 +233,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
 
         {requestsQuery.error && (
           <div className="border-b border-border px-4 py-2 text-xs text-danger">
-            Could not load payment request history:{" "}
-            {String(requestsQuery.error)}
+            Could not load payment request history: {String(requestsQuery.error)}
           </div>
         )}
 
@@ -256,9 +245,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
                 <th className="px-4 py-2 text-left font-medium">Label</th>
                 <th className="px-4 py-2 text-left font-medium">Address</th>
                 <th className="px-4 py-2 text-left font-medium">Message</th>
-                <th className="px-4 py-2 text-right font-medium">
-                  Requested ({profile.symbol})
-                </th>
+                <th className="px-4 py-2 text-right font-medium">Requested ({profile.symbol})</th>
                 <th className="px-4 py-2 text-right font-medium ">Actions</th>
               </tr>
             </thead>
@@ -274,18 +261,14 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
                       setShowDetail(true);
                     }}
                     className={cn(
-                      "cursor-pointer border-t border-border transition-colors",
-                      isSelected
-                        ? "bg-accent/15"
-                        : "odd:bg-bg-subtle/30 hover:bg-bg-subtle/60",
+                      'cursor-pointer border-t border-border transition-colors',
+                      isSelected ? 'bg-accent/15' : 'odd:bg-bg-subtle/30 hover:bg-bg-subtle/60'
                     )}
                   >
                     <td className="px-4 py-2 text-xs text-fg-muted whitespace-nowrap">
                       {new Date(row.created_at * 1000).toLocaleString()}
                     </td>
-                    <td className="max-w-[120px] truncate px-4 py-2">
-                      {row.label || "—"}
-                    </td>
+                    <td className="max-w-[120px] truncate px-4 py-2">{row.label || '—'}</td>
                     <td
                       className="max-w-[160px] truncate px-4 py-2 font-mono text-xs text-fg-muted"
                       title={row.address}
@@ -293,12 +276,10 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
                       {row.address}
                     </td>
                     <td className="max-w-[180px] truncate px-4 py-2 text-fg-muted">
-                      {row.message || "—"}
+                      {row.message || '—'}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">
-                      {row.amount != null
-                        ? formatCoinAmount(row.amount, coin, 8)
-                        : "—"}
+                      {row.amount != null ? formatCoinAmount(row.amount, coin, 8) : '—'}
                     </td>
                     <td className="px-2 py-2 text-right">
                       <div className="flex justify-end gap-1">
@@ -335,10 +316,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
               })}
               {!requestsQuery.isLoading && requests.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-sm text-fg-subtle"
-                  >
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-fg-subtle">
                     No payment requests yet. Create a receiving address above.
                   </td>
                 </tr>
@@ -353,9 +331,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h4 className="text-sm font-semibold">Payment request</h4>
-              {selected.label && (
-                <p className="text-xs text-fg-muted">{selected.label}</p>
-              )}
+              {selected.label && <p className="text-xs text-fg-muted">{selected.label}</p>}
             </div>
             <button
               type="button"
@@ -367,9 +343,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
             </button>
           </div>
 
-          {selected.message && (
-            <p className="mb-3 text-sm text-fg-muted">{selected.message}</p>
-          )}
+          {selected.message && <p className="mb-3 text-sm text-fg-muted">{selected.message}</p>}
 
           {selected.amount != null && (
             <p className="mb-3 text-lg font-semibold tabular-nums">
@@ -387,22 +361,18 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
 
           <div
             className={cn(
-              "mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors",
-              addressCopied
-                ? "border-success/40 bg-success/5"
-                : "border-border bg-bg-panel",
+              'mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors',
+              addressCopied ? 'border-success/40 bg-success/5' : 'border-border bg-bg-panel'
             )}
           >
             <span className="min-w-0 flex-1 break-all">{selected.address}</span>
             <button
               type="button"
-              aria-label={addressCopied ? "Address copied" : "Copy address"}
+              aria-label={addressCopied ? 'Address copied' : 'Copy address'}
               onClick={() => void copyAddress(selected.address)}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium transition-colors",
-                addressCopied
-                  ? "text-success"
-                  : "text-fg-muted hover:text-fg",
+                'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium transition-colors',
+                addressCopied ? 'text-success' : 'text-fg-muted hover:text-fg'
               )}
             >
               {addressCopied ? (
@@ -419,7 +389,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
           <div className="mt-3 flex flex-wrap gap-3 text-xs">
             <ExplorerLink
               coin={coin}
-              target={{ kind: "address", address: selected.address }}
+              target={{ kind: 'address', address: selected.address }}
               label="View on explorer"
             />
             <span className="text-fg-subtle">

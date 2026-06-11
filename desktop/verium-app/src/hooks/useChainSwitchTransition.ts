@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import type { CoinId } from "@/lib/coin/profile";
+import { useEffect, useRef, useState } from 'react';
+import type { CoinId } from '@/lib/coin/profile';
 
 /**
  * True briefly after `coin` changes until `isReady` is true for the latest switch.
@@ -7,7 +7,7 @@ import type { CoinId } from "@/lib/coin/profile";
  */
 export function useChainSwitchTransition(
   coin: CoinId,
-  options: { enabled?: boolean; isReady: boolean },
+  options: { enabled?: boolean; isReady: boolean }
 ): boolean {
   const enabled = options.enabled ?? true;
   const prevCoinRef = useRef(coin);

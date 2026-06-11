@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from 'react';
 import {
   ADAPTIVE_MINING_POLL_MS,
   clampMiningThreads,
@@ -6,8 +6,8 @@ import {
   MINING_THREADS_MIN,
   triedToMineOnAllLogicalCpus,
   type CpuTopology,
-} from "@/lib/mining-opt";
-import { OkDialog } from "@/components/OkDialog";
+} from '@/lib/mining-opt';
+import { OkDialog } from '@/components/OkDialog';
 
 interface MiningThreadControlsProps {
   autoAdjust: boolean;
@@ -45,13 +45,9 @@ export function MiningThreadControls({
   onManualThreadsChange,
 }: MiningThreadControlsProps) {
   const [allCpusWarningOpen, setAllCpusWarningOpen] = useState(false);
-  const detected =
-    logicalCpus ?? detectedLogicalCpus(topology);
+  const detected = logicalCpus ?? detectedLogicalCpus(topology);
   const allowedMax = maxThreads;
-  const deviceCeiling = Math.min(
-    suggestedThreads ?? manualThreads,
-    allowedMax,
-  );
+  const deviceCeiling = Math.min(suggestedThreads ?? manualThreads, allowedMax);
   const effectiveThreads = autoAdjust
     ? isMining && activeThreads != null && activeThreads > 0
       ? activeThreads
@@ -64,9 +60,7 @@ export function MiningThreadControls({
       onManualThreadsChange(allowedMax);
       return;
     }
-    onManualThreadsChange(
-      clampMiningThreads(raw || MINING_THREADS_MIN, allowedMax),
-    );
+    onManualThreadsChange(clampMiningThreads(raw || MINING_THREADS_MIN, allowedMax));
   };
 
   return (
@@ -74,12 +68,12 @@ export function MiningThreadControls({
       <div
         className={
           compact
-            ? "flex flex-col gap-2"
-            : "flex flex-col gap-3 rounded-lg border border-border bg-bg-subtle px-3 py-3"
+            ? 'flex flex-col gap-2'
+            : 'flex flex-col gap-3 rounded-lg border border-border bg-bg-subtle px-3 py-3'
         }
       >
         <label
-          className={`flex cursor-pointer items-center gap-2 ${compact ? "text-xs text-fg-muted" : "text-sm"}`}
+          className={`flex cursor-pointer items-center gap-2 ${compact ? 'text-xs text-fg-muted' : 'text-sm'}`}
         >
           <input
             type="checkbox"
@@ -92,24 +86,16 @@ export function MiningThreadControls({
         </label>
 
         {autoAdjust ? (
-          <p className={`${compact ? "text-xs" : "text-sm"} text-fg-subtle`}>
-            Using{" "}
-            <span className="font-medium tabular-nums text-fg">
-              {effectiveThreads}
-            </span>{" "}
-            thread{effectiveThreads === 1 ? "" : "s"}
-            {suggestedThreads == null ? " (detecting…)" : null}
+          <p className={`${compact ? 'text-xs' : 'text-sm'} text-fg-subtle`}>
+            Using <span className="font-medium tabular-nums text-fg">{effectiveThreads}</span>{' '}
+            thread{effectiveThreads === 1 ? '' : 's'}
+            {suggestedThreads == null ? ' (detecting…)' : null}
             {isMining && liveAdaptive ? (
-              <>
-                {" "}
-                · adjusts every {ADAPTIVE_MINING_POLL_MS / 1000}s
-              </>
+              <> · adjusts every {ADAPTIVE_MINING_POLL_MS / 1000}s</>
             ) : null}
           </p>
         ) : (
-          <div
-            className={`flex flex-col gap-1 ${compact ? "text-xs" : "text-sm"}`}
-          >
+          <div className={`flex flex-col gap-1 ${compact ? 'text-xs' : 'text-sm'}`}>
             <label className="text-fg-muted">Threads</label>
             <input
               type="number"
@@ -118,16 +104,12 @@ export function MiningThreadControls({
               value={effectiveThreads}
               disabled={disabled}
               onChange={(e) =>
-                handleManualThreadsChange(
-                  Number(e.target.value) || MINING_THREADS_MIN,
-                )
+                handleManualThreadsChange(Number(e.target.value) || MINING_THREADS_MIN)
               }
               className="h-9 max-w-[8rem] rounded-md border border-border bg-bg px-3 tabular-nums outline-none focus:border-accent disabled:opacity-50"
             />
             {disabled ? (
-              <p className="text-xs text-fg-subtle">
-                Stop mining to change threads.
-              </p>
+              <p className="text-xs text-fg-subtle">Stop mining to change threads.</p>
             ) : (
               <p className="text-xs text-fg-subtle">
                 {MINING_THREADS_MIN}–{allowedMax}
@@ -140,7 +122,7 @@ export function MiningThreadControls({
       <OkDialog
         open={allCpusWarningOpen}
         title="Cannot mine on all CPUs"
-        message={`Mining on all ${detected} logical CPUs can make your system unresponsive. Verium limits mining to ${allowedMax} thread${allowedMax === 1 ? "" : "s"} so one CPU remains available for the wallet and operating system.`}
+        message={`Mining on all ${detected} logical CPUs can make your system unresponsive. Verium limits mining to ${allowedMax} thread${allowedMax === 1 ? '' : 's'} so one CPU remains available for the wallet and operating system.`}
         onOk={() => setAllCpusWarningOpen(false)}
       />
     </>

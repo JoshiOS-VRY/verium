@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
+import { useQuery } from '@tanstack/react-query';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 import {
   fetchMinerHashrateHistory,
   fetchMinerOverview,
@@ -7,12 +7,12 @@ import {
   fetchPoolPayoutSummary,
   fetchPoolStats,
   isPoolApiEnabled,
-} from "@/lib/pool-api";
+} from '@/lib/pool-api';
 
 export function usePoolStatsQuery(enabled = true) {
   const visible = useWindowVisible();
   return useQuery({
-    queryKey: ["pool", "stats"],
+    queryKey: ['pool', 'stats'],
     queryFn: fetchPoolStats,
     enabled: enabled && visible,
     refetchInterval: false,
@@ -23,7 +23,7 @@ export function usePoolStatsQuery(enabled = true) {
 
 export function usePoolApiEnabledQuery() {
   return useQuery({
-    queryKey: ["pool", "enabled"],
+    queryKey: ['pool', 'enabled'],
     queryFn: isPoolApiEnabled,
     staleTime: 60_000,
   });
@@ -33,7 +33,7 @@ export function useMinerOverviewQuery(address: string | undefined, enabled = tru
   const visible = useWindowVisible();
   const addr = address?.trim();
   return useQuery({
-    queryKey: ["pool", "miner", addr],
+    queryKey: ['pool', 'miner', addr],
     queryFn: () => fetchMinerOverview(addr!),
     enabled: Boolean(enabled && visible && addr),
     refetchInterval: false,
@@ -42,14 +42,11 @@ export function useMinerOverviewQuery(address: string | undefined, enabled = tru
   });
 }
 
-export function useMinerHashrateHistoryQuery(
-  address: string | undefined,
-  enabled = true,
-) {
+export function useMinerHashrateHistoryQuery(address: string | undefined, enabled = true) {
   const visible = useWindowVisible();
   const addr = address?.trim();
   return useQuery({
-    queryKey: ["pool", "hashrate-history", addr],
+    queryKey: ['pool', 'hashrate-history', addr],
     queryFn: () => fetchMinerHashrateHistory(addr!),
     enabled: Boolean(enabled && visible && addr),
     refetchInterval: false,
@@ -61,7 +58,7 @@ export function useMinerHashrateHistoryQuery(
 export function usePoolPayoutSummaryQuery(enabled = true) {
   const visible = useWindowVisible();
   return useQuery({
-    queryKey: ["pool", "payout-summary"],
+    queryKey: ['pool', 'payout-summary'],
     queryFn: fetchPoolPayoutSummary,
     enabled: enabled && visible,
     refetchInterval: false,
@@ -70,14 +67,11 @@ export function usePoolPayoutSummaryQuery(enabled = true) {
   });
 }
 
-export function useMinerPayoutsQuery(
-  address: string | undefined,
-  enabled = true,
-) {
+export function useMinerPayoutsQuery(address: string | undefined, enabled = true) {
   const visible = useWindowVisible();
   const addr = address?.trim();
   return useQuery({
-    queryKey: ["pool", "miner-payouts", addr],
+    queryKey: ['pool', 'miner-payouts', addr],
     queryFn: () => fetchMinerPayouts(addr!, 20, 0),
     enabled: Boolean(enabled && visible && addr),
     refetchInterval: false,

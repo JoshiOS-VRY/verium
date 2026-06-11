@@ -1,19 +1,17 @@
 Verium Vault version 1.3.2 is now available from:
 
-  https://vericonomy.com
+https://vericonomy.com
 
 This is a new minor version release, bringing both new features and
 bug fixes.
 
 Please report bugs using the issue tracker at github:
 
-  https://github.com/VeriumReserve/Verium
+https://github.com/VeriumReserve/Verium
 
-Upgrading and downgrading
-=========================
+# Upgrading and downgrading
 
-How to Upgrade
---------------
+## How to Upgrade
 
 If you are running an older version, shut it down. Wait until it has completely
 shut down (which might take a few minutes for older versions), uninstall all
@@ -25,8 +23,7 @@ If you are upgrading from version 1.2 or earlier, the first time you run
 1.3.2 your blockchain files will be re-indexed, which will take anywhere from
 5 minutes to several hours, depending on the speed of your machine.
 
-Downgrading warnings
---------------------
+## Downgrading warnings
 
 The 'chainstate' for this release is not always compatible with previous
 releases, so if you run 1.3.x and then decide to switch back to a
@@ -41,22 +38,18 @@ Also, the first time you run a 1.2.x release on a 1.3.x wallet it will rescan
 the blockchain for missing spent coins, which will take a long time (tens
 of minutes on a typical machine).
 
-Notable changes
-===============
+# Notable changes
 
-Updater: Check new version
------------------------
+## Updater: Check new version
 
 From this version, the GUI will automatically check for a new Verium Vault version at the launch of the application.
 This feature will make easier the deployment of new vault version on the network.
 
-Bootstrap
------------------------
+## Bootstrap
 
 The synchronization modal will now show up a bootstrap button if the wallet have a chain older than a week.
 
-1.3.2 Change log
-=======================
+# 1.3.2 Change log
 
 RPC:
 
@@ -86,10 +79,10 @@ GUI:
 - Version check at startup
 - Bootstrap button in synchronization modal
 
-Credits
---------
+## Credits
 
 Thanks to everyone who contributed to this release:
+
 - Bitcoin Core Team
 - Calvario
 - Douglas Pike (effectsToCause)

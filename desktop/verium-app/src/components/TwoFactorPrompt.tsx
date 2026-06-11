@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { twoFactorVerify } from "@/lib/security/client";
+import { useState } from 'react';
+import { ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { twoFactorVerify } from '@/lib/security/client';
 
 interface TwoFactorPromptProps {
   open: boolean;
@@ -12,11 +12,11 @@ interface TwoFactorPromptProps {
 
 export function TwoFactorPrompt({
   open,
-  title = "Two-factor authentication",
+  title = 'Two-factor authentication',
   onVerified,
   onCancel,
 }: TwoFactorPromptProps) {
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
@@ -39,7 +39,7 @@ export function TwoFactorPrompt({
           autoFocus
           maxLength={12}
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\s/g, ""))}
+          onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))}
           placeholder="000000"
           className="mb-3 h-10 w-full rounded-md border border-border bg-bg-subtle px-3 text-sm tracking-widest outline-none focus:border-accent"
         />
@@ -58,14 +58,14 @@ export function TwoFactorPrompt({
               setChecking(false);
               if (ok) {
                 const verified = code;
-                setCode("");
+                setCode('');
                 onVerified(verified);
               } else {
-                setError("Invalid code. Try again or use a recovery code.");
+                setError('Invalid code. Try again or use a recovery code.');
               }
             }}
           >
-            {checking ? "Verifying…" : "Verify"}
+            {checking ? 'Verifying…' : 'Verify'}
           </Button>
         </div>
       </div>

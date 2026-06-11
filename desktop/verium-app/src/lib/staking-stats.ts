@@ -1,6 +1,6 @@
 /** Matches legacy Vericoin Qt overview: `(netStakeWeight/2)/30_000_000 * 100`. */
-import type { ExplorerStats } from "@/lib/explorer-api";
-import type { TransactionItem } from "@/lib/rpc/client";
+import type { ExplorerStats } from '@/lib/explorer-api';
+import type { TransactionItem } from '@/lib/rpc/client';
 
 export const VRC_SUPPLY_CAP = 30_000_000;
 
@@ -28,15 +28,15 @@ export interface VericoinMiningInfo {
   netstakeweight?: number;
   stakeweight?: { combined?: number };
   difficulty?: {
-    "proof-of-stake"?: number;
-    "proof-of-work"?: number;
-    "search-interval"?: number;
+    'proof-of-stake'?: number;
+    'proof-of-work'?: number;
+    'search-interval'?: number;
   };
 }
 
 function asNumber(v: unknown): number | undefined {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() !== "") {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
     const n = Number(v);
     return Number.isFinite(n) ? n : undefined;
   }
@@ -44,25 +44,25 @@ function asNumber(v: unknown): number | undefined {
 }
 
 export function parseVericoinMiningInfo(raw: unknown): VericoinMiningInfo | null {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
   const blocks = asNumber(o.blocks);
   if (blocks === undefined) return null;
 
   const difficultyRaw = o.difficulty;
-  let difficulty: VericoinMiningInfo["difficulty"];
-  if (difficultyRaw && typeof difficultyRaw === "object") {
+  let difficulty: VericoinMiningInfo['difficulty'];
+  if (difficultyRaw && typeof difficultyRaw === 'object') {
     const d = difficultyRaw as Record<string, unknown>;
     difficulty = {
-      "proof-of-stake": asNumber(d["proof-of-stake"]),
-      "proof-of-work": asNumber(d["proof-of-work"]),
-      "search-interval": asNumber(d["search-interval"]),
+      'proof-of-stake': asNumber(d['proof-of-stake']),
+      'proof-of-work': asNumber(d['proof-of-work']),
+      'search-interval': asNumber(d['search-interval']),
     };
   }
 
   const stakeWeightRaw = o.stakeweight;
-  let stakeweight: VericoinMiningInfo["stakeweight"];
-  if (stakeWeightRaw && typeof stakeWeightRaw === "object") {
+  let stakeweight: VericoinMiningInfo['stakeweight'];
+  if (stakeWeightRaw && typeof stakeWeightRaw === 'object') {
     stakeweight = {
       combined: asNumber((stakeWeightRaw as Record<string, unknown>).combined),
     };
@@ -72,10 +72,10 @@ export function parseVericoinMiningInfo(raw: unknown): VericoinMiningInfo | null
     blocks,
     blockreward: asNumber(o.blockreward) ?? 0,
     blocksperhour: asNumber(o.blocksperhour) ?? 0,
-    chain: String(o.chain ?? "vericoin"),
+    chain: String(o.chain ?? 'vericoin'),
     networkhashps: asNumber(o.networkhashps) ?? 0,
     pooledtx: asNumber(o.pooledtx) ?? 0,
-    warnings: String(o.warnings ?? ""),
+    warnings: String(o.warnings ?? ''),
     stakeinterest: asNumber(o.stakeinterest),
     stakeinflation: asNumber(o.stakeinflation),
     netstakeweight: asNumber(o.netstakeweight),
@@ -95,7 +95,7 @@ export function rpcStakeTimeHoursToSeconds(hours: number): number {
 
 /** Human-readable duration for staking estimates (seconds in). */
 export function formatEstimatedDuration(totalSeconds: number): string {
-  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return "—";
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '—';
   const secs = Math.round(totalSeconds);
   if (secs < 90) return `~${secs}s`;
   if (secs < 3600) return `~${Math.round(secs / 60)} min`;
@@ -118,7 +118,7 @@ export interface ExpectedStakeRewardEstimate {
   seconds: number;
   label: string;
   disclaimer: string;
-  source: "node" | "ratio";
+  source: 'node' | 'ratio';
 }
 
 /** Expected time to mint a stake reward (mean-style; actual time varies). */
@@ -128,8 +128,7 @@ export function estimateExpectedStakeReward(options: {
   netStakeWeight?: number;
   stakingActive?: boolean;
 }): ExpectedStakeRewardEstimate | null {
-  const { stakeTimeHours, walletStakeWeight, netStakeWeight, stakingActive } =
-    options;
+  const { stakeTimeHours, walletStakeWeight, netStakeWeight, stakingActive } = options;
 
   if (stakingActive && stakeTimeHours != null && stakeTimeHours > 0) {
     const seconds = rpcStakeTimeHoursToSeconds(stakeTimeHours);
@@ -137,8 +136,8 @@ export function estimateExpectedStakeReward(options: {
       seconds,
       label: formatEstimatedDuration(seconds),
       disclaimer:
-        "Statistical estimate from your node (same model as Vericoin Qt). Actual time varies widely.",
-      source: "node",
+        'Statistical estimate from your node (same model as Vericoin Qt). Actual time varies widely.',
+      source: 'node',
     };
   }
 
@@ -148,15 +147,13 @@ export function estimateExpectedStakeReward(options: {
     netStakeWeight != null &&
     netStakeWeight > 0
   ) {
-    const seconds = Math.round(
-      (netStakeWeight / walletStakeWeight) * STAKE_TARGET_SPACING_SECONDS,
-    );
+    const seconds = Math.round((netStakeWeight / walletStakeWeight) * STAKE_TARGET_SPACING_SECONDS);
     return {
       seconds,
       label: formatEstimatedDuration(seconds),
       disclaimer:
-        "Rough ratio from network stake weight. Start staking for your node’s kernel-based estimate.",
-      source: "ratio",
+        'Rough ratio from network stake weight. Start staking for your node’s kernel-based estimate.',
+      source: 'ratio',
     };
   }
 
@@ -170,12 +167,10 @@ export interface YoungestStakeReceive {
 }
 
 /** Newest incoming funds — PoST weight grows from this timestamp. */
-export function findYoungestStakeReceive(
-  txs: TransactionItem[],
-): YoungestStakeReceive | null {
+export function findYoungestStakeReceive(txs: TransactionItem[]): YoungestStakeReceive | null {
   let best: YoungestStakeReceive | null = null;
   for (const tx of txs) {
-    if (tx.category !== "receive" || tx.amount <= 0) continue;
+    if (tx.category !== 'receive' || tx.amount <= 0) continue;
     const coinTime = tx.blocktime ?? tx.timereceived ?? tx.time;
     if (!best || coinTime > best.coinTime) {
       best = {
@@ -197,17 +192,12 @@ export interface CoinAgeMaturityStatus {
 
 export function computeCoinAgeMaturity(
   coinTimeUnix: number,
-  nowSeconds = Math.floor(Date.now() / 1000),
+  nowSeconds = Math.floor(Date.now() / 1000)
 ): CoinAgeMaturityStatus {
   const coinAgeSeconds = Math.max(0, nowSeconds - coinTimeUnix);
-  const secondsUntilMinAge = Math.max(
-    0,
-    VRC_STAKE_MIN_AGE_SECONDS - coinAgeSeconds,
-  );
+  const secondsUntilMinAge = Math.max(0, VRC_STAKE_MIN_AGE_SECONDS - coinAgeSeconds);
   const eligible = secondsUntilMinAge === 0;
-  const timeWeightSeconds = eligible
-    ? Math.max(0, coinAgeSeconds - VRC_STAKE_MIN_AGE_SECONDS)
-    : 0;
+  const timeWeightSeconds = eligible ? Math.max(0, coinAgeSeconds - VRC_STAKE_MIN_AGE_SECONDS) : 0;
   return { eligible, secondsUntilMinAge, timeWeightSeconds, coinAgeSeconds };
 }
 
@@ -236,34 +226,33 @@ export function buildPostReadinessSummary(options: {
 
   if (!receive) {
     return {
-      minAgeLabel: "No funded UTXOs",
-      minAgeDetail: "Receive VRC to this wallet to begin PoST staking.",
-      maturityLabel: "—",
-      maturityDetail: "",
-      weightRampLabel: "Stake weight",
+      minAgeLabel: 'No funded UTXOs',
+      minAgeDetail: 'Receive VRC to this wallet to begin PoST staking.',
+      maturityLabel: '—',
+      maturityDetail: '',
+      weightRampLabel: 'Stake weight',
       weightRampDetail:
         options.walletStakeWeight != null && options.walletStakeWeight > 0
           ? `Node reports weight ${options.walletStakeWeight} (coin-age units, not VRC balance).`
-          : "Shown after coins mature and staking runs.",
+          : 'Shown after coins mature and staking runs.',
     };
   }
 
   const age = computeCoinAgeMaturity(receive.coinTime, now);
   const minAgeLabel = age.eligible
-    ? "Ready"
-    : formatEstimatedDuration(age.secondsUntilMinAge).replace(/^~/, "In ~");
+    ? 'Ready'
+    : formatEstimatedDuration(age.secondsUntilMinAge).replace(/^~/, 'In ~');
   const minAgeDetail = age.eligible
     ? `Coins are older than ${VRC_STAKE_MIN_AGE_SECONDS / 3600}h (PoST minimum).`
     : `PoST requires ${VRC_STAKE_MIN_AGE_SECONDS / 3600}h coin age before kernels.`;
 
-  const matureEnough =
-    receive.confirmations >= VRC_STAKE_MATURITY_CONFIRMATIONS;
+  const matureEnough = receive.confirmations >= VRC_STAKE_MATURITY_CONFIRMATIONS;
   const maturityLabel = matureEnough
-    ? "Confirmations OK"
+    ? 'Confirmations OK'
     : `${receive.confirmations} / ${VRC_STAKE_MATURITY_CONFIRMATIONS} conf`;
   const maturityDetail = matureEnough
-    ? "Meets wallet coin-selection depth for staking."
-    : "Wallet may not select this UTXO for staking until depth is reached.";
+    ? 'Meets wallet coin-selection depth for staking.'
+    : 'Wallet may not select this UTXO for staking until depth is reached.';
 
   const ramp = stakeWeightRampFactor(age.timeWeightSeconds);
   const rampPct = Math.round(ramp * 100);
@@ -272,12 +261,12 @@ export function buildPostReadinessSummary(options: {
       ? `Weight ${options.walletStakeWeight}`
       : rampPct > 0
         ? `Weight ramp ~${rampPct}%`
-        : "Weight ramp starting";
+        : 'Weight ramp starting';
   const weightRampDetail = age.eligible
     ? ramp >= 1
-      ? "PoST weight is near its practical plateau for this UTXO; rewards still depend on network luck."
+      ? 'PoST weight is near its practical plateau for this UTXO; rewards still depend on network luck.'
       : `Weight rises with coin age after the ${VRC_STAKE_MIN_AGE_SECONDS / 3600}h minimum (reference ~30 days to full ramp).`
-    : "Weight begins accumulating after the minimum coin-age gate.";
+    : 'Weight begins accumulating after the minimum coin-age gate.';
 
   return {
     minAgeLabel,
@@ -290,17 +279,15 @@ export function buildPostReadinessSummary(options: {
 }
 
 /** Percent of circulating supply actively staking on the network. */
-export function networkCoinsStakingPercent(
-  netStakeWeight: number | undefined,
-): number | null {
+export function networkCoinsStakingPercent(netStakeWeight: number | undefined): number | null {
   if (netStakeWeight == null || netStakeWeight <= 0) return null;
-  return ((netStakeWeight / 2) / VRC_SUPPLY_CAP) * 100;
+  return (netStakeWeight / 2 / VRC_SUPPLY_CAP) * 100;
 }
 
 /** Your stake weight as a share of network stake weight. */
 export function walletStakeSharePercent(
   walletStakeWeight: number | undefined,
-  netStakeWeight: number | undefined,
+  netStakeWeight: number | undefined
 ): number | null {
   if (
     walletStakeWeight == null ||
@@ -320,7 +307,7 @@ export function formatSessionDuration(startedAt: number): string {
   return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
 }
 
-export type StakingNetworkSource = "local" | "explorer";
+export type StakingNetworkSource = 'local' | 'explorer';
 
 export interface StakingNetworkKpis {
   interestRate?: number;
@@ -336,25 +323,23 @@ export interface StakingNetworkKpis {
 
 export function mergeStakingNetworkKpis(
   local: VericoinMiningInfo | null | undefined,
-  explorer: ExplorerStats | null | undefined,
+  explorer: ExplorerStats | null | undefined
 ): StakingNetworkKpis {
   const interestRate = local?.stakeinterest ?? explorer?.stake_interest;
   const inflationRate = local?.stakeinflation ?? explorer?.stake_inflation;
   const netStakeWeight = local?.netstakeweight ?? explorer?.net_stake_weight;
-  const posDifficulty =
-    local?.difficulty?.["proof-of-stake"] ?? explorer?.pos_difficulty;
-  const powDifficulty =
-    local?.difficulty?.["proof-of-work"] ?? explorer?.pow_difficulty;
+  const posDifficulty = local?.difficulty?.['proof-of-stake'] ?? explorer?.pos_difficulty;
+  const powDifficulty = local?.difficulty?.['proof-of-work'] ?? explorer?.pow_difficulty;
   const blocksPerHour = local?.blocksperhour ?? explorer?.blocks_per_hour;
   const blockReward = local?.blockreward ?? explorer?.block_reward;
   const supply = explorer?.supply;
 
   const source: StakingNetworkSource =
     local?.stakeinterest != null || local?.netstakeweight != null
-      ? "local"
+      ? 'local'
       : explorer?.stake_interest != null || explorer?.net_stake_weight != null
-        ? "explorer"
-        : "local";
+        ? 'explorer'
+        : 'local';
 
   return {
     interestRate,

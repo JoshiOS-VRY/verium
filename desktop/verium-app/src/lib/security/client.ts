@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { CoinId } from "@/lib/coin/profile";
+import { invoke } from '@tauri-apps/api/core';
+import type { CoinId } from '@/lib/coin/profile';
 
 // ── Recovery ────────────────────────────────────────────────────────────────
 
@@ -9,23 +9,23 @@ export interface RecoveryPhraseBundle {
 }
 
 export async function recoveryGenerateMnemonic(): Promise<RecoveryPhraseBundle> {
-  return invoke("recovery_generate_mnemonic");
+  return invoke('recovery_generate_mnemonic');
 }
 
 export async function recoveryValidateMnemonic(phrase: string): Promise<boolean> {
-  return invoke("recovery_validate_mnemonic", { phrase });
+  return invoke('recovery_validate_mnemonic', { phrase });
 }
 
 export async function recoveryVerificationIndices(wordCount = 24): Promise<number[]> {
-  return invoke("recovery_verification_indices", { wordCount });
+  return invoke('recovery_verification_indices', { wordCount });
 }
 
 export async function recoveryVerifyWords(
   phrase: string,
   indices: number[],
-  answers: string[],
+  answers: string[]
 ): Promise<boolean> {
-  return invoke("recovery_verify_words", { phrase, indices, answers });
+  return invoke('recovery_verify_words', { phrase, indices, answers });
 }
 
 export async function recoveryApplyHdSeed(
@@ -33,9 +33,9 @@ export async function recoveryApplyHdSeed(
   phrase: string,
   bip39Passphrase?: string,
   unlockPassphrase?: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<string> {
-  return invoke("recovery_apply_hd_seed", {
+  return invoke('recovery_apply_hd_seed', {
     coin,
     phrase,
     bip39Passphrase: bip39Passphrase ?? null,
@@ -45,25 +45,23 @@ export async function recoveryApplyHdSeed(
 }
 
 export async function recoveryWalletIsHd(coin: CoinId): Promise<boolean> {
-  return invoke("recovery_wallet_is_hd", { coin });
+  return invoke('recovery_wallet_is_hd', { coin });
 }
 
 export type RecoveryExportResult =
-  | { kind: "mnemonic"; mnemonic: string; word_count: number }
-  | { kind: "hd_master_xprv"; xprv: string; message: string };
+  | { kind: 'mnemonic'; mnemonic: string; word_count: number }
+  | { kind: 'hd_master_xprv'; xprv: string; message: string };
 
-export async function recoveryMnemonicBackupExists(
-  coin: CoinId,
-): Promise<boolean> {
-  return invoke("recovery_mnemonic_backup_exists", { coin });
+export async function recoveryMnemonicBackupExists(coin: CoinId): Promise<boolean> {
+  return invoke('recovery_mnemonic_backup_exists', { coin });
 }
 
 export async function recoveryExportSeed(
   coin: CoinId,
   walletPassphrase: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<RecoveryExportResult> {
-  return invoke("recovery_export_seed", {
+  return invoke('recovery_export_seed', {
     coin,
     walletPassphrase,
     totpCode: totpCode?.trim() || null,
@@ -87,41 +85,41 @@ export interface TwoFactorEnrollment {
 }
 
 export async function twoFactorStatus(): Promise<TwoFactorConfig> {
-  return invoke("two_factor_status");
+  return invoke('two_factor_status');
 }
 
 export async function twoFactorStartEnrollment(): Promise<TwoFactorEnrollment> {
-  return invoke("two_factor_start_enrollment");
+  return invoke('two_factor_start_enrollment');
 }
 
 export async function twoFactorConfirmEnrollment(
   code: string,
-  enrollmentSecret?: string | null,
+  enrollmentSecret?: string | null
 ): Promise<void> {
-  return invoke("two_factor_confirm_enrollment", {
+  return invoke('two_factor_confirm_enrollment', {
     code,
     enrollmentSecret: enrollmentSecret ?? null,
   });
 }
 
 export async function twoFactorPendingOtpauthUri(): Promise<string | null> {
-  return invoke("two_factor_pending_otpauth_uri");
+  return invoke('two_factor_pending_otpauth_uri');
 }
 
 export async function twoFactorVerify(code: string): Promise<boolean> {
-  return invoke("two_factor_verify", { code });
+  return invoke('two_factor_verify', { code });
 }
 
 export async function twoFactorDisable(code: string): Promise<void> {
-  return invoke("two_factor_disable", { code });
+  return invoke('two_factor_disable', { code });
 }
 
 export async function twoFactorIsGated(
   action: string,
   coin: CoinId,
-  amount?: number,
+  amount?: number
 ): Promise<boolean> {
-  return invoke("two_factor_is_gated", { action, coin, amount: amount ?? null });
+  return invoke('two_factor_is_gated', { action, coin, amount: amount ?? null });
 }
 
 // ── Auto-lock ───────────────────────────────────────────────────────────────
@@ -134,19 +132,19 @@ export interface AutoLockConfig {
 }
 
 export async function autoLockGetConfig(): Promise<AutoLockConfig> {
-  return invoke("auto_lock_get_config");
+  return invoke('auto_lock_get_config');
 }
 
 export async function autoLockSetConfig(config: AutoLockConfig): Promise<void> {
-  return invoke("auto_lock_set_config", { config });
+  return invoke('auto_lock_set_config', { config });
 }
 
 export async function autoLockRecordActivity(): Promise<void> {
-  return invoke("auto_lock_record_activity");
+  return invoke('auto_lock_record_activity');
 }
 
 export async function autoLockShouldLock(): Promise<boolean> {
-  return invoke("auto_lock_should_lock");
+  return invoke('auto_lock_should_lock');
 }
 
 // ── Audit log ───────────────────────────────────────────────────────────────
@@ -161,19 +159,19 @@ export interface AuditEntry {
 }
 
 export async function auditLogList(limit = 100): Promise<AuditEntry[]> {
-  return invoke("audit_log_list", { limit });
+  return invoke('audit_log_list', { limit });
 }
 
 export async function auditLogExport(): Promise<string> {
-  return invoke("audit_log_export");
+  return invoke('audit_log_export');
 }
 
 export async function auditLogRecord(
   action: string,
   detail: string,
-  coin?: CoinId,
+  coin?: CoinId
 ): Promise<AuditEntry> {
-  return invoke("audit_log_record", { action, detail, coin: coin ?? null });
+  return invoke('audit_log_record', { action, detail, coin: coin ?? null });
 }
 
 // ── Receive requests ────────────────────────────────────────────────────────
@@ -188,38 +186,35 @@ export interface ReceiveRequest {
 }
 
 export async function receiveRequestsList(coin: CoinId): Promise<ReceiveRequest[]> {
-  return invoke("receive_requests_list", { coin });
+  return invoke('receive_requests_list', { coin });
 }
 
-export type ReceiveRequestDraft = Omit<ReceiveRequest, "id" | "created_at"> & {
+export type ReceiveRequestDraft = Omit<ReceiveRequest, 'id' | 'created_at'> & {
   id?: string;
   created_at?: number;
 };
 
 export async function receiveRequestsAppend(
   coin: CoinId,
-  entry: ReceiveRequestDraft,
+  entry: ReceiveRequestDraft
 ): Promise<ReceiveRequest> {
-  return invoke<ReceiveRequest>("receive_requests_append", {
+  return invoke<ReceiveRequest>('receive_requests_append', {
     coin,
     entry: {
-      id: "",
+      id: '',
       created_at: 0,
       ...entry,
     },
   });
 }
 
-export async function receiveRequestsDelete(
-  coin: CoinId,
-  id: string,
-): Promise<void> {
-  return invoke("receive_requests_delete", { coin, id });
+export async function receiveRequestsDelete(coin: CoinId, id: string): Promise<void> {
+  return invoke('receive_requests_delete', { coin, id });
 }
 
 // ── Hardware wallets ────────────────────────────────────────────────────────
 
-export type HardwareVendor = "trezor" | "ledger" | "coldcard" | "manual";
+export type HardwareVendor = 'trezor' | 'ledger' | 'coldcard' | 'manual';
 
 export interface HardwareWalletConfig {
   id: string;
@@ -238,29 +233,29 @@ export interface PsbtSendResult {
 }
 
 export async function hardwareWalletList(): Promise<HardwareWalletConfig[]> {
-  return invoke("hardware_wallet_list");
+  return invoke('hardware_wallet_list');
 }
 
 export async function hardwareWalletAdd(
-  config: HardwareWalletConfig,
+  config: HardwareWalletConfig
 ): Promise<HardwareWalletConfig> {
-  return invoke("hardware_wallet_add", { config });
+  return invoke('hardware_wallet_add', { config });
 }
 
 export async function hardwareWalletRemove(id: string): Promise<void> {
-  return invoke("hardware_wallet_remove", { id });
+  return invoke('hardware_wallet_remove', { id });
 }
 
 export async function hardwareWalletDetect(): Promise<HardwareVendor[]> {
-  return invoke("hardware_wallet_detect");
+  return invoke('hardware_wallet_detect');
 }
 
 export async function hardwareWalletImportXpub(
   coin: CoinId,
   xpub: string,
-  label: string,
+  label: string
 ): Promise<void> {
-  return invoke("hardware_wallet_import_xpub", { coin, xpub, label });
+  return invoke('hardware_wallet_import_xpub', { coin, xpub, label });
 }
 
 export async function hardwareWalletSendPsbt(
@@ -269,9 +264,9 @@ export async function hardwareWalletSendPsbt(
   feeRate?: number,
   totpCode?: string,
   walletPassphrase?: string,
-  extraConfirmed = true,
+  extraConfirmed = true
 ): Promise<PsbtSendResult> {
-  return invoke("hardware_wallet_send_psbt", {
+  return invoke('hardware_wallet_send_psbt', {
     coin,
     outputs,
     feeRate: feeRate ?? null,
@@ -285,9 +280,9 @@ export async function hardwareWalletFinalizePsbt(
   coin: CoinId,
   psbtBase64: string,
   totpCode?: string,
-  walletPassphrase?: string,
+  walletPassphrase?: string
 ): Promise<string> {
-  return invoke("hardware_wallet_finalize_psbt", {
+  return invoke('hardware_wallet_finalize_psbt', {
     coin,
     psbtBase64,
     totpCode: totpCode?.trim() || null,
@@ -315,24 +310,24 @@ export interface MultisigWalletConfig {
 }
 
 export async function multisigList(): Promise<MultisigWalletConfig[]> {
-  return invoke("multisig_list");
+  return invoke('multisig_list');
 }
 
 export async function multisigSave(wallet: MultisigWalletConfig): Promise<MultisigWalletConfig> {
-  return invoke("multisig_save", { wallet });
+  return invoke('multisig_save', { wallet });
 }
 
 export async function multisigRemove(id: string): Promise<void> {
-  return invoke("multisig_remove", { id });
+  return invoke('multisig_remove', { id });
 }
 
 export async function multisigCreateAddress(
   coin: CoinId,
   required: number,
   pubkeys: string[],
-  label: string,
+  label: string
 ): Promise<string> {
-  return invoke("multisig_create_address", { coin, required, pubkeys, label });
+  return invoke('multisig_create_address', { coin, required, pubkeys, label });
 }
 
 // ── Spending controls ───────────────────────────────────────────────────────
@@ -353,36 +348,34 @@ export interface SpendCheckResult {
 }
 
 export async function spendingControlsGet(): Promise<SpendingControlsConfig> {
-  return invoke("spending_controls_get");
+  return invoke('spending_controls_get');
 }
 
-export async function spendingControlsSave(
-  config: SpendingControlsConfig,
-): Promise<void> {
-  return invoke("spending_controls_save", { config });
+export async function spendingControlsSave(config: SpendingControlsConfig): Promise<void> {
+  return invoke('spending_controls_save', { config });
 }
 
 export async function spendingControlsCheckSend(
   amount: number,
   coin: CoinId,
-  address: string,
+  address: string
 ): Promise<SpendCheckResult> {
-  return invoke("spending_controls_check_send", { amount, coin, address });
+  return invoke('spending_controls_check_send', { amount, coin, address });
 }
 
 export async function spendingControlsRecordSend(
   amount: number,
   coin: CoinId,
-  address: string,
+  address: string
 ): Promise<void> {
-  return invoke("spending_controls_record_send", { amount, coin, address });
+  return invoke('spending_controls_record_send', { amount, coin, address });
 }
 
 export async function spendingControlsCheckAllowlist(
   address: string,
-  allowlist: string[],
+  allowlist: string[]
 ): Promise<boolean> {
-  return invoke("spending_controls_check_allowlist", { address, allowlist });
+  return invoke('spending_controls_check_allowlist', { address, allowlist });
 }
 
 // ── Backup scheduler ──────────────────────────────────────────────────────────
@@ -400,9 +393,7 @@ type BackupSchedulerConfigRaw = BackupSchedulerConfig & {
   intervalHours?: number;
 };
 
-function normalizeBackupSchedulerConfig(
-  raw: BackupSchedulerConfigRaw,
-): BackupSchedulerConfig {
+function normalizeBackupSchedulerConfig(raw: BackupSchedulerConfigRaw): BackupSchedulerConfig {
   return {
     ...raw,
     interval_hours: raw.interval_hours ?? raw.intervalHours ?? 24,
@@ -436,14 +427,14 @@ function normalizeBackupHealth(raw: BackupHealthRaw): BackupHealth {
 }
 
 export async function backupSchedulerGetConfig(): Promise<BackupSchedulerConfig> {
-  const raw = await invoke<BackupSchedulerConfigRaw>("backup_scheduler_get_config");
+  const raw = await invoke<BackupSchedulerConfigRaw>('backup_scheduler_get_config');
   return normalizeBackupSchedulerConfig(raw);
 }
 
 export async function backupSchedulerSaveConfig(
-  config: BackupSchedulerConfig,
+  config: BackupSchedulerConfig
 ): Promise<BackupSchedulerConfig> {
-  const raw = await invoke<BackupSchedulerConfigRaw>("backup_scheduler_save_config", {
+  const raw = await invoke<BackupSchedulerConfigRaw>('backup_scheduler_save_config', {
     config: {
       ...config,
       interval_hours: config.interval_hours,
@@ -453,21 +444,21 @@ export async function backupSchedulerSaveConfig(
 }
 
 export async function backupSchedulerSetInterval(
-  intervalHours: number,
+  intervalHours: number
 ): Promise<BackupSchedulerConfig> {
-  const raw = await invoke<BackupSchedulerConfigRaw>("backup_scheduler_set_interval", {
+  const raw = await invoke<BackupSchedulerConfigRaw>('backup_scheduler_set_interval', {
     intervalHours,
   });
   return normalizeBackupSchedulerConfig(raw);
 }
 
 export async function backupHealth(): Promise<BackupHealth> {
-  const raw = await invoke<BackupHealthRaw>("backup_health");
+  const raw = await invoke<BackupHealthRaw>('backup_health');
   return normalizeBackupHealth(raw);
 }
 
 export async function backupRunNow(coin: CoinId): Promise<string> {
-  return invoke("backup_run_now", { coin });
+  return invoke('backup_run_now', { coin });
 }
 
 export interface ScheduledBackupResult {
@@ -475,21 +466,16 @@ export interface ScheduledBackupResult {
   paths: string[];
 }
 
-export async function backupRunScheduled(
-  coins: CoinId[],
-): Promise<ScheduledBackupResult> {
-  return invoke("backup_run_scheduled", { coins });
+export async function backupRunScheduled(coins: CoinId[]): Promise<ScheduledBackupResult> {
+  return invoke('backup_run_scheduled', { coins });
 }
 
-export async function backupExportCloud(
-  coin: CoinId,
-  password: string,
-): Promise<string> {
-  return invoke("backup_export_cloud", { coin, password });
+export async function backupExportCloud(coin: CoinId, password: string): Promise<string> {
+  return invoke('backup_export_cloud', { coin, password });
 }
 
 export async function backupVerify(path: string): Promise<boolean> {
-  return invoke("backup_verify", { path });
+  return invoke('backup_verify', { path });
 }
 
 // ── Shamir / SLIP-39 ────────────────────────────────────────────────────────
@@ -508,13 +494,13 @@ export interface ShamirSplitResult {
 export async function slip39Split(
   mnemonic: string,
   threshold: number,
-  total: number,
+  total: number
 ): Promise<ShamirSplitResult> {
-  return invoke("slip39_split", { mnemonic, threshold, total });
+  return invoke('slip39_split', { mnemonic, threshold, total });
 }
 
 export async function slip39Combine(shares: string[]): Promise<string> {
-  return invoke("slip39_combine", { shares });
+  return invoke('slip39_combine', { shares });
 }
 
 // ── Installer verification ────────────────────────────────────────────────────
@@ -527,7 +513,7 @@ export interface VerificationStatus {
 }
 
 export async function verifyInstallation(): Promise<VerificationStatus> {
-  return invoke("verify_installation");
+  return invoke('verify_installation');
 }
 
 // ── BIP21 URIs ──────────────────────────────────────────────────────────────
@@ -541,7 +527,7 @@ export interface ParsedPaymentUri {
 }
 
 export async function parsePaymentUri(uri: string): Promise<ParsedPaymentUri> {
-  return invoke("parse_payment_uri", { uri });
+  return invoke('parse_payment_uri', { uri });
 }
 
 export async function buildPaymentUri(
@@ -549,9 +535,9 @@ export async function buildPaymentUri(
   address: string,
   amount?: number,
   label?: string,
-  message?: string,
+  message?: string
 ): Promise<string> {
-  return invoke("build_payment_uri", {
+  return invoke('build_payment_uri', {
     coin,
     address,
     amount: amount ?? null,

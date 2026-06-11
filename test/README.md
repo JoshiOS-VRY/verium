@@ -6,10 +6,10 @@ etc.
 This directory contains the following sets of tests:
 
 - [functional](/test/functional) which test the functionality of
-bitcoind and bitcoin-qt by interacting with them through the RPC and P2P
-interfaces.
+  bitcoind and bitcoin-qt by interacting with them through the RPC and P2P
+  interfaces.
 - [util](/test/util) which tests the bitcoin utilities, currently only
-bitcoin-tx.
+  bitcoin-tx.
 - [lint](/test/lint/) which perform various static analysis checks.
 
 The util tests are run as part of `make check` target. The functional
@@ -17,8 +17,7 @@ tests and lint scripts can be run as explained in the sections below.
 
 # Running tests locally
 
-Before tests can be run locally, Bitcoin Core must be built.  See the [building instructions](/doc#building) for help.
-
+Before tests can be run locally, Bitcoin Core must be built. See the [building instructions](/doc#building) for help.
 
 ### Functional tests
 
@@ -119,7 +118,6 @@ or
 pkill -9 bitcoind
 ```
 
-
 ##### Data directory cache
 
 A pre-mined blockchain with 200 blocks is generated the first time a
@@ -141,9 +139,9 @@ and CRITICAL). From within your functional tests you can log to these different
 levels using the logger included in the test_framework, e.g.
 `self.log.debug(object)`. By default:
 
-- when run through the test_runner harness, *all* logs are written to
+- when run through the test*runner harness, \_all* logs are written to
   `test_framework.log` and no logs are output to the console.
-- when run directly, *all* logs are written to `test_framework.log` and INFO
+- when run directly, _all_ logs are written to `test_framework.log` and INFO
   level and above are output to the console.
 - when run on Travis, no logs are output to the console. However, if a test
   fails, the `test_framework.log` and bitcoind `debug.log`s will all be dumped

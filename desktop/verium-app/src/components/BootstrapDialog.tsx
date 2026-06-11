@@ -1,17 +1,14 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { Button } from "@/components/ui/Button";
-import { BootstrapProgressPanel } from "@/components/BootstrapProgressPanel";
-import { useBootstrapProgress } from "@/hooks/useBootstrapProgress";
-import {
-  bootstrapCanCancel,
-  isBootstrapCancelledError,
-} from "@/lib/bootstrap-progress";
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { getCoinProfile } from "@/lib/coin/profile";
-import { tauriCancelBootstrap, tauriImportBootstrap } from "@/lib/rpc/client";
-import { resetDaemonEnsureAttempt } from "@/hooks/useDaemonStatus";
-import { useUserPreferences } from "@/lib/user-preferences";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { Button } from '@/components/ui/Button';
+import { BootstrapProgressPanel } from '@/components/BootstrapProgressPanel';
+import { useBootstrapProgress } from '@/hooks/useBootstrapProgress';
+import { bootstrapCanCancel, isBootstrapCancelledError } from '@/lib/bootstrap-progress';
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { getCoinProfile } from '@/lib/coin/profile';
+import { tauriCancelBootstrap, tauriImportBootstrap } from '@/lib/rpc/client';
+import { resetDaemonEnsureAttempt } from '@/hooks/useDaemonStatus';
+import { useUserPreferences } from '@/lib/user-preferences';
 
 interface BootstrapDialogProps {
   coin: CoinId;
@@ -25,26 +22,25 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
   const profile = getCoinProfile(coin);
 
   const run = useMutation({
-    mutationFn: (localPath?: string | null) =>
-      tauriImportBootstrap(coin, localPath),
+    mutationFn: (localPath?: string | null) => tauriImportBootstrap(coin, localPath),
     onSuccess: async () => {
       resetDaemonEnsureAttempt(coin);
       await loadPrefs();
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "getblockchaininfo"),
+          queryKey: coinQueryKey(coin, 'getblockchaininfo'),
         }),
         queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "getnetworkinfo"),
+          queryKey: coinQueryKey(coin, 'getnetworkinfo'),
         }),
         queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "daemon-status"),
+          queryKey: coinQueryKey(coin, 'daemon-status'),
         }),
         queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "explorer-stats"),
+          queryKey: coinQueryKey(coin, 'explorer-stats'),
         }),
         queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "getpeerinfo"),
+          queryKey: coinQueryKey(coin, 'getpeerinfo'),
         }),
       ]);
     },
@@ -53,12 +49,9 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
   const progress = useBootstrapProgress(coin, open && run.isPending);
   const canCancel = run.isPending && bootstrapCanCancel(progress);
   const cancelled =
-    progress?.phase === "cancelled" ||
-    (run.error != null && isBootstrapCancelledError(run.error));
+    progress?.phase === 'cancelled' || (run.error != null && isBootstrapCancelledError(run.error));
   const selectedLocalPath =
-    run.variables != null && typeof run.variables === "string"
-      ? run.variables
-      : null;
+    run.variables != null && typeof run.variables === 'string' ? run.variables : null;
 
   if (!open) return null;
 
@@ -78,10 +71,10 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
   const pickLocalZip = async () => {
     const selected = await openDialog({
       title: `Choose ${profile.displayName} bootstrap zip`,
-      filters: [{ name: "Zip archive", extensions: ["zip"] }],
+      filters: [{ name: 'Zip archive', extensions: ['zip'] }],
       multiple: false,
     });
-    if (typeof selected === "string" && selected.length > 0) {
+    if (typeof selected === 'string' && selected.length > 0) {
       run.mutate(selected);
     }
   };
@@ -91,20 +84,16 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
       <div className="w-full max-w-lg rounded-xl border border-border bg-bg-panel p-6 shadow-2xl">
         <h2 className="text-lg font-semibold">Import chain bootstrap</h2>
         <p className="mt-2 text-sm text-fg-muted">
-          Imports the official {profile.displayName} bootstrap archive into your
-          data directory, replacing existing{" "}
-          <span className="text-xs">blocks/</span> and{" "}
-          <span className="text-xs">chainstate/</span>. Downloads from{" "}
-          <span className="text-xs">{profile.bootstrapCdn}</span> or uses a
-          local <span className="text-xs">vericoin-bootstrap.zip</span> or{" "}
-          <span className="text-xs">verium-bootstrap.zip</span> if found (e.g.
-          in Downloads).
+          Imports the official {profile.displayName} bootstrap archive into your data directory,
+          replacing existing <span className="text-xs">blocks/</span> and{' '}
+          <span className="text-xs">chainstate/</span>. Downloads from{' '}
+          <span className="text-xs">{profile.bootstrapCdn}</span> or uses a local{' '}
+          <span className="text-xs">vericoin-bootstrap.zip</span> or{' '}
+          <span className="text-xs">verium-bootstrap.zip</span> if found (e.g. in Downloads).
         </p>
 
         {selectedLocalPath && !run.isPending && !succeeded && (
-          <p className="mt-2 truncate text-[11px] text-fg-subtle">
-            Selected: {selectedLocalPath}
-          </p>
+          <p className="mt-2 truncate text-[11px] text-fg-subtle">Selected: {selectedLocalPath}</p>
         )}
 
         {run.isPending && (
@@ -117,8 +106,7 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
 
         {cancelled && !run.isPending && (
           <div className="mt-4 rounded-md border border-border bg-bg-subtle px-3 py-2 text-xs text-fg-muted">
-            Bootstrap import was cancelled. Your existing chain data was not
-            replaced.
+            Bootstrap import was cancelled. Your existing chain data was not replaced.
           </div>
         )}
 
@@ -159,18 +147,10 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
                 onClick={handleCancel}
                 disabled={run.isPending && !canCancel}
               >
-                {canCancel
-                  ? "Cancel download"
-                  : failed || cancelled
-                    ? "Close"
-                    : "Cancel"}
+                {canCancel ? 'Cancel download' : failed || cancelled ? 'Close' : 'Cancel'}
               </Button>
               {!run.isPending && !cancelled && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void pickLocalZip()}
-                >
+                <Button variant="secondary" size="sm" onClick={() => void pickLocalZip()}>
                   Choose local zip…
                 </Button>
               )}
@@ -180,12 +160,8 @@ export function BootstrapDialog({ coin, open, onClose }: BootstrapDialogProps) {
                 </Button>
               ) : (
                 !cancelled && (
-                  <Button
-                    onClick={() => run.mutate(undefined)}
-                    disabled={run.isPending}
-                    size="sm"
-                  >
-                    {run.isPending ? "Bootstrapping…" : "Start bootstrap"}
+                  <Button onClick={() => run.mutate(undefined)} disabled={run.isPending} size="sm">
+                    {run.isPending ? 'Bootstrapping…' : 'Start bootstrap'}
                   </Button>
                 )
               )}

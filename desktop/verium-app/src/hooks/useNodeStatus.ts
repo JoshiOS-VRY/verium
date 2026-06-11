@@ -1,29 +1,23 @@
-import { useEffect, useMemo, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import {
-  isBinaryUnavailableError,
-  isDaemonConnectingState,
-} from "@/lib/daemon-connecting";
-import { subscribeNodeStateChanged } from "@/lib/node-state-listener";
-import { nodeStateFromStatus } from "@/lib/node/status";
-import { rpcGetNodeStatus, type NodeStatus } from "@/lib/rpc/client";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
+import { useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { isBinaryUnavailableError, isDaemonConnectingState } from '@/lib/daemon-connecting';
+import { subscribeNodeStateChanged } from '@/lib/node-state-listener';
+import { nodeStateFromStatus } from '@/lib/node/status';
+import { rpcGetNodeStatus, type NodeStatus } from '@/lib/rpc/client';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 
 /** How long to treat unreachable RPC as "still starting" after app open. */
 const STARTUP_GRACE_MS = 120_000;
 
-export function useNodeStatus(
-  coin: CoinId,
-  options?: { enabled?: boolean },
-) {
+export function useNodeStatus(coin: CoinId, options?: { enabled?: boolean }) {
   const pollEnabled = options?.enabled ?? true;
   const mountedAt = useRef(Date.now());
   const queryClient = useQueryClient();
   const visible = useWindowVisible();
 
   const query = useQuery<NodeStatus>({
-    queryKey: coinQueryKey(coin, "daemon-status"),
+    queryKey: coinQueryKey(coin, 'daemon-status'),
     queryFn: () => rpcGetNodeStatus(coin),
     enabled: pollEnabled,
     refetchInterval: (q) => {
@@ -43,7 +37,7 @@ export function useNodeStatus(
 
   // One Tauri listener per coin (shared across all hook instances).
   useEffect(() => {
-    const queryKey = coinQueryKey(coin, "daemon-status");
+    const queryKey = coinQueryKey(coin, 'daemon-status');
     return subscribeNodeStateChanged(coin, () => {
       void queryClient.invalidateQueries({ queryKey });
     });
@@ -58,7 +52,7 @@ export function useNodeStatus(
         isFetching: query.isFetching,
         startupGraceActive,
       }),
-    [query.data, query.isLoading, query.isFetching, startupGraceActive],
+    [query.data, query.isLoading, query.isFetching, startupGraceActive]
   );
 
   const nodeState = nodeStateFromStatus(query.data);

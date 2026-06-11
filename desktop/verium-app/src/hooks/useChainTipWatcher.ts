@@ -1,11 +1,11 @@
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { listen } from "@tauri-apps/api/event";
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { listen } from '@tauri-apps/api/event';
 
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { pushChainTip } from "@/lib/chain-tip-store";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { walletTransactionsKeyPrefix } from "@/lib/wallet-transactions-query";
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { pushChainTip } from '@/lib/chain-tip-store';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { walletTransactionsKeyPrefix } from '@/lib/wallet-transactions-query';
 
 interface ChainTipPayload {
   coin: CoinId;
@@ -38,10 +38,10 @@ export function useChainTipWatcher(): void {
       if (invalidateTimer != null) window.clearTimeout(invalidateTimer);
       invalidateTimer = window.setTimeout(() => {
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "getblockchaininfo"),
+          queryKey: coinQueryKey(coin, 'getblockchaininfo'),
         });
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(coin, "getwalletinfo"),
+          queryKey: coinQueryKey(coin, 'getwalletinfo'),
         });
         // Wallet txs are heavy (listtransactions + header lookups) — refresh
         // on a slower cadence; block-found watchers also use chain-tip events.
@@ -54,7 +54,7 @@ export function useChainTipWatcher(): void {
       }, INVALIDATE_DEBOUNCE_MS);
     };
 
-    const unlistenPromise = listen<ChainTipPayload>("chain-tip-changed", (event) => {
+    const unlistenPromise = listen<ChainTipPayload>('chain-tip-changed', (event) => {
       if (cancelled) return;
       const payload = event.payload;
 
@@ -70,7 +70,7 @@ export function useChainTipWatcher(): void {
       if (enrichTimer != null) window.clearTimeout(enrichTimer);
       enrichTimer = window.setTimeout(() => {
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(payload.coin, "explorer-blocks"),
+          queryKey: coinQueryKey(payload.coin, 'explorer-blocks'),
         });
       }, ENRICH_DELAY_MS);
     });

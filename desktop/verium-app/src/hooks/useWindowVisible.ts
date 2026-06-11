@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
 /**
  * App-wide "should display polling be running" signal.
@@ -35,11 +35,11 @@ const listeners = new Set<() => void>();
 let initialized = false;
 
 function isHidden(): boolean {
-  return typeof document !== "undefined" && document.visibilityState === "hidden";
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
 }
 
 function computeActive(): boolean {
-  if (typeof document === "undefined") return true;
+  if (typeof document === 'undefined') return true;
   if (isHidden()) return false;
   return Date.now() - lastActivityAt < INACTIVITY_LIMIT_MS;
 }
@@ -79,20 +79,20 @@ function onVisibilityChange(): void {
 }
 
 function ensureInitialized(): void {
-  if (initialized || typeof window === "undefined") return;
+  if (initialized || typeof window === 'undefined') return;
   initialized = true;
 
-  document.addEventListener("visibilitychange", onVisibilityChange);
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   // Passive activity listeners — work is a timestamp write plus, only on a
   // paused->resumed transition, a single notify().
   const opts: AddEventListenerOptions = { passive: true };
-  window.addEventListener("pointerdown", markActivity, opts);
-  window.addEventListener("pointermove", markActivity, opts);
-  window.addEventListener("keydown", markActivity, opts);
-  window.addEventListener("wheel", markActivity, opts);
-  window.addEventListener("touchstart", markActivity, opts);
-  window.addEventListener("scroll", markActivity, opts);
+  window.addEventListener('pointerdown', markActivity, opts);
+  window.addEventListener('pointermove', markActivity, opts);
+  window.addEventListener('keydown', markActivity, opts);
+  window.addEventListener('wheel', markActivity, opts);
+  window.addEventListener('touchstart', markActivity, opts);
+  window.addEventListener('scroll', markActivity, opts);
 
   // Single low-frequency timer flips us to inactive once the threshold passes.
   window.setInterval(recompute, INACTIVITY_CHECK_MS);

@@ -1,30 +1,30 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { BootstrapProgressPanel } from "@/components/BootstrapProgressPanel";
-import { DaemonConnectingBanner } from "@/components/DaemonConnectingBanner";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useDashboardActivity } from "@/hooks/useDashboardActivity";
-import { useActiveCoin } from "@/lib/coin/context";
-import { getCoinProfile } from "@/lib/coin/profile";
-import { isBinaryUnavailableError } from "@/lib/daemon-connecting";
-import { showDashboardActivityBanner } from "@/lib/node/dashboard-activity";
-import { bootstrapCanCancel } from "@/lib/bootstrap-progress";
-import { useBootstrapProgress } from "@/hooks/useBootstrapProgress";
-import { useNodeStatus } from "@/hooks/useNodeStatus";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { BootstrapProgressPanel } from '@/components/BootstrapProgressPanel';
+import { DaemonConnectingBanner } from '@/components/DaemonConnectingBanner';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useDashboardActivity } from '@/hooks/useDashboardActivity';
+import { useActiveCoin } from '@/lib/coin/context';
+import { getCoinProfile } from '@/lib/coin/profile';
+import { isBinaryUnavailableError } from '@/lib/daemon-connecting';
+import { showDashboardActivityBanner } from '@/lib/node/dashboard-activity';
+import { bootstrapCanCancel } from '@/lib/bootstrap-progress';
+import { useBootstrapProgress } from '@/hooks/useBootstrapProgress';
+import { useNodeStatus } from '@/hooks/useNodeStatus';
 import {
   nodeStateFromStatus,
   recoveryActionLabel,
   recoveryHintFromStatus,
-} from "@/lib/node/status";
+} from '@/lib/node/status';
 import {
   tauriCancelBootstrap,
   tauriNodeClearInvalidBlock,
   tauriNodeRetry,
   tauriRepairChain,
   tauriRestartDaemon,
-} from "@/lib/rpc/client";
+} from '@/lib/rpc/client';
 
 export function NodeRecoveryBanner() {
   const coin = useActiveCoin();
@@ -34,38 +34,37 @@ export function NodeRecoveryBanner() {
   const { activity } = useDashboardActivity(coin);
 
   const reindex = useMutation({
-    mutationFn: () => tauriRepairChain(coin, "reindex"),
+    mutationFn: () => tauriRepairChain(coin, 'reindex'),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "daemon-status"),
+        queryKey: coinQueryKey(coin, 'daemon-status'),
       });
     },
   });
 
   const repair = useMutation({
-    mutationFn: () => tauriRepairChain(coin, "bootstrap"),
+    mutationFn: () => tauriRepairChain(coin, 'bootstrap'),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "daemon-status"),
+        queryKey: coinQueryKey(coin, 'daemon-status'),
       });
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "getblockchaininfo"),
+        queryKey: coinQueryKey(coin, 'getblockchaininfo'),
       });
     },
   });
 
   const bootstrapProgress = useBootstrapProgress(coin, repair.isPending);
-  const canCancelBootstrap =
-    repair.isPending && bootstrapCanCancel(bootstrapProgress);
+  const canCancelBootstrap = repair.isPending && bootstrapCanCancel(bootstrapProgress);
 
   const restart = useMutation({
     mutationFn: () => tauriRestartDaemon(coin),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "daemon-status"),
+        queryKey: coinQueryKey(coin, 'daemon-status'),
       });
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "getblockchaininfo"),
+        queryKey: coinQueryKey(coin, 'getblockchaininfo'),
       });
     },
   });
@@ -74,10 +73,10 @@ export function NodeRecoveryBanner() {
     mutationFn: () => tauriNodeClearInvalidBlock(coin),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "daemon-status"),
+        queryKey: coinQueryKey(coin, 'daemon-status'),
       });
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "getblockchaininfo"),
+        queryKey: coinQueryKey(coin, 'getblockchaininfo'),
       });
     },
   });
@@ -86,7 +85,7 @@ export function NodeRecoveryBanner() {
     mutationFn: () => tauriNodeRetry(coin),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "daemon-status"),
+        queryKey: coinQueryKey(coin, 'daemon-status'),
       });
     },
   });
@@ -102,7 +101,7 @@ export function NodeRecoveryBanner() {
     return <DaemonConnectingBanner coin={coin} status={data} />;
   }
 
-  if (data?.connected && !data.chain_corrupt && !data.sync_stalled && state !== "auth_mismatch") {
+  if (data?.connected && !data.chain_corrupt && !data.sync_stalled && state !== 'auth_mismatch') {
     return null;
   }
 
@@ -111,7 +110,7 @@ export function NodeRecoveryBanner() {
       <div className="rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
         <div className="font-medium">Node software not available</div>
         <p className="mt-1 text-fg-muted">
-          {data?.error ?? "Reinstall the wallet from the official release."}
+          {data?.error ?? 'Reinstall the wallet from the official release.'}
         </p>
       </div>
     );
@@ -148,27 +147,25 @@ export function NodeRecoveryBanner() {
   const showBanner =
     data?.chain_corrupt ||
     data?.sync_stalled ||
-    state === "auth_mismatch" ||
-    state === "datadir_locked" ||
-    state === "failed" ||
+    state === 'auth_mismatch' ||
+    state === 'datadir_locked' ||
+    state === 'failed' ||
     Boolean(data?.error);
 
   if (!showBanner) return null;
 
   const action =
-    recoveryHint === "clear_invalid_block"
+    recoveryHint === 'clear_invalid_block'
       ? () => clearInvalidBlock.mutate()
-      : recoveryHint === "repair_chain"
-      ? () => reindex.mutate()
-      : recoveryHint === "bootstrap_chain"
-        ? () => repair.mutate()
-        : recoveryHint === "restart_node" || state === "auth_mismatch"
-          ? () => restart.mutate()
-          : () => retry.mutate();
+      : recoveryHint === 'repair_chain'
+        ? () => reindex.mutate()
+        : recoveryHint === 'bootstrap_chain'
+          ? () => repair.mutate()
+          : recoveryHint === 'restart_node' || state === 'auth_mismatch'
+            ? () => restart.mutate()
+            : () => retry.mutate();
 
-  const actionLabel = recoveryHint
-    ? recoveryActionLabel(recoveryHint)
-    : "Restart node";
+  const actionLabel = recoveryHint ? recoveryActionLabel(recoveryHint) : 'Restart node';
 
   const pending =
     restart.isPending ||
@@ -180,7 +177,7 @@ export function NodeRecoveryBanner() {
   return (
     <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm">
       <div className="font-medium text-fg">
-        {data?.user_message ?? data?.error ?? "Node needs attention"}
+        {data?.user_message ?? data?.error ?? 'Node needs attention'}
       </div>
       {data?.chain_repair_detail && (
         <p className="mt-1 text-xs text-fg-muted">{data.chain_repair_detail}</p>
@@ -190,25 +187,15 @@ export function NodeRecoveryBanner() {
       )}
       {(reindex.error || repair.error || restart.error || clearInvalidBlock.error) && (
         <p className="mt-1 text-xs text-danger">
-          {String(
-            reindex.error ??
-              repair.error ??
-              restart.error ??
-              clearInvalidBlock.error,
-          )}
+          {String(reindex.error ?? repair.error ?? restart.error ?? clearInvalidBlock.error)}
         </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button size="sm" disabled={pending} onClick={action}>
-          {pending ? "Working…" : actionLabel}
+          {pending ? 'Working…' : actionLabel}
         </Button>
         {data?.chain_corrupt && (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={pending}
-            onClick={() => repair.mutate()}
-          >
+          <Button size="sm" variant="secondary" disabled={pending} onClick={() => repair.mutate()}>
             Download snapshot
           </Button>
         )}

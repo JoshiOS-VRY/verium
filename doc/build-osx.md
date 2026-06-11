@@ -1,10 +1,10 @@
-Mac OS X Build Instructions and Notes
-====================================
+# Mac OS X Build Instructions and Notes
+
 The commands in this guide should be executed in a Terminal application.
 The built-in one is located in `/Applications/Utilities/Terminal.app`.
 
-Preparation
------------
+## Preparation
+
 Install the OS X command line tools:
 
 `xcode-select --install`
@@ -13,8 +13,7 @@ When the popup appears, click `Install`.
 
 Then install [Homebrew](https://brew.sh).
 
-Dependencies
-----------------------
+## Dependencies
 
     brew install automake berkeley-db4 libtool boost miniupnpc openssl pkg-config protobuf python3 qt libevent
 
@@ -26,8 +25,8 @@ If you want to build the disk image with `make deploy` (.dmg / optional), you ne
 
 NOTE: Building with Qt4 is still supported, however, could result in a broken UI. Building with Qt5 is recommended.
 
-Berkeley DB
------------
+## Berkeley DB
+
 It is recommended to use Berkeley DB 4.8. If you have to build it yourself,
 you can use [the installation script included in contrib/](/contrib/install_db4.sh)
 like so
@@ -38,12 +37,11 @@ like so
 
 from the root of the repository.
 
-**Note**: You only need Berkeley DB if the wallet is enabled (see the section *Disable-Wallet mode* below).
+**Note**: You only need Berkeley DB if the wallet is enabled (see the section _Disable-Wallet mode_ below).
 
-Build Verium
-------------------------
+## Build Verium
 
-1. Clone the verium source code and cd into `verium`
+1.  Clone the verium source code and cd into `verium`
 
         git clone https://github.com/VeriumReserve/verium.git
         cd verium
@@ -66,8 +64,7 @@ Build Verium
 
         make deploy
 
-Running
--------
+## Running
 
 Verium is now available at `./src/veriumd`
 
@@ -83,15 +80,14 @@ You can monitor the download process by looking at the debug.log file:
 
     tail -f $HOME/Library/Application\ Support/Verium/debug.log
 
-Other commands:
--------
+## Other commands:
 
     ./src/veriumd -daemon # Starts the verium daemon.
     ./src/verium-cli --help # Outputs a list of command-line options.
     ./src/verium-cli help # Outputs a list of RPC commands when the daemon is running.
 
-Using Qt Creator as IDE
-------------------------
+## Using Qt Creator as IDE
+
 You can use Qt Creator as an IDE, for verium development.
 Download and install the community edition of [Qt Creator](https://www.qt.io/download/).
 Uncheck everything except Qt Creator during the installation process.
@@ -107,9 +103,8 @@ Uncheck everything except Qt Creator during the installation process.
 9. Select LLDB as debugger (you might need to set the path to your installation)
 10. Start debugging with Qt Creator
 
-Notes
------
+## Notes
 
-* Tested on OS X 10.8 through 10.13 on 64-bit Intel processors only.
+- Tested on OS X 10.8 through 10.13 on 64-bit Intel processors only.
 
-* Building with downloaded Qt binaries is not officially supported. See the notes in [#7714](https://github.com/bitcoin/bitcoin/issues/7714)
+- Building with downloaded Qt binaries is not officially supported. See the notes in [#7714](https://github.com/bitcoin/bitcoin/issues/7714)

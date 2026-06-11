@@ -1,12 +1,12 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { SearchableAddressSelect } from "@/components/SearchableAddressSelect";
-import { Button } from "@/components/ui/Button";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { rpcGetNewAddress, rpcListAddressGroupings } from "@/lib/rpc/client";
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import { SearchableAddressSelect } from '@/components/SearchableAddressSelect';
+import { Button } from '@/components/ui/Button';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { rpcGetNewAddress, rpcListAddressGroupings } from '@/lib/rpc/client';
 
-const VERIUM = "verium" as const;
+const VERIUM = 'verium' as const;
 
 export function PoolPayoutAddressControls({
   address,
@@ -19,7 +19,7 @@ export function PoolPayoutAddressControls({
 }) {
   const { isLight } = useWalletMode();
   const addresses = useQuery({
-    queryKey: coinQueryKey(VERIUM, "listaddressgroupings"),
+    queryKey: coinQueryKey(VERIUM, 'listaddressgroupings'),
     queryFn: () => rpcListAddressGroupings(VERIUM),
     staleTime: 30_000,
     enabled: !isLight,
@@ -62,9 +62,7 @@ export function PoolPayoutAddressControls({
         </Button>
       </div>
       {!address.trim() ? (
-        <p className="text-xs text-warning">
-          Choose a payout address before starting pool mining.
-        </p>
+        <p className="text-xs text-warning">Choose a payout address before starting pool mining.</p>
       ) : null}
     </label>
   );

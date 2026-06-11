@@ -1,7 +1,7 @@
-import { Clock3 } from "lucide-react";
+import { Clock3 } from 'lucide-react';
 
-import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
-import { formatBlockAge } from "@/lib/utils";
+import { useBlockAgeTick } from '@/hooks/useBlockAgeTick';
+import { formatBlockAge } from '@/lib/utils';
 
 /**
  * Renders the "Mined <age> ago" line for the dashboard hero. The ~1Hz tick that
@@ -16,8 +16,8 @@ export function BlockAgeLabel({
   enabled?: boolean;
 }) {
   const tick = useBlockAgeTick(enabled && tipTime != null);
-  const blockAge = tipTime != null ? formatBlockAge(tipTime, tick) : "—";
-  if (blockAge === "—") return null;
+  const blockAge = tipTime != null ? formatBlockAge(tipTime, tick) : '—';
+  if (blockAge === '—') return null;
 
   return (
     <p className="mt-3 inline-flex min-w-0 items-center gap-1.5 text-sm text-fg-muted xl:mt-2">

@@ -1,10 +1,10 @@
-import { ExternalLink } from "lucide-react";
-import { type ReactNode } from "react";
-import { Button, type ButtonProps } from "@/components/ui/Button";
-import { openExternal } from "@/lib/open-external";
-import { cn } from "@/lib/utils";
+import { ExternalLink } from 'lucide-react';
+import { type ReactNode } from 'react';
+import { Button, type ButtonProps } from '@/components/ui/Button';
+import { openExternal } from '@/lib/open-external';
+import { cn } from '@/lib/utils';
 
-interface ExternalLinkButtonProps extends Omit<ButtonProps, "onClick"> {
+interface ExternalLinkButtonProps extends Omit<ButtonProps, 'onClick'> {
   href: string;
   showIcon?: boolean;
   children: ReactNode;
@@ -15,8 +15,8 @@ export function ExternalLinkButton({
   showIcon = true,
   className,
   children,
-  variant = "secondary",
-  size = "sm",
+  variant = 'secondary',
+  size = 'sm',
   ...rest
 }: ExternalLinkButtonProps) {
   return (

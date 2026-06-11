@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import { BLOCK_AGE_TICK_MS } from "@/lib/block-tip";
+import { BLOCK_AGE_TICK_MS } from '@/lib/block-tip';
 
 function msUntilNextSecond(): number {
   return BLOCK_AGE_TICK_MS - (Date.now() % BLOCK_AGE_TICK_MS);

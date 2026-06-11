@@ -1,7 +1,7 @@
-import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { cn } from "@/lib/utils";
+import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { cn } from '@/lib/utils';
 
 export interface MiningStatTileProps {
   label: string;
@@ -24,7 +24,7 @@ export function MiningStatTile({
     <Card
       className={cn(
         highlight &&
-          "border-accent/35 ring-1 ring-accent/15 shadow-[0_0_0_1px_rgb(var(--accent)/0.08)]",
+          'border-accent/35 ring-1 ring-accent/15 shadow-[0_0_0_1px_rgb(var(--accent)/0.08)]'
       )}
     >
       <CardHeader className="pb-2">
@@ -36,9 +36,7 @@ export function MiningStatTile({
       <CardContent className="pt-0">
         <div className="text-xl font-semibold tabular-nums sm:text-2xl">
           {value}
-          {unit && (
-            <span className="ml-1 text-sm font-normal text-fg-subtle">{unit}</span>
-          )}
+          {unit && <span className="ml-1 text-sm font-normal text-fg-subtle">{unit}</span>}
         </div>
         {hint && <p className="mt-1 text-xs text-fg-subtle">{hint}</p>}
       </CardContent>

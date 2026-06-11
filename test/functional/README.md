@@ -37,16 +37,16 @@ don't have test cases for.
 #### Naming guidelines
 
 - Name the test `<area>_test.py`, where area can be one of the following:
-    - `feature` for tests for full features that aren't wallet/mining/mempool, eg `feature_rbf.py`
-    - `interface` for tests for other interfaces (REST, ZMQ, etc), eg `interface_rest.py`
-    - `mempool` for tests for mempool behaviour, eg `mempool_reorg.py`
-    - `mining` for tests for mining features, eg `mining_prioritisetransaction.py`
-    - `p2p` for tests that explicitly test the p2p interface, eg `p2p_disconnect_ban.py`
-    - `rpc` for tests for individual RPC methods or features, eg `rpc_listtransactions.py`
-    - `tool` for tests for tools, eg `tool_wallet.py`
-    - `wallet` for tests for wallet features, eg `wallet_keypool.py`
+  - `feature` for tests for full features that aren't wallet/mining/mempool, eg `feature_rbf.py`
+  - `interface` for tests for other interfaces (REST, ZMQ, etc), eg `interface_rest.py`
+  - `mempool` for tests for mempool behaviour, eg `mempool_reorg.py`
+  - `mining` for tests for mining features, eg `mining_prioritisetransaction.py`
+  - `p2p` for tests that explicitly test the p2p interface, eg `p2p_disconnect_ban.py`
+  - `rpc` for tests for individual RPC methods or features, eg `rpc_listtransactions.py`
+  - `tool` for tests for tools, eg `tool_wallet.py`
+  - `wallet` for tests for wallet features, eg `wallet_keypool.py`
 - use an underscore to separate words
-    - exception: for tests for specific RPCs or command line options which don't include underscores, name the test after the exact RPC or argument name, eg `rpc_decodescript.py`, not `rpc_decode_script.py`
+  - exception: for tests for specific RPCs or command line options which don't include underscores, name the test after the exact RPC or argument name, eg `rpc_decodescript.py`, not `rpc_decode_script.py`
 - Don't use the redundant word `test` in the name, eg `interface_zmq.py`, not `interface_zmq_test.py`
 
 #### General test-writing advice
@@ -83,45 +83,53 @@ P2P messages. These can be found in the following source files:
 #### Using the P2P interface
 
 - `messages.py` contains all the definitions for objects that pass
-over the network (`CBlock`, `CTransaction`, etc, along with the network-level
-wrappers for them, `msg_block`, `msg_tx`, etc).
+  over the network (`CBlock`, `CTransaction`, etc, along with the network-level
+  wrappers for them, `msg_block`, `msg_tx`, etc).
 
 - P2P tests have two threads. One thread handles all network communication
-with the bitcoind(s) being tested in a callback-based event loop; the other
-implements the test logic.
+  with the bitcoind(s) being tested in a callback-based event loop; the other
+  implements the test logic.
 
-- `P2PConnection` is the class used to connect to a bitcoind.  `P2PInterface`
-contains the higher level logic for processing P2P payloads and connecting to
-the Bitcoin Core node application logic. For custom behaviour, subclass the
-P2PInterface object and override the callback methods.
+- `P2PConnection` is the class used to connect to a bitcoind. `P2PInterface`
+  contains the higher level logic for processing P2P payloads and connecting to
+  the Bitcoin Core node application logic. For custom behaviour, subclass the
+  P2PInterface object and override the callback methods.
 
 - Can be used to write tests where specific P2P protocol behavior is tested.
-Examples tests are `p2p_unrequested_blocks.py`.
+  Examples tests are `p2p_unrequested_blocks.py`.
 
 ### test-framework modules
 
 #### [test_framework/authproxy.py](test_framework/authproxy.py)
+
 Taken from the [python-bitcoinrpc repository](https://github.com/jgarzik/python-bitcoinrpc).
 
 #### [test_framework/test_framework.py](test_framework/test_framework.py)
+
 Base class for functional tests.
 
 #### [test_framework/util.py](test_framework/util.py)
+
 Generally useful functions.
 
 #### [test_framework/mininode.py](test_framework/mininode.py)
+
 Basic code to support P2P connectivity to a bitcoind.
 
 #### [test_framework/script.py](test_framework/script.py)
+
 Utilities for manipulating transaction scripts (originally from python-bitcoinlib)
 
 #### [test_framework/key.py](test_framework/key.py)
+
 Test-only secp256k1 elliptic curve implementation
 
 #### [test_framework/bignum.py](test_framework/bignum.py)
+
 Helpers for script.py
 
 #### [test_framework/blocktools.py](test_framework/blocktools.py)
+
 Helper functions for creating blocks and transactions.
 
 ### Benchmarking with perf

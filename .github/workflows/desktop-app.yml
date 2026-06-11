@@ -2,23 +2,22 @@ name: Build Vericonomy Wallet (Tauri)
 
 on:
   push:
-    branches:
-      [main, master, testnet]
+    branches: [main, master, testnet]
     tags:
-      - "desktop-v*"
+      - 'desktop-v*'
     paths:
-      - "desktop/verium-app/**"
-      - ".github/workflows/desktop-app.yml"
+      - 'desktop/verium-app/**'
+      - '.github/workflows/desktop-app.yml'
   pull_request:
     paths:
-      - "desktop/verium-app/**"
-      - ".github/workflows/desktop-app.yml"
+      - 'desktop/verium-app/**'
+      - '.github/workflows/desktop-app.yml'
   workflow_dispatch:
     inputs:
       publish:
-        description: "Create / update a GitHub Release with the bundle artifacts"
+        description: 'Create / update a GitHub Release with the bundle artifacts'
         required: false
-        default: "false"
+        default: 'false'
 
 permissions:
   contents: write
@@ -44,35 +43,35 @@ jobs:
             os: ubuntu-22.04
             host: x86_64-linux-gnu
             kind: linux
-            configure_extra: ""
+            configure_extra: ''
           - target: aarch64-unknown-linux-gnu
             label: Linux ARM64
             os: ubuntu-24.04-arm
             host: aarch64-linux-gnu
             kind: linux
-            configure_extra: "--enable-arm-crypto"
+            configure_extra: '--enable-arm-crypto'
           - target: x86_64-apple-darwin
             label: macOS Intel
             os: macos-15-intel
             host: x86_64-apple-darwin
             kind: macos
-            configure_extra: ""
+            configure_extra: ''
           - target: aarch64-apple-darwin
             label: macOS Apple Silicon
             os: macos-14
             host: aarch64-apple-darwin
             kind: macos
-            configure_extra: ""
+            configure_extra: ''
           - target: x86_64-pc-windows-msvc
             label: Windows x64
             os: ubuntu-22.04
             host: x86_64-w64-mingw32
             kind: mingw
-            configure_extra: ""
+            configure_extra: ''
 
     runs-on: ${{ matrix.os }}
     env:
-      NO_QT: "1"
+      NO_QT: '1'
 
     steps:
       - name: Checkout (with submodules)
@@ -239,7 +238,7 @@ jobs:
           VERICOIND_CI_KIND: ${{ matrix.kind }}
           VERICOIND_CI_HOST: ${{ matrix.host }}
           VERICOIND_CONFIGURE_EXTRA: ${{ matrix.configure_extra }}
-          VERICOIND_SKIP_DEPENDS: "1"
+          VERICOIND_SKIP_DEPENDS: '1'
           VERICOIND_DEPENDS_ROOT: ${{ github.workspace }}
           VERICOIND_OUT_DIR: ${{ github.workspace }}/out
         run: bash scripts/ci-build-vericoind.sh
@@ -294,7 +293,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: '20'
           cache: npm
           cache-dependency-path: desktop/verium-app/package-lock.json
 
@@ -373,7 +372,7 @@ jobs:
           VERIUMD_OPTIONAL: ${{ contains(github.ref, 'refs/tags/desktop-v') && '0' || '1' }}
           # Keep the rebranded from-source binary downloaded above; only hit the
           # CDN if the build artifact is somehow absent.
-          VERIUMD_SKIP_IF_PRESENT: "1"
+          VERIUMD_SKIP_IF_PRESENT: '1'
         run: npm run fetch:veriumd
 
       - name: Download vericoind sidecar
@@ -394,7 +393,7 @@ jobs:
         working-directory: desktop/verium-app
         env:
           CPUMINER_TARGET_TRIPLE: ${{ matrix.target }}
-          CPUMINER_REQUIRE: "1"
+          CPUMINER_REQUIRE: '1'
         run: npm run fetch:cpuminer -- --force
 
       - name: Mark cpuminer sidecar executable
@@ -405,7 +404,7 @@ jobs:
       - name: Assert real daemon sidecars (no build placeholders)
         working-directory: desktop/verium-app
         env:
-          CPUMINER_REQUIRE: "1"
+          CPUMINER_REQUIRE: '1'
         run: npm run assert:sidecars
 
       - name: Prepare frontendDist for Cargo tests
@@ -436,7 +435,7 @@ jobs:
       - name: Tauri bundle
         run: npx tauri build --target ${{ matrix.target }}
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY: ''
 
       - name: Stage bundle artifacts
         shell: bash
@@ -511,7 +510,7 @@ jobs:
             cosign sign-blob --yes "$f" --output-signature "${f}.sig"
           done
         env:
-          COSIGN_EXPERIMENTAL: "1"
+          COSIGN_EXPERIMENTAL: '1'
 
       - name: Generate SBOM (npm)
         if: startsWith(github.ref, 'refs/tags/desktop-v')

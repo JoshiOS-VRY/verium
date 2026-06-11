@@ -1,17 +1,17 @@
-import type { NodeStatus } from "@/lib/rpc/client";
+import type { NodeStatus } from '@/lib/rpc/client';
 
 /** Errors that usually mean veriumd is still starting, not a permanent failure. */
 export function isTransientDaemonError(error?: string | null): boolean {
   if (!error) return false;
   const lower = error.toLowerCase();
   return (
-    lower.includes("error sending request") ||
-    lower.includes("connection refused") ||
-    lower.includes("actively refused") ||
-    lower.includes("failed to connect") ||
-    lower.includes("connecterror") ||
-    lower.includes("timed out") ||
-    lower.includes("daemon unreachable")
+    lower.includes('error sending request') ||
+    lower.includes('connection refused') ||
+    lower.includes('actively refused') ||
+    lower.includes('failed to connect') ||
+    lower.includes('connecterror') ||
+    lower.includes('timed out') ||
+    lower.includes('daemon unreachable')
   );
 }
 
@@ -20,19 +20,14 @@ export function isBinaryUnavailableError(error?: string | null): boolean {
   if (!error) return false;
   const lower = error.toLowerCase();
   return (
-    lower.includes("dev placeholder") ||
-    lower.includes("was not found on this system") ||
-    lower.includes("could not locate a runnable")
+    lower.includes('dev placeholder') ||
+    lower.includes('was not found on this system') ||
+    lower.includes('could not locate a runnable')
   );
 }
 
-const STARTING_PHASES = new Set(["starting", "reindexing", "warming_up"]);
-const STARTING_STATES = new Set([
-  "starting",
-  "warming_up",
-  "reindexing",
-  "initializing",
-]);
+const STARTING_PHASES = new Set(['starting', 'reindexing', 'warming_up']);
+const STARTING_STATES = new Set(['starting', 'warming_up', 'reindexing', 'initializing']);
 
 export function isDaemonConnectingState(
   status: NodeStatus | undefined,
@@ -40,7 +35,7 @@ export function isDaemonConnectingState(
     isLoading: boolean;
     isFetching: boolean;
     startupGraceActive: boolean;
-  },
+  }
 ): boolean {
   if (opts.isLoading) return true;
   if (status?.chain_corrupt) return false;
@@ -50,14 +45,10 @@ export function isDaemonConnectingState(
   if (status?.connected) return false;
 
   const unauthorized =
-    status?.error?.includes("unauthorized") ||
-    status?.error?.includes("invalid RPC credentials");
+    status?.error?.includes('unauthorized') || status?.error?.includes('invalid RPC credentials');
   if (unauthorized) return false;
 
-  if (
-    status?.daemon_phase &&
-    STARTING_PHASES.has(status.daemon_phase)
-  ) {
+  if (status?.daemon_phase && STARTING_PHASES.has(status.daemon_phase)) {
     return true;
   }
 
@@ -66,18 +57,18 @@ export function isDaemonConnectingState(
   }
 
   // Backend maps connection refused → "Starting node…" — keep UI in connecting mode.
-  if (status?.error?.includes("Starting node")) {
+  if (status?.error?.includes('Starting node')) {
     return true;
   }
 
   // Backend-reported startup / index load messages should stay in connecting state.
-  if (status?.error?.toLowerCase().includes("reindexing block headers")) {
+  if (status?.error?.toLowerCase().includes('reindexing block headers')) {
     return true;
   }
 
   if (
-    status?.error?.toLowerCase().includes("loading the chain index") ||
-    status?.error?.toLowerCase().includes("loading imported chain data")
+    status?.error?.toLowerCase().includes('loading the chain index') ||
+    status?.error?.toLowerCase().includes('loading imported chain data')
   ) {
     return true;
   }

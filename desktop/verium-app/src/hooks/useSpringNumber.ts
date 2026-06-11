@@ -1,5 +1,5 @@
-import { useSpring } from "@react-spring/web";
-import { useEffect, useRef, useState } from "react";
+import { useSpring } from '@react-spring/web';
+import { useEffect, useRef, useState } from 'react';
 
 export interface UseSpringNumberOptions {
   /** @react-spring tension (default 120). */
@@ -21,8 +21,7 @@ export const WALLET_NUMBER_SPRING = {
 
 function prefersReducedMotion(): boolean {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
 
@@ -38,17 +37,13 @@ export function useSpringNumber(
     mass = WALLET_NUMBER_SPRING.mass,
     enabled = true,
     immediate: immediateOverride,
-  }: UseSpringNumberOptions = {},
+  }: UseSpringNumberOptions = {}
 ) {
   const prevTarget = useRef(target);
-  const [trend, setTrend] = useState<"up" | "down" | null>(null);
+  const [trend, setTrend] = useState<'up' | 'down' | null>(null);
 
   const hasValue = target != null && Number.isFinite(target);
-  const snap =
-    immediateOverride === true ||
-    !enabled ||
-    prefersReducedMotion() ||
-    !hasValue;
+  const snap = immediateOverride === true || !enabled || prefersReducedMotion() || !hasValue;
 
   const { number } = useSpring({
     number: hasValue ? target : 0,
@@ -68,7 +63,7 @@ export function useSpringNumber(
       Number.isFinite(prevTarget.current) &&
       target !== prevTarget.current
     ) {
-      setTrend(target > prevTarget.current ? "up" : "down");
+      setTrend(target > prevTarget.current ? 'up' : 'down');
       const id = window.setTimeout(() => setTrend(null), 700);
       prevTarget.current = target;
       return () => window.clearTimeout(id);

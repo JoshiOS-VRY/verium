@@ -1,5 +1,5 @@
-import { NavLink } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight,
   BookOpen,
@@ -14,23 +14,23 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Terminal,
-} from "lucide-react";
-import { CoinSwitcher } from "@/components/CoinSwitcher";
-import { QuitWalletButton } from "@/components/QuitWalletButton";
-import { useActiveCoin, useEnabledCoins } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { BINARYTEST_ENABLED } from "@/lib/features";
-import { useIsTestNetwork } from "@/lib/network-mode";
-import { rpcGetWalletInfo } from "@/lib/rpc/client";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { cn } from "@/lib/utils";
-import { isWalletLocked } from "@/lib/wallet-unlock";
+} from 'lucide-react';
+import { CoinSwitcher } from '@/components/CoinSwitcher';
+import { QuitWalletButton } from '@/components/QuitWalletButton';
+import { useActiveCoin, useEnabledCoins } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { BINARYTEST_ENABLED } from '@/lib/features';
+import { useIsTestNetwork } from '@/lib/network-mode';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { cn } from '@/lib/utils';
+import { isWalletLocked } from '@/lib/wallet-unlock';
 
 interface NavItem {
   to: string;
   label: string;
   icon: typeof Gauge;
-  coins?: ("verium" | "vericoin")[];
+  coins?: ('verium' | 'vericoin')[];
   /** Shown only while the wallet is in binarytest (DACE) mode. */
   testNetworkOnly?: boolean;
   /** Hidden in light wallet mode (requires local full node). */
@@ -40,60 +40,59 @@ interface NavItem {
 }
 
 const items: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge },
+  { to: '/dashboard', label: 'Dashboard', icon: Gauge },
   {
-    to: "/mining",
-    label: "Mining",
+    to: '/mining',
+    label: 'Mining',
     icon: Cpu,
-    coins: ["verium"],
+    coins: ['verium'],
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
   {
-    to: "/staking",
-    label: "Staking",
+    to: '/staking',
+    label: 'Staking',
     icon: Coins,
-    coins: ["vericoin"],
+    coins: ['vericoin'],
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
-  { to: "/network", label: "Network", icon: NetworkIcon, fullNodeOnly: true },
+  { to: '/network', label: 'Network', icon: NetworkIcon, fullNodeOnly: true },
   {
-    to: "/binary-chain",
-    label: "Binary Chain",
+    to: '/binary-chain',
+    label: 'Binary Chain',
     icon: Link2,
     testNetworkOnly: true,
   },
   {
-    to: "/transactions",
-    label: "Transactions",
+    to: '/transactions',
+    label: 'Transactions',
     icon: ArrowLeftRight,
     requiresPassphrase: true,
   },
-  { to: "/addresses", label: "Address book", icon: BookUser },
-  { to: "/security", label: "Security", icon: Lock, requiresPassphrase: true },
+  { to: '/addresses', label: 'Address book', icon: BookUser },
+  { to: '/security', label: 'Security', icon: Lock, requiresPassphrase: true },
   {
-    to: "/sign",
-    label: "Sign & verify",
+    to: '/sign',
+    label: 'Sign & verify',
     icon: ShieldCheck,
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
   {
-    to: "/console",
-    label: "RPC console",
+    to: '/console',
+    label: 'RPC console',
     icon: Terminal,
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
-  { to: "/logs", label: "Logs", icon: ScrollText, fullNodeOnly: true },
-  { to: "/resources", label: "Resources", icon: BookOpen },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
+  { to: '/logs', label: 'Logs', icon: ScrollText, fullNodeOnly: true },
+  { to: '/resources', label: 'Resources', icon: BookOpen },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 const APP_VERSION =
-  (import.meta as unknown as { env: Record<string, string> }).env
-    ?.VITE_APP_VERSION || "1.0.0";
+  (import.meta as unknown as { env: Record<string, string> }).env?.VITE_APP_VERSION || '1.0.0';
 
 export function Sidebar() {
   const activeCoin = useActiveCoin();
@@ -105,7 +104,7 @@ export function Sidebar() {
   // sync without an extra fetch. Locked == encrypted AND currently locked;
   // unencrypted or unlocked wallets report false, so no icon is shown.
   const wallet = useQuery({
-    queryKey: coinQueryKey(activeCoin, "getwalletinfo"),
+    queryKey: coinQueryKey(activeCoin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(activeCoin),
     refetchInterval: false,
   });
@@ -117,9 +116,7 @@ export function Sidebar() {
       return false;
     }
     if (!item.coins) return true;
-    return item.coins.some(
-      (coin) => enabledCoins.includes(coin) && coin === activeCoin,
-    );
+    return item.coins.some((coin) => enabledCoins.includes(coin) && coin === activeCoin);
   });
 
   return (
@@ -137,10 +134,8 @@ export function Sidebar() {
               to={to}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                  isActive
-                    ? "bg-bg-panel text-fg"
-                    : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                  isActive ? 'bg-bg-panel text-fg' : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
                 )
               }
             >

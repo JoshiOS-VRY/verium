@@ -31,6 +31,7 @@ To obtain it, register for a developer account, then download the [Xcode 7.3.1 d
 
 This file is several gigabytes in size, but only a single directory inside is
 needed:
+
 ```
 Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk
 ```
@@ -39,6 +40,7 @@ Unfortunately, the usual linux tools (7zip, hpmount, loopback mount) are incapab
 To create a tarball suitable for Gitian input, there are two options:
 
 Using Mac OS X, you can mount the dmg, and then create it with:
+
 ```
   $ hdiutil attach Xcode_7.3.1.dmg
   $ tar -C /Volumes/Xcode/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/ -czf MacOSX10.11.sdk.tar.gz MacOSX10.11.sdk
@@ -64,7 +66,7 @@ fully deterministic and may be freely redistributed.
 genisoimage is used to create the initial DMG. It is not deterministic as-is,
 so it has been patched. A system genisoimage will work fine, but it will not
 be deterministic because the file-order will change between invocations.
-The patch can be seen here:  [theuni/osx-cross-depends](https://raw.githubusercontent.com/theuni/osx-cross-depends/master/patches/cdrtools/genisoimage.diff).
+The patch can be seen here: [theuni/osx-cross-depends](https://raw.githubusercontent.com/theuni/osx-cross-depends/master/patches/cdrtools/genisoimage.diff).
 No effort was made to fix this cleanly, so it likely leaks memory badly. But
 it's only used for a single invocation, so that's no real concern.
 

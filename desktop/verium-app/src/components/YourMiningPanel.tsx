@@ -1,29 +1,20 @@
-import { useActiveCoin } from "@/lib/coin/context";
-import { Link } from "react-router-dom";
-import type { ReactNode } from "react";
-import { MiningPickaxeAnimation } from "@/components/MiningPickaxeAnimation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import {
-  MinerBootBadge,
-  MinerHashrateDisplay,
-} from "@/components/MinerBootIndicator";
+import { useActiveCoin } from '@/lib/coin/context';
+import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { MiningPickaxeAnimation } from '@/components/MiningPickaxeAnimation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { MinerBootBadge, MinerHashrateDisplay } from '@/components/MinerBootIndicator';
 import {
   buildNetworkStats,
   estimateDailyMining,
   estimateHoursPerBlock,
   formatSessionDuration,
   networkSharePercent,
-} from "@/lib/mining-revenue";
-import { isMinerBooting } from "@/lib/mining-boot";
-import { formatNumber, formatVrm } from "@/lib/utils";
-import { useDashboardData } from "@/hooks/useDashboardData";
+} from '@/lib/mining-revenue';
+import { isMinerBooting } from '@/lib/mining-boot';
+import { formatNumber, formatVrm } from '@/lib/utils';
+import { useDashboardData } from '@/hooks/useDashboardData';
 
 export function YourMiningPanel() {
   const coin = useActiveCoin();
@@ -41,18 +32,13 @@ export function YourMiningPanel() {
 
   const networkStats = buildNetworkStats(explorerStats.data, mining.data);
   const blocksFound =
-    transactions.data?.filter(
-      (t) => t.category === "generate" || t.category === "immature",
-    ).length ?? 0;
+    transactions.data?.filter((t) => t.category === 'generate' || t.category === 'immature')
+      .length ?? 0;
   const immature = wallet.data?.immature_balance ?? 0;
   const active = miningActive;
   const minerBooting = poolMinerRunning
     ? localHashrate <= 0
-    : isMinerBooting(
-        minerActive,
-        localHashrate,
-        minerState.data?.started_at,
-      );
+    : isMinerBooting(minerActive, localHashrate, minerState.data?.started_at);
   const share = networkSharePercent(localHashrate, networkStats?.networkHash);
   const estBlockH = estimateHoursPerBlock(localHashrate, networkStats);
   const daily =
@@ -66,27 +52,17 @@ export function YourMiningPanel() {
         })
       : null;
 
-  const miningAny =
-    minerBooting ||
-    active ||
-    localHashrate > 0 ||
-    blocksFound > 0 ||
-    immature > 0;
+  const miningAny = minerBooting || active || localHashrate > 0 || blocksFound > 0 || immature > 0;
 
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <MiningPickaxeAnimation
-              active={active && !minerBooting}
-              booting={minerBooting}
-            />
+            <MiningPickaxeAnimation active={active && !minerBooting} booting={minerBooting} />
             Your mining
           </CardTitle>
-          <CardDescription>
-            Solo CPU mining activity on this wallet.
-          </CardDescription>
+          <CardDescription>Solo CPU mining activity on this wallet.</CardDescription>
         </div>
         <MinerBootBadge booting={minerBooting} active={active} />
       </CardHeader>
@@ -108,10 +84,7 @@ export function YourMiningPanel() {
         ) : (
           <div className="grid grid-cols-2 gap-3 text-sm">
             <Stat label="Blocks found" value={formatNumber(blocksFound, 0)} />
-            <Stat
-              label="Pending (immature)"
-              value={formatVrm(immature, 4)}
-            />
+            <Stat label="Pending (immature)" value={formatVrm(immature, 4)} />
             <Stat
               label="Hashrate"
               value={
@@ -125,30 +98,19 @@ export function YourMiningPanel() {
             />
             <Stat
               label="Network share"
-              value={share != null ? `${formatNumber(share, 2)}%` : "—"}
+              value={share != null ? `${formatNumber(share, 2)}%` : '—'}
             />
             {active && minerState.data?.started_at && (
-              <Stat
-                label="Session"
-                value={formatSessionDuration(minerState.data.started_at)}
-              />
+              <Stat label="Session" value={formatSessionDuration(minerState.data.started_at)} />
             )}
             <Stat
               label="Est. next block"
-              value={estBlockH != null ? `${formatNumber(estBlockH, 1)} h` : "—"}
+              value={estBlockH != null ? `${formatNumber(estBlockH, 1)} h` : '—'}
             />
-            {daily && (
-              <Stat
-                label="Est. daily"
-                value={`${formatNumber(daily.vrmPerDay, 3)} VRM`}
-              />
-            )}
+            {daily && <Stat label="Est. daily" value={`${formatNumber(daily.vrmPerDay, 3)} VRM`} />}
           </div>
         )}
-        <Link
-          to="/mining"
-          className="text-xs text-accent underline underline-offset-2"
-        >
+        <Link to="/mining" className="text-xs text-accent underline underline-offset-2">
           Open mining page →
         </Link>
       </CardContent>

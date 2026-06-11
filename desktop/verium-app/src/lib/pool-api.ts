@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 export interface PoolStats {
   poolHashrate: number | null;
@@ -62,26 +62,24 @@ export interface PoolPayoutSummary {
 }
 
 export function isPoolApiEnabled(): Promise<boolean> {
-  return invoke<boolean>("is_pool_api_enabled_cmd");
+  return invoke<boolean>('is_pool_api_enabled_cmd');
 }
 
 export function fetchPoolStats(): Promise<PoolStats> {
-  return invoke<PoolStats>("fetch_pool_stats_cmd");
+  return invoke<PoolStats>('fetch_pool_stats_cmd');
 }
 
-export function fetchMinerOverview(
-  address: string,
-): Promise<MinerOverview | null> {
-  return invoke<MinerOverview | null>("fetch_miner_overview_cmd", { address });
+export function fetchMinerOverview(address: string): Promise<MinerOverview | null> {
+  return invoke<MinerOverview | null>('fetch_miner_overview_cmd', { address });
 }
 
 export function fetchMinerHashrateHistory(
   address: string,
   hours = 12,
   bucketSeconds = 30,
-  smoothSeconds = 1800,
+  smoothSeconds = 1800
 ): Promise<HashratePoint[]> {
-  return invoke<HashratePoint[]>("fetch_miner_hashrate_history_cmd", {
+  return invoke<HashratePoint[]>('fetch_miner_hashrate_history_cmd', {
     address,
     hours,
     bucketSeconds,
@@ -90,7 +88,7 @@ export function fetchMinerHashrateHistory(
 }
 
 export function fetchPoolPayoutSummary(): Promise<PoolPayoutSummary> {
-  return invoke<PoolPayoutSummary>("fetch_pool_payout_summary_cmd");
+  return invoke<PoolPayoutSummary>('fetch_pool_payout_summary_cmd');
 }
 
 export interface MinerPayoutsResult {
@@ -101,9 +99,9 @@ export interface MinerPayoutsResult {
 export function fetchMinerPayouts(
   address: string,
   limit = 20,
-  offset = 0,
+  offset = 0
 ): Promise<MinerPayoutsResult> {
-  return invoke<MinerPayoutsResult>("fetch_miner_payouts_cmd", {
+  return invoke<MinerPayoutsResult>('fetch_miner_payouts_cmd', {
     address,
     limit,
     offset,

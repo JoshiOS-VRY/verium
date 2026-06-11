@@ -1,14 +1,8 @@
-import { Check, Copy } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import { Check, Copy } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
-export function CopyButton({
-  value,
-  label = "Copy",
-}: {
-  value: string;
-  label?: string;
-}) {
+export function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
   const { copied, copy } = useCopyToClipboard();
   return (
     <Button
@@ -23,7 +17,7 @@ export function CopyButton({
       ) : (
         <Copy className="h-3.5 w-3.5" aria-hidden />
       )}
-      {copied ? "Copied" : "Copy"}
+      {copied ? 'Copied' : 'Copy'}
     </Button>
   );
 }

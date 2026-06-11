@@ -1,10 +1,10 @@
-import { Badge } from "@/components/ui/Badge";
-import { AnimatedHashrate } from "@/components/AnimatedHashrate";
+import { Badge } from '@/components/ui/Badge';
+import { AnimatedHashrate } from '@/components/AnimatedHashrate';
 
 export function MinerBootBadge({
   booting,
   active,
-  activeLabel = "Mining",
+  activeLabel = 'Mining',
 }: {
   booting: boolean;
   active: boolean;
@@ -48,7 +48,7 @@ export function MinerHashrateDisplay({
       className={className}
       unitClassName={unitClassName}
       spinnerClassName={spinnerClassName}
-      fallback={fallback ?? "—"}
+      fallback={fallback ?? '—'}
       immediate={!booting && value != null}
     />
   );

@@ -1,6 +1,6 @@
-import type { CoinId } from "@/lib/coin/profile";
+import type { CoinId } from '@/lib/coin/profile';
 
-export const BOOTSTRAP_CANCELLED_MESSAGE = "Bootstrap cancelled by user.";
+export const BOOTSTRAP_CANCELLED_MESSAGE = 'Bootstrap cancelled by user.';
 
 export interface BootstrapProgress {
   coin: string;
@@ -18,31 +18,29 @@ export interface BootstrapProgress {
 }
 
 export const BOOTSTRAP_PHASE_LABELS: Record<string, string> = {
-  stopping: "Stopping node",
-  resolving: "Finding bootstrap",
-  local: "Local archive",
-  downloading: "Downloading",
-  validating: "Validating",
-  extracting: "Extracting",
-  applying: "Installing",
-  restarting: "Restarting",
-  done: "Complete",
-  cancelled: "Cancelled",
-  error: "Failed",
+  stopping: 'Stopping node',
+  resolving: 'Finding bootstrap',
+  local: 'Local archive',
+  downloading: 'Downloading',
+  validating: 'Validating',
+  extracting: 'Extracting',
+  applying: 'Installing',
+  restarting: 'Restarting',
+  done: 'Complete',
+  cancelled: 'Cancelled',
+  error: 'Failed',
 };
 
 export function bootstrapPhaseLabel(phase: string): string {
   return BOOTSTRAP_PHASE_LABELS[phase] ?? phase;
 }
 
-export function bootstrapCanCancel(
-  progress: BootstrapProgress | null | undefined,
-): boolean {
+export function bootstrapCanCancel(progress: BootstrapProgress | null | undefined): boolean {
   if (progress?.cancellable != null) return progress.cancellable;
   return (
-    progress?.phase === "stopping" ||
-    progress?.phase === "resolving" ||
-    progress?.phase === "downloading"
+    progress?.phase === 'stopping' ||
+    progress?.phase === 'resolving' ||
+    progress?.phase === 'downloading'
   );
 }
 
@@ -66,42 +64,34 @@ export function formatBootstrapEta(seconds: number | undefined): string | null {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   if (mins < 60) {
-    return secs > 0
-      ? `About ${mins}m ${secs}s remaining`
-      : `About ${mins}m remaining`;
+    return secs > 0 ? `About ${mins}m ${secs}s remaining` : `About ${mins}m remaining`;
   }
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
-  return remMins > 0
-    ? `About ${hours}h ${remMins}m remaining`
-    : `About ${hours}h remaining`;
+  return remMins > 0 ? `About ${hours}h ${remMins}m remaining` : `About ${hours}h remaining`;
 }
 
 export function bootstrapProgressDetail(progress: BootstrapProgress): string | null {
   const parts: string[] = [];
 
-  if (progress.phase === "downloading") {
+  if (progress.phase === 'downloading') {
     if (
       progress.downloadedBytes != null &&
       progress.totalBytes != null &&
       progress.totalBytes > 0
     ) {
       parts.push(
-        `${formatBootstrapBytes(progress.downloadedBytes)} / ${formatBootstrapBytes(progress.totalBytes)}`,
+        `${formatBootstrapBytes(progress.downloadedBytes)} / ${formatBootstrapBytes(progress.totalBytes)}`
       );
     } else if (progress.downloadedBytes != null) {
       parts.push(`${formatBootstrapBytes(progress.downloadedBytes)} downloaded`);
     }
   }
 
-  if (progress.phase === "extracting") {
-    if (
-      progress.extractedFiles != null &&
-      progress.totalFiles != null &&
-      progress.totalFiles > 0
-    ) {
+  if (progress.phase === 'extracting') {
+    if (progress.extractedFiles != null && progress.totalFiles != null && progress.totalFiles > 0) {
       parts.push(
-        `${progress.extractedFiles.toLocaleString()} / ${progress.totalFiles.toLocaleString()} files`,
+        `${progress.extractedFiles.toLocaleString()} / ${progress.totalFiles.toLocaleString()} files`
       );
     } else if (progress.extractedFiles != null) {
       parts.push(`${progress.extractedFiles.toLocaleString()} files extracted`);
@@ -111,12 +101,12 @@ export function bootstrapProgressDetail(progress: BootstrapProgress): string | n
   const eta = formatBootstrapEta(progress.etaSeconds);
   if (eta) parts.push(eta);
 
-  return parts.length > 0 ? parts.join(" · ") : null;
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 export function isBootstrapProgressForCoin(
   progress: BootstrapProgress | null | undefined,
-  coin: CoinId,
+  coin: CoinId
 ): progress is BootstrapProgress {
   return progress?.coin === coin;
 }

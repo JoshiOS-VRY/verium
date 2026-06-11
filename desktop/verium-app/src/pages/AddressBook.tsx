@@ -1,25 +1,19 @@
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookUser, Pencil, Plus, Save, Trash2, X } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BookUser, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import {
   deleteAddressBookEntry,
   listAddressBookEntries,
   upsertAddressBookEntry,
   type AddressBookCategory,
   type AddressBookEntry,
-} from "@/lib/address-book";
-import { cn } from "@/lib/utils";
+} from '@/lib/address-book';
+import { cn } from '@/lib/utils';
 
 interface DraftEntry {
   id?: string;
@@ -29,47 +23,43 @@ interface DraftEntry {
   category: AddressBookCategory;
 }
 
-function emptyDraft(category: AddressBookCategory = "send"): DraftEntry {
-  return { address: "", label: "", notes: "", category };
+function emptyDraft(category: AddressBookCategory = 'send'): DraftEntry {
+  return { address: '', label: '', notes: '', category };
 }
 
 export function AddressBook() {
   const coin = useActiveCoin();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<AddressBookCategory>("send");
+  const [filter, setFilter] = useState<AddressBookCategory>('send');
   const [draft, setDraft] = useState<DraftEntry | null>(null);
 
   const entries = useQuery({
-    queryKey: coinQueryKey(coin, "address-book"),
+    queryKey: coinQueryKey(coin, 'address-book'),
     queryFn: () => listAddressBookEntries(coin),
   });
 
   const upsert = useMutation({
     mutationFn: (entry: DraftEntry) =>
       upsertAddressBookEntry(coin, {
-        id: entry.id ?? "",
+        id: entry.id ?? '',
         address: entry.address.trim(),
         label: entry.label.trim(),
         notes: entry.notes.trim(),
         category: entry.category,
       }),
     onSuccess: (saved) => {
-      const category: AddressBookCategory =
-        saved.category === "receive" ? "receive" : "send";
-      queryClient.setQueryData<AddressBookEntry[]>(
-        coinQueryKey(coin, "address-book"),
-        (prev) => {
-          const list = prev ?? [];
-          const normalized = { ...saved, category };
-          const index = list.findIndex((e) => e.id === normalized.id);
-          if (index >= 0) {
-            const next = [...list];
-            next[index] = normalized;
-            return next;
-          }
-          return [...list, normalized];
-        },
-      );
+      const category: AddressBookCategory = saved.category === 'receive' ? 'receive' : 'send';
+      queryClient.setQueryData<AddressBookEntry[]>(coinQueryKey(coin, 'address-book'), (prev) => {
+        const list = prev ?? [];
+        const normalized = { ...saved, category };
+        const index = list.findIndex((e) => e.id === normalized.id);
+        if (index >= 0) {
+          const next = [...list];
+          next[index] = normalized;
+          return next;
+        }
+        return [...list, normalized];
+      });
       setFilter(category);
       setDraft(null);
     },
@@ -78,9 +68,8 @@ export function AddressBook() {
   const remove = useMutation({
     mutationFn: (id: string) => deleteAddressBookEntry(coin, id),
     onSuccess: (_result, id) => {
-      queryClient.setQueryData<AddressBookEntry[]>(
-        coinQueryKey(coin, "address-book"),
-        (prev) => (prev ?? []).filter((e) => e.id !== id),
+      queryClient.setQueryData<AddressBookEntry[]>(coinQueryKey(coin, 'address-book'), (prev) =>
+        (prev ?? []).filter((e) => e.id !== id)
       );
     },
   });
@@ -108,16 +97,16 @@ export function AddressBook() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="inline-flex w-fit rounded-md border border-border bg-bg-subtle p-1">
-            {(["send", "receive"] as AddressBookCategory[]).map((cat) => (
+            {(['send', 'receive'] as AddressBookCategory[]).map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setFilter(cat)}
                 className={cn(
-                  "h-8 rounded px-3 text-xs font-medium capitalize",
+                  'h-8 rounded px-3 text-xs font-medium capitalize',
                   filter === cat
-                    ? "bg-accent text-accent-fg"
-                    : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+                    ? 'bg-accent text-accent-fg'
+                    : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
                 )}
               >
                 {cat}
@@ -149,9 +138,7 @@ export function AddressBook() {
             </div>
           )}
           {entries.isLoading ? (
-            <div className="py-10 text-center text-sm text-fg-muted">
-              Loading…
-            </div>
+            <div className="py-10 text-center text-sm text-fg-muted">Loading…</div>
           ) : filtered.length === 0 ? (
             <div className="py-10 text-center text-sm text-fg-subtle">
               No {filter} addresses yet.
@@ -242,12 +229,8 @@ function DraftRow({
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
           <X className="h-3.5 w-3.5" /> Cancel
         </Button>
-        <Button
-          size="sm"
-          onClick={onSave}
-          disabled={!draft.address.trim() || saving}
-        >
-          <Save className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Save"}
+        <Button size="sm" onClick={onSave} disabled={!draft.address.trim() || saving}>
+          <Save className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save'}
         </Button>
       </div>
     </div>
@@ -267,28 +250,17 @@ function EntryRow({
     <li className="flex items-start justify-between gap-3 rounded-md border border-border bg-bg-subtle/40 px-3 py-2.5">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-fg">
-            {entry.label || "(no label)"}
-          </span>
+          <span className="text-sm font-medium text-fg">{entry.label || '(no label)'}</span>
           <Badge tone="neutral">{entry.category}</Badge>
         </div>
-        <div className="mt-0.5 break-all text-[11px] text-fg-muted">
-          {entry.address}
-        </div>
-        {entry.notes && (
-          <div className="mt-1 text-xs text-fg-subtle">{entry.notes}</div>
-        )}
+        <div className="mt-0.5 break-all text-[11px] text-fg-muted">{entry.address}</div>
+        {entry.notes && <div className="mt-1 text-xs text-fg-subtle">{entry.notes}</div>}
       </div>
       <div className="flex shrink-0 gap-1">
         <Button size="sm" variant="ghost" onClick={onEdit} aria-label="Edit">
           <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onDelete}
-          aria-label="Delete"
-        >
+        <Button size="sm" variant="ghost" onClick={onDelete} aria-label="Delete">
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>

@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Lock } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { useState } from 'react';
+import { Lock } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 
 interface SendPassphrasePromptProps {
   open: boolean;
@@ -11,22 +11,22 @@ interface SendPassphrasePromptProps {
 
 export function SendPassphrasePrompt({
   open,
-  title = "Confirm send with passphrase",
+  title = 'Confirm send with passphrase',
   onVerified,
   onCancel,
 }: SendPassphrasePromptProps) {
-  const [passphrase, setPassphrase] = useState("");
+  const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
 
   const submit = () => {
     if (!passphrase.trim()) {
-      setError("Enter your wallet passphrase.");
+      setError('Enter your wallet passphrase.');
       return;
     }
     const verified = passphrase;
-    setPassphrase("");
+    setPassphrase('');
     setError(null);
     onVerified(verified);
   };
@@ -39,8 +39,8 @@ export function SendPassphrasePrompt({
           <h2 className="text-base font-semibold">{title}</h2>
         </div>
         <p className="mb-3 text-sm text-fg-muted">
-          Enter your wallet passphrase to authorize this payment. It is required
-          for every send when two-factor authentication is disabled.
+          Enter your wallet passphrase to authorize this payment. It is required for every send when
+          two-factor authentication is disabled.
         </p>
         <input
           type="password"
@@ -52,7 +52,7 @@ export function SendPassphrasePrompt({
             setError(null);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
+            if (e.key === 'Enter') submit();
           }}
           placeholder="Wallet passphrase"
           className="mb-3 h-10 w-full rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent"
@@ -63,7 +63,7 @@ export function SendPassphrasePrompt({
             variant="secondary"
             size="sm"
             onClick={() => {
-              setPassphrase("");
+              setPassphrase('');
               setError(null);
               onCancel();
             }}

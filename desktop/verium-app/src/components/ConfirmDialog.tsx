@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Button } from "@/components/ui/Button";
+import { useEffect } from 'react';
+import { Button } from '@/components/ui/Button';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -14,10 +14,10 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   open,
-  title = "Are you sure?",
+  title = 'Are you sure?',
   message,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   confirming = false,
   onConfirm,
   onCancel,
@@ -26,11 +26,11 @@ export function ConfirmDialog({
     if (!open) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !confirming) onCancel();
+      if (event.key === 'Escape' && !confirming) onCancel();
     };
 
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, confirming, onCancel]);
 
   if (!open) return null;
@@ -54,18 +54,10 @@ export function ConfirmDialog({
           </h2>
         </div>
 
-        {message && (
-          <p className="px-5 py-4 text-sm text-fg-muted">{message}</p>
-        )}
+        {message && <p className="px-5 py-4 text-sm text-fg-muted">{message}</p>}
 
         <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={confirming}
-            onClick={onCancel}
-          >
+          <Button type="button" size="sm" variant="ghost" disabled={confirming} onClick={onCancel}>
             {cancelLabel}
           </Button>
           <Button
@@ -75,7 +67,7 @@ export function ConfirmDialog({
             disabled={confirming}
             onClick={onConfirm}
           >
-            {confirming ? "Removing…" : confirmLabel}
+            {confirming ? 'Removing…' : confirmLabel}
           </Button>
         </div>
       </div>

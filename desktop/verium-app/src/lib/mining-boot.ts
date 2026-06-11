@@ -9,7 +9,7 @@ export function isMinerBooting(
   hashrate: number,
   startedAt: number | undefined,
   startPending = false,
-  stopPending = false,
+  stopPending = false
 ): boolean {
   if (stopPending) return false;
   if (startPending) return true;
@@ -22,7 +22,7 @@ export function isMinerBooting(
 export function miningInfoRefetchMs(
   active?: boolean,
   hashrate?: number,
-  startedAt?: number,
+  startedAt?: number
 ): number | false {
   if (!active) return false;
   if (hashrate !== undefined && hashrate > 0) return MINING_HASHRATE_POLL_MS;

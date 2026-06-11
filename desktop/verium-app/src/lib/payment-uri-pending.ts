@@ -1,5 +1,5 @@
-import type { CoinId } from "@/lib/coin/profile";
-import type { ParsedPaymentUri } from "@/lib/security/client";
+import type { CoinId } from '@/lib/coin/profile';
+import type { ParsedPaymentUri } from '@/lib/security/client';
 
 export interface PendingPaymentUri extends ParsedPaymentUri {
   coin: CoinId;

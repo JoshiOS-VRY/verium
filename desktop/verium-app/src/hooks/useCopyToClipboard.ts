@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const DEFAULT_RESET_MS = 2000;
 
@@ -33,7 +33,7 @@ export function useCopyToClipboard(resetMs = DEFAULT_RESET_MS) {
         return false;
       }
     },
-    [resetMs],
+    [resetMs]
   );
 
   useEffect(() => () => reset(), [reset]);

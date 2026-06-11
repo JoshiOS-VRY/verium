@@ -1,1 +1,1 @@
-export { NodeRecoveryBanner as DaemonConnectionBanner } from "./NodeRecoveryBanner";
+export { NodeRecoveryBanner as DaemonConnectionBanner } from './NodeRecoveryBanner';

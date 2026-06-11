@@ -1,34 +1,28 @@
-import { PoolDisclaimer } from "@/components/pool/PoolDisclaimer";
-import { PoolStatsStrip } from "@/components/pool/PoolStatsStrip";
-import { PoolMiningPanel } from "@/components/pool/PoolMiningPanel";
-import { usePoolMinerRunning } from "@/components/pool/PoolMiningControls";
-import {
-  fetchPoolMinerMemoryLimits,
-  stopPoolMiner,
-} from "@/lib/pool-miner-api";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useExplorerQueriesEnabled } from "@/lib/network-mode";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Cpu, Globe, Target } from "lucide-react";
-import { WalletUnlockGate } from "@/components/WalletUnlockGate";
-import { MiningControlsCard } from "@/components/MiningControlsCard";
-import { MiningEconomicsCard } from "@/components/MiningEconomicsCard";
-import {
-  MiningHashrateChart,
-  type HashSample,
-} from "@/components/MiningHashrateChart";
-import { MiningHero } from "@/components/MiningHero";
-import { MiningStatTile } from "@/components/MiningStatTile";
-import { MiningStatusBanner } from "@/components/MiningStatusBanner";
-import { MinerHashrateDisplay } from "@/components/MinerBootIndicator";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { fetchExplorerStats } from "@/lib/explorer-api";
-import { Button } from "@/components/ui/Button";
+import { PoolDisclaimer } from '@/components/pool/PoolDisclaimer';
+import { PoolStatsStrip } from '@/components/pool/PoolStatsStrip';
+import { PoolMiningPanel } from '@/components/pool/PoolMiningPanel';
+import { usePoolMinerRunning } from '@/components/pool/PoolMiningControls';
+import { fetchPoolMinerMemoryLimits, stopPoolMiner } from '@/lib/pool-miner-api';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useExplorerQueriesEnabled } from '@/lib/network-mode';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Clock, Cpu, Globe, Target } from 'lucide-react';
+import { WalletUnlockGate } from '@/components/WalletUnlockGate';
+import { MiningControlsCard } from '@/components/MiningControlsCard';
+import { MiningEconomicsCard } from '@/components/MiningEconomicsCard';
+import { MiningHashrateChart, type HashSample } from '@/components/MiningHashrateChart';
+import { MiningHero } from '@/components/MiningHero';
+import { MiningStatTile } from '@/components/MiningStatTile';
+import { MiningStatusBanner } from '@/components/MiningStatusBanner';
+import { MinerHashrateDisplay } from '@/components/MinerBootIndicator';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { fetchExplorerStats } from '@/lib/explorer-api';
+import { Button } from '@/components/ui/Button';
 
 import {
   buildNetworkStats,
@@ -38,7 +32,7 @@ import {
   networkHashToKhm,
   networkSharePercent,
   type RevenuePeriod,
-} from "@/lib/mining-revenue";
+} from '@/lib/mining-revenue';
 import {
   fetchCpuTopology,
   maxMiningThreads,
@@ -47,13 +41,13 @@ import {
   poolSidecarManualMaxThreads,
   resolveMiningThreads,
   resolvePoolMiningThreads,
-} from "@/lib/mining-opt";
-import { poolMiningPrefsPatch } from "@/lib/pool-mining-prefs";
+} from '@/lib/mining-opt';
+import { poolMiningPrefsPatch } from '@/lib/pool-mining-prefs';
 import {
   miningRewardAddressForStart,
   staticMiningAddressConfigured,
   type MiningRewardAddressMode,
-} from "@/lib/mining-reward-address";
+} from '@/lib/mining-reward-address';
 import {
   rpcGetBlockchainInfo,
   rpcGetMinerState,
@@ -61,17 +55,14 @@ import {
   rpcGetWalletInfo,
   rpcMinerStart,
   rpcMinerStop,
-} from "@/lib/rpc/client";
-import { formatNumber } from "@/lib/utils";
-import {
-  clearMiningStoppedByUser,
-  markMiningStoppedByUser,
-} from "@/lib/mining-session";
-import { isChainSynced } from "@/lib/bootstrap-policy";
-import { isMinerBooting, MINING_HASHRATE_POLL_MS } from "@/lib/mining-boot";
-import { lightWalletExists } from "@/lib/light-wallet/client";
+} from '@/lib/rpc/client';
+import { formatNumber } from '@/lib/utils';
+import { clearMiningStoppedByUser, markMiningStoppedByUser } from '@/lib/mining-session';
+import { isChainSynced } from '@/lib/bootstrap-policy';
+import { isMinerBooting, MINING_HASHRATE_POLL_MS } from '@/lib/mining-boot';
+import { lightWalletExists } from '@/lib/light-wallet/client';
 
-type MiningMode = "solo" | "pool";
+type MiningMode = 'solo' | 'pool';
 
 const MAX_SAMPLES = 60;
 const SAMPLE_MIN_MS = MINING_HASHRATE_POLL_MS;
@@ -88,7 +79,7 @@ export function Mining() {
     void updatePrefs(poolMiningPrefsPatch(payoutAddress, workerName));
   };
   const topology = useQuery({
-    queryKey: ["cpu-topology"],
+    queryKey: ['cpu-topology'],
     queryFn: fetchCpuTopology,
     staleTime: 60_000,
   });
@@ -96,12 +87,12 @@ export function Mining() {
   const miningThreads = resolveMiningThreads(
     topology.data,
     autoAdjustThreads,
-    prefs.auto_mine_threads ?? 2,
+    prefs.auto_mine_threads ?? 2
   );
   const suggestedThreads = optimizedMiningThreads(topology.data);
   const maxThreads = maxMiningThreads(topology.data);
   const poolMemory = useQuery({
-    queryKey: ["pool-miner", "memory-limits"],
+    queryKey: ['pool-miner', 'memory-limits'],
     queryFn: fetchPoolMinerMemoryLimits,
     staleTime: 30_000,
   });
@@ -113,46 +104,45 @@ export function Mining() {
     topology.data,
     autoAdjustThreads,
     prefs.auto_mine_threads ?? 2,
-    poolMemory.data,
+    poolMemory.data
   );
   const logicalCpus = topology.data?.logicalCpus;
   const [samples, setSamples] = useState<HashSample[]>([]);
-  const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("day");
+  const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>('day');
   const [miningMode, setMiningMode] = useState<MiningMode>(
-    isLight ? "pool" : (prefs.mining_mode ?? "pool"),
+    isLight ? 'pool' : (prefs.mining_mode ?? 'pool')
   );
   const lastSampleRef = useRef<{ t: number; hr: number } | null>(null);
 
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
   const storedLightWallet = useQuery({
-    queryKey: coinQueryKey(coin, "light-wallet-exists"),
+    queryKey: coinQueryKey(coin, 'light-wallet-exists'),
     queryFn: () => lightWalletExists(coin),
   });
-  const lightOnlyOnDevice =
-    !isLight && storedLightWallet.data === true && wallet.data == null;
-  const effectiveMiningMode: MiningMode = lightOnlyOnDevice ? "pool" : miningMode;
+  const lightOnlyOnDevice = !isLight && storedLightWallet.data === true && wallet.data == null;
+  const effectiveMiningMode: MiningMode = lightOnlyOnDevice ? 'pool' : miningMode;
 
   const minerState = useQuery({
-    queryKey: coinQueryKey(coin, "get_miner_state"),
+    queryKey: coinQueryKey(coin, 'get_miner_state'),
     queryFn: () => rpcGetMinerState(coin),
     refetchInterval: false,
-    enabled: effectiveMiningMode === "solo",
+    enabled: effectiveMiningMode === 'solo',
   });
   const minerActive = minerState.data?.active ?? false;
   const minerStartedAt = minerState.data?.started_at;
 
   const mining = useQuery({
-    queryKey: coinQueryKey(coin, "getmininginfo"),
+    queryKey: coinQueryKey(coin, 'getmininginfo'),
     queryFn: () => rpcGetMiningInfo(coin),
     refetchInterval: false,
-    enabled: effectiveMiningMode === "solo" && (minerActive || minerState.isLoading),
+    enabled: effectiveMiningMode === 'solo' && (minerActive || minerState.isLoading),
   });
   const blockchain = useQuery({
-    queryKey: coinQueryKey(coin, "getblockchaininfo"),
+    queryKey: coinQueryKey(coin, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(coin),
     refetchInterval: false,
   });
@@ -161,7 +151,7 @@ export function Mining() {
   const poolMinerRunning = usePoolMinerRunning(nodeRpcConnected);
   const explorerEnabled = useExplorerQueriesEnabled();
   const explorerStats = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-stats"),
+    queryKey: coinQueryKey(coin, 'explorer-stats'),
     queryFn: () => fetchExplorerStats(coin),
     enabled: explorerEnabled,
     refetchInterval: false,
@@ -177,9 +167,7 @@ export function Mining() {
       return;
     }
     lastSampleRef.current = { t: now, hr };
-    setSamples((prev) =>
-      [...prev, { t: now, hashrate: hr }].slice(-MAX_SAMPLES),
-    );
+    setSamples((prev) => [...prev, { t: now, hashrate: hr }].slice(-MAX_SAMPLES));
   }, [mining.data]);
 
   useEffect(() => {
@@ -212,26 +200,19 @@ export function Mining() {
 
   const start = useMutation({
     mutationFn: async () => {
-      if (
-        prefs.mining_reward_address_mode === "static" &&
-        !staticMiningAddressConfigured(prefs)
-      ) {
+      if (prefs.mining_reward_address_mode === 'static' && !staticMiningAddressConfigured(prefs)) {
         throw new Error(
-          "Choose a wallet address for mining rewards before starting in static mode.",
+          'Choose a wallet address for mining rewards before starting in static mode.'
         );
       }
       await stopPoolMiner().catch(() => undefined);
-      return rpcMinerStart(
-        coin,
-        miningThreads,
-        miningRewardAddressForStart(prefs),
-      );
+      return rpcMinerStart(coin, miningThreads, miningRewardAddressForStart(prefs));
     },
     onSuccess: (state) => {
       clearMiningStoppedByUser();
-      queryClient.setQueryData(coinQueryKey(coin, "get_miner_state"), state);
+      queryClient.setQueryData(coinQueryKey(coin, 'get_miner_state'), state);
       queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "getmininginfo"),
+        queryKey: coinQueryKey(coin, 'getmininginfo'),
       });
     },
   });
@@ -239,9 +220,9 @@ export function Mining() {
     mutationFn: () => rpcMinerStop(coin),
     onSuccess: (state) => {
       markMiningStoppedByUser();
-      queryClient.setQueryData(coinQueryKey(coin, "get_miner_state"), state);
+      queryClient.setQueryData(coinQueryKey(coin, 'get_miner_state'), state);
       queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "getmininginfo"),
+        queryKey: coinQueryKey(coin, 'getmininginfo'),
       });
     },
   });
@@ -256,10 +237,7 @@ export function Mining() {
   };
   const chainSynced = isChainSynced(blockchain.data, syncCtx);
   const syncTarget = blockchain.data
-    ? Math.max(
-        blockchain.data.headers ?? blockchain.data.blocks,
-        networkTip ?? 0,
-      )
+    ? Math.max(blockchain.data.headers ?? blockchain.data.blocks, networkTip ?? 0)
     : networkTip;
   const blocksBehind =
     blockchain.data?.blocks != null && syncTarget != null
@@ -272,22 +250,17 @@ export function Mining() {
     localHashrate,
     minerStartedAt,
     start.isPending,
-    stop.isPending,
+    stop.isPending
   );
   const live = active || minerBooting;
-  const displayThreads =
-    active && minerState.data ? minerState.data.threads : miningThreads;
+  const displayThreads = active && minerState.data ? minerState.data.threads : miningThreads;
   const networkStats = buildNetworkStats(explorerStats.data, mining.data);
   const networkHash = networkStats?.networkHash;
-  const networkKhm =
-    networkHash != null ? networkHashToKhm(networkHash) : undefined;
+  const networkKhm = networkHash != null ? networkHashToKhm(networkHash) : undefined;
   const share = networkSharePercent(localHashrate, networkHash);
   const estBlockRate = estimateHoursPerBlock(localHashrate, networkStats);
   const marketPriceUsd = networkStats?.priceUsd;
-  const revenuePriceUsd = effectiveMiningVrmPriceUsd(
-    prefs.mining_vrm_price_usd,
-    marketPriceUsd,
-  );
+  const revenuePriceUsd = effectiveMiningVrmPriceUsd(prefs.mining_vrm_price_usd, marketPriceUsd);
   const usingCustomVrmPrice =
     prefs.mining_vrm_price_usd != null &&
     Number.isFinite(prefs.mining_vrm_price_usd) &&
@@ -315,19 +288,18 @@ export function Mining() {
 
   const immature = wallet.data?.immature_balance ?? 0;
   const staticAddressMissing =
-    prefs.mining_reward_address_mode === "static" &&
-    !staticMiningAddressConfigured(prefs);
+    prefs.mining_reward_address_mode === 'static' && !staticMiningAddressConfigured(prefs);
   const controlsDisabled = active || start.isPending || stop.isPending;
 
   const difficulty =
     networkStats?.blockReward != null && mining.data
       ? formatNumber(
-          networkStats.source === "explorer"
+          networkStats.source === 'explorer'
             ? (explorerStats.data?.difficulty ?? mining.data.difficulty)
             : mining.data.difficulty,
-          7,
+          7
         )
-      : "—";
+      : '—';
 
   const chartProps = {
     samples,
@@ -337,17 +309,17 @@ export function Mining() {
     active,
   };
 
-  if (coin !== "verium") {
+  if (coin !== 'verium') {
     return <Navigate to="/staking" replace />;
   }
 
   const setMiningModePersist = (mode: MiningMode) => {
     setMiningMode(mode);
     void updatePrefs({ mining_mode: mode });
-    if (mode === "solo" && poolMinerRunning) {
+    if (mode === 'solo' && poolMinerRunning) {
       void stopPoolMiner();
     }
-    if (mode === "pool" && active) {
+    if (mode === 'pool' && active) {
       void stop.mutate();
     }
   };
@@ -358,8 +330,8 @@ export function Mining() {
       title="Unlock to mine"
       description={
         isLight
-          ? "Enter your wallet passphrase to mine on the public Verium pool."
-          : "Enter your wallet passphrase to access solo CPU mining or mine on the public Verium pool."
+          ? 'Enter your wallet passphrase to mine on the public Verium pool.'
+          : 'Enter your wallet passphrase to access solo CPU mining or mine on the public Verium pool.'
       }
     >
       <div className="flex flex-col gap-4">
@@ -383,35 +355,31 @@ export function Mining() {
           >
             <Button
               type="button"
-              variant={effectiveMiningMode === "solo" ? "primary" : "ghost"}
+              variant={effectiveMiningMode === 'solo' ? 'primary' : 'ghost'}
               className="h-8 px-4 text-sm"
-              onClick={() => setMiningModePersist("solo")}
+              onClick={() => setMiningModePersist('solo')}
             >
               Solo Mining
             </Button>
             <Button
               type="button"
-              variant={effectiveMiningMode === "pool" ? "primary" : "ghost"}
+              variant={effectiveMiningMode === 'pool' ? 'primary' : 'ghost'}
               className="h-8 px-4 text-sm"
-              onClick={() => setMiningModePersist("pool")}
+              onClick={() => setMiningModePersist('pool')}
             >
               Pool Mining
             </Button>
           </div>
         )}
 
-        {effectiveMiningMode === "pool" || isLight ? (
+        {effectiveMiningMode === 'pool' || isLight ? (
           <>
             <PoolStatsStrip enabled={explorerEnabled} />
             <PoolMiningPanel
               prefs={prefs}
               enabled={explorerEnabled}
-              payoutAddress={
-                prefsLoaded ? (prefs.pool_payout_address ?? "") : ""
-              }
-              workerName={
-                prefsLoaded ? (prefs.pool_worker_name ?? "wallet") : "wallet"
-              }
+              payoutAddress={prefsLoaded ? (prefs.pool_payout_address ?? '') : ''}
+              workerName={prefsLoaded ? (prefs.pool_worker_name ?? 'wallet') : 'wallet'}
               onPoolIdentityChange={onPoolIdentityChange}
               miningThreads={poolMiningThreads}
               autoAdjustThreads={autoAdjustThreads}
@@ -421,9 +389,7 @@ export function Mining() {
               topology={topology.data}
               logicalCpus={logicalCpus}
               onAutoAdjustChange={handleAutoAdjustChange}
-              onManualThreadsChange={(threads) =>
-                void updatePrefs({ auto_mine_threads: threads })
-              }
+              onManualThreadsChange={(threads) => void updatePrefs({ auto_mine_threads: threads })}
               chainSynced={chainSynced}
               syncStalled={syncStalled}
               onStartPool={() => {
@@ -437,7 +403,7 @@ export function Mining() {
           </>
         ) : null}
 
-        {!isLight && effectiveMiningMode === "solo" ? (
+        {!isLight && effectiveMiningMode === 'solo' ? (
           <>
             <MiningHero
               active={active}
@@ -477,23 +443,15 @@ export function Mining() {
               <MiningStatTile
                 label="Network hashrate"
                 icon={Globe}
-                value={networkKhm != null ? formatNumber(networkKhm, 2) : "—"}
+                value={networkKhm != null ? formatNumber(networkKhm, 2) : '—'}
                 unit="kH/m"
               />
-              <MiningStatTile
-                label="Difficulty"
-                icon={Target}
-                value={difficulty}
-              />
+              <MiningStatTile label="Difficulty" icon={Target} value={difficulty} />
               <MiningStatTile
                 label="Est. next block"
                 icon={Clock}
-                value={
-                  estBlockRate != null
-                    ? `${formatNumber(estBlockRate, 1)}`
-                    : "—"
-                }
-                unit={estBlockRate != null ? "h" : undefined}
+                value={estBlockRate != null ? `${formatNumber(estBlockRate, 1)}` : '—'}
+                unit={estBlockRate != null ? 'h' : undefined}
                 hint={
                   networkStats?.blockReward != null
                     ? `reward ${formatNumber(networkStats.blockReward, 4)} VRM`
@@ -506,9 +464,7 @@ export function Mining() {
               <div className="rounded-lg border border-border bg-bg-subtle/50 px-4 py-3">
                 <div className="mb-1 flex justify-between text-sm">
                   <span className="text-fg-muted">Your network share</span>
-                  <span className="font-semibold tabular-nums">
-                    {formatNumber(share, 2)}%
-                  </span>
+                  <span className="font-semibold tabular-nums">{formatNumber(share, 2)}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-bg-panel">
                   <div
@@ -530,25 +486,18 @@ export function Mining() {
               isMining={active}
               controlsDisabled={controlsDisabled}
               rewardMode={
-                (prefs.mining_reward_address_mode ??
-                  "dynamic") as MiningRewardAddressMode
+                (prefs.mining_reward_address_mode ?? 'dynamic') as MiningRewardAddressMode
               }
-              rewardAddress={prefs.mining_reward_address ?? ""}
+              rewardAddress={prefs.mining_reward_address ?? ''}
               autoMineOnOpen={prefs.auto_mine_on_open === true}
               playSoundOnBlock={prefs.play_sound_on_block_mined === true}
               onAutoAdjustChange={handleAutoAdjustChange}
-              onManualThreadsChange={(threads) =>
-                void updatePrefs({ auto_mine_threads: threads })
-              }
-              onRewardModeChange={(mode) =>
-                void updatePrefs({ mining_reward_address_mode: mode })
-              }
+              onManualThreadsChange={(threads) => void updatePrefs({ auto_mine_threads: threads })}
+              onRewardModeChange={(mode) => void updatePrefs({ mining_reward_address_mode: mode })}
               onRewardAddressChange={(address) =>
                 void updatePrefs({ mining_reward_address: address })
               }
-              onAutoMineOnOpenChange={(checked) =>
-                void updatePrefs({ auto_mine_on_open: checked })
-              }
+              onAutoMineOnOpenChange={(checked) => void updatePrefs({ auto_mine_on_open: checked })}
               onPlaySoundChange={(checked) =>
                 void updatePrefs({ play_sound_on_block_mined: checked })
               }

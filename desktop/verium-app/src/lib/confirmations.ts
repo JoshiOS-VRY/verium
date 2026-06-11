@@ -9,48 +9,36 @@ const COINBASE_MATURITY = 100;
 export const COINBASE_SPEND_MATURITY = COINBASE_MATURITY + 1;
 
 export function requiredConfirmations(category: string): number {
-  if (category === "immature" || category === "generate") {
+  if (category === 'immature' || category === 'generate') {
     return COINBASE_SPEND_MATURITY;
   }
   return 1;
 }
 
-export function blocksUntilSpendable(
-  confirmations: number,
-  category: string,
-): number {
+export function blocksUntilSpendable(confirmations: number, category: string): number {
   const required = requiredConfirmations(category);
-  if (category !== "immature" && category !== "generate") return 0;
+  if (category !== 'immature' && category !== 'generate') return 0;
   return Math.max(0, required - confirmations);
 }
 
-export function confirmationProgress(
-  confirmations: number,
-  required: number,
-): number {
+export function confirmationProgress(confirmations: number, required: number): number {
   if (required <= 0) return 0;
   return Math.min(1, Math.max(0, confirmations / required));
 }
 
-export function isFullyConfirmed(
-  confirmations: number,
-  required: number,
-): boolean {
+export function isFullyConfirmed(confirmations: number, required: number): boolean {
   return confirmations >= required;
 }
 
-export function confirmationStatusLabel(
-  confirmations: number,
-  category: string,
-): string {
+export function confirmationStatusLabel(confirmations: number, category: string): string {
   const required = requiredConfirmations(category);
   const remaining = blocksUntilSpendable(confirmations, category);
 
-  if (category === "immature" || category === "generate") {
+  if (category === 'immature' || category === 'generate') {
     if (remaining === 0) {
       return `${confirmations} confirmations — mature`;
     }
-    return `${confirmations} of ${required} confirmations — matures in ${remaining} more block${remaining === 1 ? "" : "s"}`;
+    return `${confirmations} of ${required} confirmations — matures in ${remaining} more block${remaining === 1 ? '' : 's'}`;
   }
 
   if (confirmations >= required) {

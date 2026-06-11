@@ -1,5 +1,4 @@
-retry - The command line retry tool
-------------------------------------------
+## retry - The command line retry tool
 
 Retry any shell command with exponential backoff or constant delay.
 
@@ -19,6 +18,7 @@ If you're on OS X, retry is also on Homebrew:
 brew pull 27283
 brew install retry
 ```
+
 Not popular enough for homebrew-core. Please star this project to help.
 
 ### Usage

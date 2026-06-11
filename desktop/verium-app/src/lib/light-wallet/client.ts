@@ -1,7 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { CoinId } from "@/lib/coin/profile";
+import { invoke } from '@tauri-apps/api/core';
+import type { CoinId } from '@/lib/coin/profile';
 
-export type WalletMode = "full_node" | "light";
+export type WalletMode = 'full_node' | 'light';
 
 export interface WalletModeStatus {
   mode: WalletMode;
@@ -35,59 +35,49 @@ export interface ConformanceResult {
 }
 
 export async function walletModeGet(): Promise<WalletModeStatus> {
-  return invoke<WalletModeStatus>("wallet_mode_get");
+  return invoke<WalletModeStatus>('wallet_mode_get');
 }
 
 export async function walletModeSet(mode: WalletMode): Promise<void> {
-  return invoke("wallet_mode_set", { mode });
+  return invoke('wallet_mode_set', { mode });
 }
 
 /** Effective wallet mode for a single coin (per-coin override or app default). */
-export async function walletModeGetForCoin(
-  coin: CoinId,
-): Promise<WalletModeStatus> {
-  return invoke<WalletModeStatus>("wallet_mode_get_for_coin", { coin });
+export async function walletModeGetForCoin(coin: CoinId): Promise<WalletModeStatus> {
+  return invoke<WalletModeStatus>('wallet_mode_get_for_coin', { coin });
 }
 
 /** Set the wallet mode for one coin without affecting the other chain. */
-export async function walletModeSetForCoin(
-  coin: CoinId,
-  mode: WalletMode,
-): Promise<void> {
-  return invoke("wallet_mode_set_for_coin", { coin, mode });
+export async function walletModeSetForCoin(coin: CoinId, mode: WalletMode): Promise<void> {
+  return invoke('wallet_mode_set_for_coin', { coin, mode });
 }
 
 export async function electrumServersGet(coin: CoinId): Promise<string[]> {
-  return invoke<string[]>("electrum_servers_get", { coin });
+  return invoke<string[]>('electrum_servers_get', { coin });
 }
 
-export async function electrumServersSet(
-  coin: CoinId,
-  servers: string[],
-): Promise<void> {
-  return invoke("electrum_servers_set", { coin, servers });
+export async function electrumServersSet(coin: CoinId, servers: string[]): Promise<void> {
+  return invoke('electrum_servers_set', { coin, servers });
 }
 
 export async function electrumTestConnection(
   coin: CoinId,
-  server?: string,
+  server?: string
 ): Promise<ConformanceResult> {
-  return invoke<ConformanceResult>("electrum_test_connection", { coin, server });
+  return invoke<ConformanceResult>('electrum_test_connection', { coin, server });
 }
 
-export async function electrumValidateDefaults(
-  coin: CoinId,
-): Promise<ConformanceResult[]> {
-  return invoke<ConformanceResult[]>("electrum_validate_defaults", { coin });
+export async function electrumValidateDefaults(coin: CoinId): Promise<ConformanceResult[]> {
+  return invoke<ConformanceResult[]>('electrum_validate_defaults', { coin });
 }
 
 export async function lightWalletCreate(
   coin: CoinId,
   mnemonic: string,
   passphrase: string,
-  label?: string,
+  label?: string
 ): Promise<void> {
-  return invoke("light_wallet_create", { coin, mnemonic, passphrase, label });
+  return invoke('light_wallet_create', { coin, mnemonic, passphrase, label });
 }
 
 /** Replace the active-chain light wallet from a BIP39 phrase or xprv master key. */
@@ -96,9 +86,9 @@ export async function lightWalletImport(
   mnemonic: string,
   passphrase: string,
   label?: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<void> {
-  return invoke("light_wallet_import", {
+  return invoke('light_wallet_import', {
     coin,
     mnemonic,
     passphrase,
@@ -110,23 +100,21 @@ export async function lightWalletImport(
 export async function lightWalletUnlock(
   coin: CoinId,
   passphrase: string,
-  seconds?: number,
+  seconds?: number
 ): Promise<void> {
-  return invoke("light_wallet_unlock", { coin, passphrase, seconds });
+  return invoke('light_wallet_unlock', { coin, passphrase, seconds });
 }
 
 export async function lightWalletLock(coin: CoinId): Promise<void> {
-  return invoke("light_wallet_lock", { coin });
+  return invoke('light_wallet_lock', { coin });
 }
 
 export async function lightWalletExists(coin: CoinId): Promise<boolean> {
-  return invoke<boolean>("light_wallet_exists", { coin });
+  return invoke<boolean>('light_wallet_exists', { coin });
 }
 
-export async function lightServerStatus(
-  coin: CoinId,
-): Promise<LightServerStatus | null> {
-  return invoke<LightServerStatus | null>("light_server_status", { coin });
+export async function lightServerStatus(coin: CoinId): Promise<LightServerStatus | null> {
+  return invoke<LightServerStatus | null>('light_server_status', { coin });
 }
 
 export interface ServerTip {
@@ -141,8 +129,6 @@ export interface TipVerifyResult {
   max_drift_blocks: number;
 }
 
-export async function electrumCrossVerifyTip(
-  coin: CoinId,
-): Promise<TipVerifyResult> {
-  return invoke<TipVerifyResult>("electrum_cross_verify_tip", { coin });
+export async function electrumCrossVerifyTip(coin: CoinId): Promise<TipVerifyResult> {
+  return invoke<TipVerifyResult>('electrum_cross_verify_tip', { coin });
 }

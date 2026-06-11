@@ -5,6 +5,7 @@ This setup provides a complete Verium testnet environment with multiple nodes, m
 ## Architecture
 
 The testnet consists of:
+
 - **3 Verium Nodes**: Primary node + 2 additional nodes for network redundancy
 - **1 Mining Node**: Dedicated node for generating test blocks
 - **1 Explorer**: Web interface for browsing the testnet blockchain
@@ -20,6 +21,7 @@ The testnet consists of:
 ```
 
 This will:
+
 - Create directory structure in `/docker/appdata/verium-testnet/`
 - Build the explorer Docker image
 - Start all services
@@ -77,25 +79,25 @@ Use the management script for easy operations:
 
 ### Verium Nodes
 
-| Service | Container | RPC Port | P2P Port | IP Address |
-|---------|-----------|----------|----------|------------|
-| Node 1 (Primary) | verium-testnet-node1 | 36988 | 36989 | 172.20.0.10 |
-| Node 2 | verium-testnet-node2 | 36991 | 36990 | 172.20.0.11 |
-| Node 3 | verium-testnet-node3 | 36993 | 36992 | 172.20.0.12 |
-| Miner | verium-testnet-miner | - | - | 172.20.0.13 |
+| Service          | Container            | RPC Port | P2P Port | IP Address  |
+| ---------------- | -------------------- | -------- | -------- | ----------- |
+| Node 1 (Primary) | verium-testnet-node1 | 36988    | 36989    | 172.20.0.10 |
+| Node 2           | verium-testnet-node2 | 36991    | 36990    | 172.20.0.11 |
+| Node 3           | verium-testnet-node3 | 36993    | 36992    | 172.20.0.12 |
+| Miner            | verium-testnet-miner | -        | -        | 172.20.0.13 |
 
 ### Explorer
 
-| Service | Container | Web Port | IP Address |
-|---------|-----------|----------|------------|
-| Explorer | verium-testnet-explorer | 3003 | 172.20.0.20 |
+| Service  | Container               | Web Port | IP Address  |
+| -------- | ----------------------- | -------- | ----------- |
+| Explorer | verium-testnet-explorer | 3003     | 172.20.0.20 |
 
 ## Configuration Files
 
 Each node has its own configuration file in the `configs/` directory:
 
 - `verium-testnet-node1.conf` - Primary node configuration
-- `verium-testnet-node2.conf` - Secondary node configuration  
+- `verium-testnet-node2.conf` - Secondary node configuration
 - `verium-testnet-node3.conf` - Third node configuration
 - `verium-testnet-miner.conf` - Mining node configuration
 
@@ -115,6 +117,7 @@ All persistent data is stored in `/docker/appdata/verium-testnet/`:
 ## Network Configuration
 
 The testnet uses a custom Docker network (`172.20.0.0/16`) with:
+
 - Internal communication between nodes
 - External access to RPC ports and explorer
 - Isolated from other Docker networks
@@ -122,6 +125,7 @@ The testnet uses a custom Docker network (`172.20.0.0/16`) with:
 ## Prerequisites
 
 ### Required
+
 - Docker and Docker Compose
 - Verium Docker image (`verium:latest`)
 - Write access to `/docker/appdata/`
@@ -131,6 +135,7 @@ The testnet uses a custom Docker network (`172.20.0.0/16`) with:
 You need a Verium Docker image. You can either:
 
 1. **Build your own**:
+
    ```bash
    # Create a simple Dockerfile for Verium
    FROM ubuntu:20.04
@@ -147,11 +152,13 @@ You need a Verium Docker image. You can either:
 ### Services Won't Start
 
 1. **Check Docker is running**:
+
    ```bash
    docker info
    ```
 
 2. **Check port availability**:
+
    ```bash
    lsof -i :36988
    lsof -i :3003
@@ -165,6 +172,7 @@ You need a Verium Docker image. You can either:
 ### Nodes Not Connecting
 
 1. **Check network connectivity**:
+
    ```bash
    docker network ls
    docker network inspect verium-testnet_verium-testnet
@@ -178,6 +186,7 @@ You need a Verium Docker image. You can either:
 ### Explorer Not Loading
 
 1. **Check explorer logs**:
+
    ```bash
    docker logs verium-testnet-explorer
    ```
@@ -190,6 +199,7 @@ You need a Verium Docker image. You can either:
 ### Permission Issues
 
 1. **Fix directory permissions**:
+
    ```bash
    sudo chown -R 1001:1001 /docker/appdata/verium-testnet/
    ```
@@ -204,6 +214,7 @@ You need a Verium Docker image. You can either:
 ### Custom Configuration
 
 Edit the configuration files in `configs/` to customize:
+
 - Network parameters
 - Mining settings
 - RPC access
@@ -253,6 +264,7 @@ docker stats
 ## Support
 
 For issues:
+
 1. Check the logs: `./manage-verium-testnet.sh logs`
 2. Verify Docker and Docker Compose are working
 3. Check the [main README](README.md) for general troubleshooting

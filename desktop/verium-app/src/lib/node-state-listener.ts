@@ -6,8 +6,8 @@
  * subscribers instead.
  */
 
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CoinId } from "@/lib/coin/profile";
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import type { CoinId } from '@/lib/coin/profile';
 
 type CoinChannel = {
   subscribers: Set<() => void>;
@@ -26,8 +26,8 @@ function listenerCount(): number {
 async function reportListenerCount(): Promise<void> {
   if (!import.meta.env.DEV) return;
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("set_node_state_listener_count", { count: listenerCount() });
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('set_node_state_listener_count', { count: listenerCount() });
   } catch {
     /* telemetry optional */
   }
@@ -38,7 +38,7 @@ function getChannel(coin: CoinId): CoinChannel {
   if (!ch) {
     ch = { subscribers: new Set(), unlisten: null, listenPromise: null };
     channels.set(coin, ch);
-    ch.listenPromise = listen<{ coin: string }>("node-state-changed", (event) => {
+    ch.listenPromise = listen<{ coin: string }>('node-state-changed', (event) => {
       if (event.payload.coin !== coin) return;
       const current = channels.get(coin);
       if (!current) return;
@@ -53,10 +53,7 @@ function getChannel(coin: CoinId): CoinChannel {
 }
 
 /** Subscribe to node state changes for a coin. Returns an unsubscribe function. */
-export function subscribeNodeStateChanged(
-  coin: CoinId,
-  onChange: () => void,
-): () => void {
+export function subscribeNodeStateChanged(coin: CoinId, onChange: () => void): () => void {
   const ch = getChannel(coin);
   ch.subscribers.add(onChange);
   void reportListenerCount();

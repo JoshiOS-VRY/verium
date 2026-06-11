@@ -1,8 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import {
-  getSharedAudioContext,
-  unlockSharedWebAudio,
-} from "@/lib/web-audio";
+import { invoke } from '@tauri-apps/api/core';
+import { getSharedAudioContext, unlockSharedWebAudio } from '@/lib/web-audio';
 
 /** Pleasant three-note chime when you find a block (Web Audio — no asset file). */
 
@@ -13,7 +10,7 @@ export async function unlockBlockMinedAudio(): Promise<void> {
 
 async function playNativeBlockChime(): Promise<void> {
   try {
-    await invoke("play_block_chime");
+    await invoke('play_block_chime');
   } catch {
     // Not macOS or afplay unavailable
   }
@@ -25,7 +22,7 @@ async function playBlockMinedWebAudio(): Promise<boolean> {
 
   try {
     await unlockSharedWebAudio();
-    if (ctx.state !== "running") return false;
+    if (ctx.state !== 'running') return false;
 
     const now = ctx.currentTime;
     const notes = [523.25, 659.25, 783.99]; // C5 · E5 · G5
@@ -33,7 +30,7 @@ async function playBlockMinedWebAudio(): Promise<boolean> {
     for (let i = 0; i < notes.length; i += 1) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "sine";
+      osc.type = 'sine';
       osc.frequency.value = notes[i]!;
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -64,7 +61,7 @@ async function playStakeRewardWebAudio(): Promise<boolean> {
 
   try {
     await unlockSharedWebAudio();
-    if (ctx.state !== "running") return false;
+    if (ctx.state !== 'running') return false;
 
     const now = ctx.currentTime;
     const notes = [587.33, 739.99, 880.0]; // D5 · F#5 · A5
@@ -72,7 +69,7 @@ async function playStakeRewardWebAudio(): Promise<boolean> {
     for (let i = 0; i < notes.length; i += 1) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "triangle";
+      osc.type = 'triangle';
       osc.frequency.value = notes[i]!;
       osc.connect(gain);
       gain.connect(ctx.destination);

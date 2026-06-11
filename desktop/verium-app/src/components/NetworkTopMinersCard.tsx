@@ -1,21 +1,12 @@
-import type { CoinId } from "@/lib/coin/profile";
-import { Pickaxe } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { MinersPeriodPicker } from "@/components/MinersPeriodPicker";
-import type { ExplorerExtractionEntry } from "@/lib/explorer-api";
-import { explorerExtractionHash } from "@/lib/explorer-links";
-import {
-  minersPeriodLabel,
-  type MinersPeriodId,
-} from "@/lib/miners-periods";
-import { cn } from "@/lib/utils";
+import type { CoinId } from '@/lib/coin/profile';
+import { Pickaxe } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { MinersPeriodPicker } from '@/components/MinersPeriodPicker';
+import type { ExplorerExtractionEntry } from '@/lib/explorer-api';
+import { explorerExtractionHash } from '@/lib/explorer-links';
+import { minersPeriodLabel, type MinersPeriodId } from '@/lib/miners-periods';
+import { cn } from '@/lib/utils';
 
 interface NetworkTopMinersCardProps {
   coin: CoinId;
@@ -37,7 +28,7 @@ export function NetworkTopMinersCard({
   isFetching,
 }: NetworkTopMinersCardProps) {
   const showTableLoading = Boolean(isLoading || isFetching);
-  if (coin !== "verium") return null;
+  if (coin !== 'verium') return null;
 
   return (
     <Card>
@@ -49,8 +40,8 @@ export function NetworkTopMinersCard({
               Top miners
             </CardTitle>
             <CardDescription>
-              Addresses that found the most blocks in{" "}
-              {minersPeriodLabel(period).toLowerCase()} (explorer index).
+              Addresses that found the most blocks in {minersPeriodLabel(period).toLowerCase()}{' '}
+              (explorer index).
             </CardDescription>
           </div>
           <MinersPeriodPicker
@@ -62,7 +53,7 @@ export function NetworkTopMinersCard({
         <ExplorerLink
           coin={coin}
           target={{
-            kind: "raw",
+            kind: 'raw',
             url: `${explorerExtractionHash(coin)}?period=${period}`,
           }}
           label="Full list"
@@ -74,9 +65,7 @@ export function NetworkTopMinersCard({
             Could not load extraction data from the explorer.
           </div>
         ) : isLoading && entries.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-fg-muted">
-            Loading miner rankings…
-          </div>
+          <div className="px-5 py-8 text-center text-sm text-fg-muted">Loading miner rankings…</div>
         ) : entries.length === 0 ? (
           <div className="mx-5 mb-5 rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-fg-muted">
             No mining rewards recorded for this period.
@@ -84,8 +73,8 @@ export function NetworkTopMinersCard({
         ) : (
           <div
             className={cn(
-              "max-h-[360px] overflow-auto",
-              showTableLoading && "pointer-events-none opacity-60",
+              'max-h-[360px] overflow-auto',
+              showTableLoading && 'pointer-events-none opacity-60'
             )}
           >
             <table className="w-full border-collapse text-sm">
@@ -107,12 +96,12 @@ export function NetworkTopMinersCard({
                     </td>
                     <td className="max-w-[12rem] truncate px-5 py-2.5 text-xs sm:max-w-none">
                       <ExplorerLink
-                        target={{ kind: "address", address: entry.address }}
+                        target={{ kind: 'address', address: entry.address }}
                         label={entry.address}
                       />
                     </td>
                     <td className="px-5 py-2.5 text-right font-semibold tabular-nums">
-                      {entry.count ?? "—"}
+                      {entry.count ?? '—'}
                     </td>
                   </tr>
                 ))}

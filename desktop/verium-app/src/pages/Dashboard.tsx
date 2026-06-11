@@ -1,13 +1,13 @@
-import { BootstrapBanner } from "@/components/BootstrapBanner";
-import { BackupHealthCard } from "@/components/BackupHealthCard";
-import { DashboardHero } from "@/components/DashboardHero";
-import { ExplorerRecentBlocks } from "@/components/ExplorerRecentBlocks";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useIsTestNetwork } from "@/lib/network-mode";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { LightWalletDashboardUnlock } from "@/components/LightWalletDashboardUnlock";
-import { LightWalletMissingBanner } from "@/components/LightWalletMissingBanner";
-import { LightWalletSyncBanner } from "@/components/LightWalletSyncBanner";
+import { BootstrapBanner } from '@/components/BootstrapBanner';
+import { BackupHealthCard } from '@/components/BackupHealthCard';
+import { DashboardHero } from '@/components/DashboardHero';
+import { ExplorerRecentBlocks } from '@/components/ExplorerRecentBlocks';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useIsTestNetwork } from '@/lib/network-mode';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { LightWalletDashboardUnlock } from '@/components/LightWalletDashboardUnlock';
+import { LightWalletMissingBanner } from '@/components/LightWalletMissingBanner';
+import { LightWalletSyncBanner } from '@/components/LightWalletSyncBanner';
 
 export function Dashboard() {
   const coin = useActiveCoin();
@@ -21,9 +21,7 @@ export function Dashboard() {
       {isLight && <LightWalletSyncBanner />}
       {!isLight && <BootstrapBanner />}
       <DashboardHero coin={coin} />
-      {!isTestNetwork && (
-        <ExplorerRecentBlocks coin={coin} variant="dashboard" />
-      )}
+      {!isTestNetwork && <ExplorerRecentBlocks coin={coin} variant="dashboard" />}
       <BackupHealthCard />
     </div>
   );

@@ -3,8 +3,8 @@
  * Tracks heap samples, React Query cache size, and optional render counts.
  */
 
-import type { QueryClient } from "@tanstack/react-query";
-import { nodeStateChannelCount } from "@/lib/node-state-listener";
+import type { QueryClient } from '@tanstack/react-query';
+import { nodeStateChannelCount } from '@/lib/node-state-listener';
 
 export interface HeapSample {
   atMs: number;
@@ -25,9 +25,7 @@ const heapSamples: HeapSample[] = [];
 const renderCounts = new Map<string, number>();
 
 function readJsHeapBytes(): number | null {
-  const mem = (
-    performance as Performance & { memory?: { usedJSHeapSize: number } }
-  ).memory;
+  const mem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
   return mem?.usedJSHeapSize ?? null;
 }
 
@@ -62,9 +60,7 @@ export function queryCacheStats(queryClient: QueryClient): {
   return { entries: queries.length, observers };
 }
 
-export function takeFrontendSnapshot(
-  queryClient: QueryClient,
-): FrontendMemorySnapshot {
+export function takeFrontendSnapshot(queryClient: QueryClient): FrontendMemorySnapshot {
   const heap = readJsHeapBytes();
   const { entries, observers } = queryCacheStats(queryClient);
   return {

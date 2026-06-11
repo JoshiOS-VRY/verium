@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { PoolMinerMemoryLimits } from "@/lib/pool-miner-api";
+import { invoke } from '@tauri-apps/api/core';
+import type { PoolMinerMemoryLimits } from '@/lib/pool-miner-api';
 
 export interface CpuTopology {
   logicalCpus: number;
@@ -56,19 +56,19 @@ export const INITIAL_ADAPTIVE_THREAD_STATE: AdaptiveThreadState = {
 };
 
 export async function fetchCpuTopology(): Promise<CpuTopology> {
-  return invoke<CpuTopology>("cpu_topology");
+  return invoke<CpuTopology>('cpu_topology');
 }
 
 export async function fetchCpuUtilizationSnapshot(): Promise<CpuUtilizationSnapshot> {
-  return invoke<CpuUtilizationSnapshot>("cpu_utilization_snapshot");
+  return invoke<CpuUtilizationSnapshot>('cpu_utilization_snapshot');
 }
 
 export async function runScryptBench(): Promise<ScryptBenchResult> {
-  return invoke<ScryptBenchResult>("bench_scrypt");
+  return invoke<ScryptBenchResult>('bench_scrypt');
 }
 
 export async function isOnAcPower(): Promise<boolean> {
-  return invoke<boolean>("battery_on_ac_power");
+  return invoke<boolean>('battery_on_ac_power');
 }
 
 export const MINING_THREADS_MIN = 1;
@@ -80,10 +80,7 @@ export const MINING_THREADS_MIN = 1;
 export const UI_RESERVE_LOGICAL_CORES = 2;
 
 function uiReserveLogicalCpus(detected: number): number {
-  return Math.max(
-    UI_RESERVE_LOGICAL_CORES,
-    Math.min(4, Math.floor(detected * 0.1)),
-  );
+  return Math.max(UI_RESERVE_LOGICAL_CORES, Math.min(4, Math.floor(detected * 0.1)));
 }
 
 /** Logical CPUs reported by the OS / topology probe (for display). */
@@ -91,7 +88,7 @@ export function detectedLogicalCpus(topology: CpuTopology | undefined): number {
   if (topology?.logicalCpus && topology.logicalCpus > 0) {
     return topology.logicalCpus;
   }
-  if (typeof navigator !== "undefined" && navigator.hardwareConcurrency) {
+  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
     return Math.max(MINING_THREADS_MIN, navigator.hardwareConcurrency);
   }
   return 2;
@@ -107,17 +104,14 @@ export function maxMiningThreads(topology: CpuTopology | undefined): number {
 export function triedToMineOnAllLogicalCpus(
   threads: number,
   topology: CpuTopology | undefined,
-  detectedOverride?: number,
+  detectedOverride?: number
 ): boolean {
   const detected = detectedOverride ?? detectedLogicalCpus(topology);
   return detected > 1 && threads >= detected;
 }
 
 export function clampMiningThreads(n: number, max: number): number {
-  return Math.max(
-    MINING_THREADS_MIN,
-    Math.min(max, n || MINING_THREADS_MIN),
-  );
+  return Math.max(MINING_THREADS_MIN, Math.min(max, n || MINING_THREADS_MIN));
 }
 
 /** Thread count tuned for this device from CPU topology (P-core aware). */
@@ -136,28 +130,26 @@ export function adaptiveMiningCeiling(topology: CpuTopology | undefined): number
   return optimizedMiningThreads(topology);
 }
 
-export type AdaptiveLoadSignal = "high" | "low" | "neutral";
+export type AdaptiveLoadSignal = 'high' | 'low' | 'neutral';
 
 /** Classify CPU load for adaptive thread scaling. */
-export function adaptiveLoadSignal(
-  snapshot: CpuUtilizationSnapshot,
-): AdaptiveLoadSignal {
+export function adaptiveLoadSignal(snapshot: CpuUtilizationSnapshot): AdaptiveLoadSignal {
   if (snapshot.daemonUtilizationPercent != null) {
     if (snapshot.otherUtilizationPercent >= ADAPTIVE_OTHER_UTIL_HIGH) {
-      return "high";
+      return 'high';
     }
     if (snapshot.otherUtilizationPercent <= ADAPTIVE_OTHER_UTIL_LOW) {
-      return "low";
+      return 'low';
     }
-    return "neutral";
+    return 'neutral';
   }
   if (snapshot.systemIdlePercent <= ADAPTIVE_IDLE_LOW_PERCENT) {
-    return "high";
+    return 'high';
   }
   if (snapshot.systemIdlePercent >= ADAPTIVE_IDLE_HIGH_PERCENT) {
-    return "low";
+    return 'low';
   }
-  return "neutral";
+  return 'neutral';
 }
 
 /**
@@ -169,17 +161,17 @@ export function nextAdaptiveMiningThreads(
   ceiling: number,
   floor: number,
   snapshot: CpuUtilizationSnapshot,
-  state: AdaptiveThreadState,
+  state: AdaptiveThreadState
 ): { threads: number; state: AdaptiveThreadState } {
   const cappedCeiling = Math.max(floor, ceiling);
   let threads = clampMiningThreads(currentThreads, cappedCeiling);
   let { consecutiveHighLoad, consecutiveLowLoad } = state;
   const signal = adaptiveLoadSignal(snapshot);
 
-  if (signal === "high") {
+  if (signal === 'high') {
     consecutiveHighLoad += 1;
     consecutiveLowLoad = 0;
-  } else if (signal === "low") {
+  } else if (signal === 'low') {
     consecutiveLowLoad += 1;
     consecutiveHighLoad = 0;
   } else {
@@ -187,17 +179,11 @@ export function nextAdaptiveMiningThreads(
     consecutiveLowLoad = 0;
   }
 
-  if (
-    consecutiveHighLoad >= ADAPTIVE_CONSECUTIVE_SAMPLES &&
-    threads > floor
-  ) {
+  if (consecutiveHighLoad >= ADAPTIVE_CONSECUTIVE_SAMPLES && threads > floor) {
     threads = Math.max(floor, threads - 1);
     consecutiveHighLoad = 0;
     consecutiveLowLoad = 0;
-  } else if (
-    consecutiveLowLoad >= ADAPTIVE_CONSECUTIVE_SAMPLES &&
-    threads < cappedCeiling
-  ) {
+  } else if (consecutiveLowLoad >= ADAPTIVE_CONSECUTIVE_SAMPLES && threads < cappedCeiling) {
     threads = Math.min(cappedCeiling, threads + 1);
     consecutiveHighLoad = 0;
     consecutiveLowLoad = 0;
@@ -213,7 +199,7 @@ export function nextAdaptiveMiningThreads(
 export function resolveMiningThreads(
   topology: CpuTopology | undefined,
   autoAdjust: boolean,
-  manualThreads: number,
+  manualThreads: number
 ): number {
   const max = maxMiningThreads(topology);
   if (autoAdjust) return adaptiveMiningCeiling(topology);
@@ -222,7 +208,7 @@ export function resolveMiningThreads(
 
 /** Auto-adjust ceiling for the cpuminer sidecar (`-t 0` / `--tune`). */
 export function poolSidecarAutoThreads(
-  limits: PoolMinerMemoryLimits | undefined,
+  limits: PoolMinerMemoryLimits | undefined
 ): number | undefined {
   if (limits?.usesSidecar && limits.maxSafeThreads > 0) {
     return limits.maxSafeThreads;
@@ -232,7 +218,7 @@ export function poolSidecarAutoThreads(
 
 /** Manual slider max for the cpuminer sidecar (P-logical count on hybrid CPUs). */
 export function poolSidecarManualMaxThreads(
-  limits: PoolMinerMemoryLimits | undefined,
+  limits: PoolMinerMemoryLimits | undefined
 ): number | undefined {
   if (limits?.usesSidecar && limits.maxManualThreads > 0) {
     return limits.maxManualThreads;
@@ -245,7 +231,7 @@ export function resolvePoolMiningThreads(
   topology: CpuTopology | undefined,
   autoAdjust: boolean,
   manualThreads: number,
-  limits: PoolMinerMemoryLimits | undefined,
+  limits: PoolMinerMemoryLimits | undefined
 ): number {
   const autoMax = poolSidecarAutoThreads(limits);
   const manualMax = poolSidecarManualMaxThreads(limits);

@@ -1,33 +1,29 @@
-import { useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { isChainSynced } from "@/lib/bootstrap-policy";
-import { fetchExplorerStats } from "@/lib/explorer-api";
-import { useExplorerQueriesEnabled } from "@/lib/network-mode";
-import {
-  fetchCpuTopology,
-  isOnAcPower,
-  resolveMiningThreads,
-} from "@/lib/mining-opt";
-import { miningRewardAddressForStart } from "@/lib/mining-reward-address";
-import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
+import { useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { isChainSynced } from '@/lib/bootstrap-policy';
+import { fetchExplorerStats } from '@/lib/explorer-api';
+import { useExplorerQueriesEnabled } from '@/lib/network-mode';
+import { fetchCpuTopology, isOnAcPower, resolveMiningThreads } from '@/lib/mining-opt';
+import { miningRewardAddressForStart } from '@/lib/mining-reward-address';
+import { fetchPoolMinerStatus } from '@/lib/pool-miner-api';
 import {
   rpcGetBlockchainInfo,
   rpcGetMinerState,
   rpcGetWalletInfo,
   rpcMinerStart,
-} from "@/lib/rpc/client";
-import { isWalletUnlocked } from "@/lib/wallet-unlock";
-import { useCoinWalletMode } from "@/hooks/useWalletMode";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { wasMiningStoppedByUser } from "@/lib/mining-session";
+} from '@/lib/rpc/client';
+import { isWalletUnlocked } from '@/lib/wallet-unlock';
+import { useCoinWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { wasMiningStoppedByUser } from '@/lib/mining-session';
 
 const RETRY_MS = 10_000;
 /** Slow retry cadence while the window is hidden/idle (auto-start still happens, just less aggressively). */
 const RETRY_MS_HIDDEN = 60_000;
-const VERIUM = "verium" as const;
+const VERIUM = 'verium' as const;
 
 /**
  * When enabled in Settings, starts the built-in CPU miner once the verium
@@ -35,7 +31,7 @@ const VERIUM = "verium" as const;
  * Thread count follows auto-adjust preference or manual override.
  */
 export function useAutoMine() {
-  const { isLight } = useCoinWalletMode("verium");
+  const { isLight } = useCoinWalletMode('verium');
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
@@ -46,19 +42,16 @@ export function useAutoMine() {
   const lastErrorRef = useRef<string | null>(null);
 
   const topology = useQuery({
-    queryKey: ["cpu-topology"],
+    queryKey: ['cpu-topology'],
     queryFn: fetchCpuTopology,
     staleTime: 60_000,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_mine_on_open === true &&
-      prefs.verium_enabled !== false,
+      !isLight && loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
   });
 
   const explorerEnabled = useExplorerQueriesEnabled();
   const explorer = useQuery({
-    queryKey: coinQueryKey(VERIUM, "explorer-stats"),
+    queryKey: coinQueryKey(VERIUM, 'explorer-stats'),
     queryFn: () => fetchExplorerStats(VERIUM),
     refetchInterval: false,
     enabled:
@@ -71,36 +64,27 @@ export function useAutoMine() {
   });
 
   const blockchain = useQuery({
-    queryKey: coinQueryKey(VERIUM, "getblockchaininfo"),
+    queryKey: coinQueryKey(VERIUM, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(VERIUM),
     refetchInterval: false,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_mine_on_open === true &&
-      prefs.verium_enabled !== false,
+      !isLight && loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
   });
 
   const wallet = useQuery({
-    queryKey: coinQueryKey(VERIUM, "getwalletinfo"),
+    queryKey: coinQueryKey(VERIUM, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(VERIUM),
     refetchInterval: false,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_mine_on_open === true &&
-      prefs.verium_enabled !== false,
+      !isLight && loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
   });
 
   const minerState = useQuery({
-    queryKey: coinQueryKey(VERIUM, "get_miner_state"),
+    queryKey: coinQueryKey(VERIUM, 'get_miner_state'),
     queryFn: () => rpcGetMinerState(VERIUM),
     refetchInterval: false,
     enabled:
-      !isLight &&
-      loaded &&
-      prefs.auto_mine_on_open === true &&
-      prefs.verium_enabled !== false,
+      !isLight && loaded && prefs.auto_mine_on_open === true && prefs.verium_enabled !== false,
   });
 
   useEffect(() => {
@@ -137,16 +121,16 @@ export function useAutoMine() {
       const threads = resolveMiningThreads(
         topology.data,
         prefs.auto_adjust_mine_threads !== false,
-        prefs.auto_mine_threads ?? 2,
+        prefs.auto_mine_threads ?? 2
       );
       try {
         await rpcMinerStart(VERIUM, threads, miningRewardAddressForStart(prefs));
         lastErrorRef.current = null;
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(VERIUM, "get_miner_state"),
+          queryKey: coinQueryKey(VERIUM, 'get_miner_state'),
         });
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(VERIUM, "getmininginfo"),
+          queryKey: coinQueryKey(VERIUM, 'getmininginfo'),
         });
       } catch (e) {
         lastErrorRef.current = String(e);
@@ -154,10 +138,7 @@ export function useAutoMine() {
     };
 
     void tryStart();
-    const id = window.setInterval(
-      () => void tryStart(),
-      visible ? RETRY_MS : RETRY_MS_HIDDEN,
-    );
+    const id = window.setInterval(() => void tryStart(), visible ? RETRY_MS : RETRY_MS_HIDDEN);
     return () => window.clearInterval(id);
   }, [
     isLight,

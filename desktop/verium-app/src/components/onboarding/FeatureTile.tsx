@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
 /** Small labelled tile used across onboarding step intros. */
 export function FeatureTile({

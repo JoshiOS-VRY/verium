@@ -1,17 +1,11 @@
-import { Blocks, Loader2, Pickaxe, Trophy } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Blocks, Loader2, Pickaxe, Trophy } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from '@tanstack/react-query';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 
-import { ExplorerLink } from "@/components/ExplorerLink";
+import { ExplorerLink } from '@/components/ExplorerLink';
 
 import {
   BlockFoundBanner,
@@ -19,9 +13,9 @@ import {
   MinedBlocksSummary,
   YouMinedBadge,
   youMinedRowClassName,
-} from "@/components/YouMinedCelebration";
+} from '@/components/YouMinedCelebration';
 
-import { AnimatedBlockNumber } from "@/components/AnimatedBlockNumber";
+import { AnimatedBlockNumber } from '@/components/AnimatedBlockNumber';
 
 import {
   StakeFoundBanner,
@@ -29,28 +23,22 @@ import {
   YouStakedBadge,
   isFreshStakedReward,
   youStakedRowClassName,
-} from "@/components/YouStakedCelebration";
+} from '@/components/YouStakedCelebration';
 
-import {
-  isBlockMinedByWallet,
-  useWalletMiningContext,
-} from "@/hooks/useWalletMiningContext";
+import { isBlockMinedByWallet, useWalletMiningContext } from '@/hooks/useWalletMiningContext';
 
-import {
-  isBlockStakedByWallet,
-  useWalletStakingContext,
-} from "@/hooks/useWalletStakingContext";
+import { isBlockStakedByWallet, useWalletStakingContext } from '@/hooks/useWalletStakingContext';
 
-import { subscribeBlockMined } from "@/hooks/useBlockMinedWatcher";
-import { subscribeStakeReward } from "@/hooks/useStakeRewardWatcher";
-import { useBlockRowEnterAnimation } from "@/hooks/useBlockRowEnterAnimation";
-import { useChainSynced } from "@/hooks/useChainSynced";
+import { subscribeBlockMined } from '@/hooks/useBlockMinedWatcher';
+import { subscribeStakeReward } from '@/hooks/useStakeRewardWatcher';
+import { useBlockRowEnterAnimation } from '@/hooks/useBlockRowEnterAnimation';
+import { useChainSynced } from '@/hooks/useChainSynced';
 
-import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
-import { useEffectiveLocalChainTip } from "@/hooks/useEffectiveLocalChainTip";
+import { useBlockAgeTick } from '@/hooks/useBlockAgeTick';
+import { useEffectiveLocalChainTip } from '@/hooks/useEffectiveLocalChainTip';
 
-import { fetchExplorerBlocks, isExplorerApiEnabled } from "@/lib/explorer-api";
-import type { ExplorerBlock } from "@/lib/explorer-api";
+import { fetchExplorerBlocks, isExplorerApiEnabled } from '@/lib/explorer-api';
+import type { ExplorerBlock } from '@/lib/explorer-api';
 import {
   blockNeedsRpcEnrichment,
   blockRowFromRewardEvent,
@@ -60,25 +48,25 @@ import {
   isIndexingBlockRow,
   MAX_PENDING_BLOCKS_ABOVE,
   mergeRecentBlocks,
-} from "@/lib/local-recent-block";
-import { useWalletMode } from "@/hooks/useWalletMode";
+} from '@/lib/local-recent-block';
+import { useWalletMode } from '@/hooks/useWalletMode';
 
-import { explorerBlocksHash } from "@/lib/explorer-links";
+import { explorerBlocksHash } from '@/lib/explorer-links';
 import {
   isVeriumPoolMinerAddress,
   resolveVeriumMinerExplorerAddress,
   VERIUM_POOL_DISPLAY_NAME,
-} from "@/lib/verium-pool-labels";
+} from '@/lib/verium-pool-labels';
 
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { formatCoinAmount } from "@/lib/units";
-import { cn, formatBlockAge, formatNumber } from "@/lib/utils";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { formatCoinAmount } from '@/lib/units';
+import { cn, formatBlockAge, formatNumber } from '@/lib/utils';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 
 interface ExplorerRecentBlocksProps {
-  coin: import("@/lib/coin/profile").CoinId;
+  coin: import('@/lib/coin/profile').CoinId;
 
-  variant?: "default" | "dashboard";
+  variant?: 'default' | 'dashboard';
 
   className?: string;
 }
@@ -97,7 +85,7 @@ const BLOCKS_ENRICH_RETRY_MS = 3_000;
 const CELEBRATION_DISMISS_MS = 60_000;
 
 function formatDifficulty(value?: string): string {
-  if (!value) return "—";
+  if (!value) return '—';
 
   const n = Number(value);
 
@@ -109,7 +97,7 @@ function formatDifficulty(value?: string): string {
 }
 
 function formatBlockOutput(value: string | undefined, coin: CoinId): string {
-  if (!value) return "—";
+  if (!value) return '—';
 
   const n = Number(value);
 
@@ -133,13 +121,13 @@ interface CelebrationState {
 export function ExplorerRecentBlocks({
   coin,
 
-  variant = "default",
+  variant = 'default',
 
   className,
 }: ExplorerRecentBlocksProps) {
-  const isDashboard = variant === "dashboard";
+  const isDashboard = variant === 'dashboard';
 
-  const isVerium = coin === "verium";
+  const isVerium = coin === 'verium';
 
   const miningCtx = useWalletMiningContext(isVerium);
   const stakingCtx = useWalletStakingContext(!isVerium);
@@ -149,8 +137,12 @@ export function ExplorerRecentBlocks({
   const visible = useWindowVisible();
   const { isLight } = useWalletMode();
 
-  const { height: localTipHeight, hash: localTipHash, time: localTipTime, chainTip } =
-    useEffectiveLocalChainTip(coin);
+  const {
+    height: localTipHeight,
+    hash: localTipHash,
+    time: localTipTime,
+    chainTip,
+  } = useEffectiveLocalChainTip(coin);
   const { enteringHash, nudgeOthers } = useBlockRowEnterAnimation(localTipHash);
 
   const ageTick = useBlockAgeTick(isDashboard && visible);
@@ -167,19 +159,17 @@ export function ExplorerRecentBlocks({
   }, [coin]);
 
   const enabled = useQuery({
-    queryKey: ["explorer-api-enabled"],
+    queryKey: ['explorer-api-enabled'],
 
     queryFn: isExplorerApiEnabled,
 
     staleTime: Infinity,
   });
 
-  const blocksPollMs = isLight
-    ? BLOCKS_LIGHT_REFETCH_MS
-    : BLOCKS_FALLBACK_REFETCH_MS;
+  const blocksPollMs = isLight ? BLOCKS_LIGHT_REFETCH_MS : BLOCKS_FALLBACK_REFETCH_MS;
 
   const blocks = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-blocks", 10),
+    queryKey: coinQueryKey(coin, 'explorer-blocks', 10),
 
     queryFn: () => fetchExplorerBlocks(coin, 10),
 
@@ -196,9 +186,7 @@ export function ExplorerRecentBlocks({
 
   const explorerTopHeight = blocks.data?.[0]?.height;
   const indexingLag =
-    localTipHeight != null &&
-    explorerTopHeight != null &&
-    localTipHeight > explorerTopHeight;
+    localTipHeight != null && explorerTopHeight != null && localTipHeight > explorerTopHeight;
 
   useEffect(() => {
     if (!visible || !indexingLag) return;
@@ -212,8 +200,7 @@ export function ExplorerRecentBlocks({
     return () => window.clearInterval(fastPoll);
   }, [blocks.refetch, indexingLag, visible]);
 
-  const explorerBlocksSignature =
-    blocks.data?.map((block) => block.height).join(",") ?? "";
+  const explorerBlocksSignature = blocks.data?.map((block) => block.height).join(',') ?? '';
 
   useEffect(() => {
     if (!visible) return;
@@ -284,17 +271,17 @@ export function ExplorerRecentBlocks({
   ]);
 
   useEffect(() => {
-    if (coin === "verium") {
+    if (coin === 'verium') {
       return subscribeBlockMined((event) => {
         setCelebration({
           height: event.height,
           reward:
             event.amount != null && Number.isFinite(event.amount)
-              ? formatCoinAmount(event.amount, "verium", 4)
-              : "—",
+              ? formatCoinAmount(event.amount, 'verium', 4)
+              : '—',
         });
 
-        void blockRowFromRewardEvent("verium", event).then((row) => {
+        void blockRowFromRewardEvent('verium', event).then((row) => {
           if (!row) return;
           setLocalBlocks((prev) => {
             const next = prev.filter((b) => b.height !== row.height);
@@ -309,11 +296,11 @@ export function ExplorerRecentBlocks({
         height: event.height,
         reward:
           event.amount != null && Number.isFinite(event.amount)
-            ? formatCoinAmount(event.amount, "vericoin", 4)
-            : "—",
+            ? formatCoinAmount(event.amount, 'vericoin', 4)
+            : '—',
       });
 
-      void blockRowFromRewardEvent("vericoin", event).then((row) => {
+      void blockRowFromRewardEvent('vericoin', event).then((row) => {
         if (!row) return;
         setLocalBlocks((prev) => {
           const next = prev.filter((b) => b.height !== row.height);
@@ -372,24 +359,18 @@ export function ExplorerRecentBlocks({
       localTipHeight,
       localTipHash,
       localTipTime,
-      knownHeights,
+      knownHeights
     );
-  }, [
-    explorerBlocks,
-    liveAndLocal,
-    localTipHash,
-    localTipHeight,
-    localTipTime,
-  ]);
+  }, [explorerBlocks, liveAndLocal, localTipHash, localTipHeight, localTipTime]);
 
   const blockRows = useMemo(
     () =>
       mergeRecentBlocks(
         mergeRecentBlocks(explorerBlocks, pendingLocal, feedLimit + 4),
         liveAndLocal,
-        feedLimit,
+        feedLimit
       ),
-    [explorerBlocks, feedLimit, liveAndLocal, pendingLocal],
+    [explorerBlocks, feedLimit, liveAndLocal, pendingLocal]
   );
 
   /** Same tip source as the dashboard hero. */
@@ -398,22 +379,20 @@ export function ExplorerRecentBlocks({
   if (!isDashboard && enabled.data !== true) return null;
 
   const yoursInFeed = blockRows.filter((block) =>
-    isVerium
-      ? isBlockMinedByWallet(block, miningCtx)
-      : isBlockStakedByWallet(block, stakingCtx),
+    isVerium ? isBlockMinedByWallet(block, miningCtx) : isBlockStakedByWallet(block, stakingCtx)
   );
 
   const yoursRewardTotal = yoursInFeed.reduce(
     (sum, block) => sum + parseBlockOutput(block.output_total ?? block.mint),
-    0,
+    0
   );
 
   return (
     <Card
       className={cn(
-        isDashboard && "flex  flex-col",
+        isDashboard && 'flex  flex-col',
 
-        className,
+        className
       )}
     >
       <CardHeader className="flex-row items-start justify-between shrink-0">
@@ -425,10 +404,7 @@ export function ExplorerRecentBlocks({
 
           <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {!loading && yoursInFeed.length > 0 && isVerium && (
-              <MinedBlocksSummary
-                count={yoursInFeed.length}
-                totalRewardVrm={yoursRewardTotal}
-              />
+              <MinedBlocksSummary count={yoursInFeed.length} totalRewardVrm={yoursRewardTotal} />
             )}
             {!loading && yoursInFeed.length > 0 && !isVerium && (
               <StakedRewardsSummary count={yoursInFeed.length} />
@@ -438,14 +414,12 @@ export function ExplorerRecentBlocks({
 
         <ExplorerLink
           coin={coin}
-          target={{ kind: "raw", url: explorerBlocksHash(coin) }}
+          target={{ kind: 'raw', url: explorerBlocksHash(coin) }}
           label="All blocks"
         />
       </CardHeader>
 
-      <CardContent
-        className={cn("p-0", isDashboard && "flex min-h-0 flex-1 flex-col")}
-      >
+      <CardContent className={cn('p-0', isDashboard && 'flex min-h-0 flex-1 flex-col')}>
         {celebration && synced && isVerium && (
           <div className="shrink-0 pt-1">
             <BlockFoundBanner
@@ -468,16 +442,14 @@ export function ExplorerRecentBlocks({
         {blocks.isError ? (
           <div className="px-4 py-6 text-xs text-fg-subtle">
             Could not load blocks from explorer.
-            {blocks.error != null && (
-              <div className="mt-1 text-danger">{String(blocks.error)}</div>
-            )}
+            {blocks.error != null && <div className="mt-1 text-danger">{String(blocks.error)}</div>}
           </div>
         ) : (
           <div
             className={cn(
-              "relative isolate overflow-auto",
+              'relative isolate overflow-auto',
 
-              isDashboard ? "flex-1" : "max-h-[360px]",
+              isDashboard ? 'flex-1' : 'max-h-[360px]'
             )}
           >
             <table className="w-full border-collapse text-sm">
@@ -503,9 +475,7 @@ export function ExplorerRecentBlocks({
                     </>
                   )}
 
-                  <th className="px-4 py-2 text-left font-medium">
-                    Extracted by
-                  </th>
+                  <th className="px-4 py-2 text-left font-medium">Extracted by</th>
                 </tr>
               </thead>
 
@@ -532,10 +502,7 @@ export function ExplorerRecentBlocks({
                       ? isYours && isFreshMinedBlock(block.time)
                       : isYours && isFreshStakedReward(block.time);
 
-                    const reward = formatBlockOutput(
-                      block.output_total ?? block.mint,
-                      coin,
-                    );
+                    const reward = formatBlockOutput(block.output_total ?? block.mint, coin);
 
                     const isEntering = enteringHash === block.hash;
                     const isNudging = nudgeOthers && !isEntering;
@@ -557,25 +524,22 @@ export function ExplorerRecentBlocks({
                       <tr
                         key={block.hash}
                         className={cn(
-                          "border-t border-border transition-[background-color,box-shadow]",
+                          'border-t border-border transition-[background-color,box-shadow]',
                           rowClassName,
-                          isEntering && "block-row-enter",
-                          isNudging && "block-row-nudge",
+                          isEntering && 'block-row-enter',
+                          isNudging && 'block-row-nudge'
                         )}
                       >
                         <td className="px-4 py-2.5 tabular-nums">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={cn(
-                                "inline-flex items-center rounded-md px-1.5 py-0.5 tabular-nums",
+                                'inline-flex items-center rounded-md px-1.5 py-0.5 tabular-nums',
                                 isYours &&
                                   (isVerium
-                                    ? "bg-success/12 font-semibold text-success"
-                                    : "bg-accent/12 font-semibold text-accent"),
-                                !isYours &&
-                                  (isTip
-                                    ? "font-medium text-accent"
-                                    : "text-fg"),
+                                    ? 'bg-success/12 font-semibold text-success'
+                                    : 'bg-accent/12 font-semibold text-accent'),
+                                !isYours && (isTip ? 'font-medium text-accent' : 'text-fg')
                               )}
                             >
                               <AnimatedBlockNumber
@@ -596,44 +560,41 @@ export function ExplorerRecentBlocks({
 
                         <td
                           className={cn(
-                            "px-4 py-2.5 text-right text-xs tabular-nums",
-                            isYours ? "font-medium text-fg" : "text-fg-muted",
+                            'px-4 py-2.5 text-right text-xs tabular-nums',
+                            isYours ? 'font-medium text-fg' : 'text-fg-muted'
                           )}
                         >
                           {indexing ? (
                             <span className="inline-flex items-center justify-end gap-1 text-fg-subtle">
-                              <Loader2
-                                className="h-3 w-3 animate-spin"
-                                aria-hidden
-                              />
+                              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
                               Indexing…
                             </span>
                           ) : block.time > 0 ? (
                             formatBlockAge(block.time, ageTick)
                           ) : (
-                            "—"
+                            '—'
                           )}
                         </td>
 
                         <td
                           className={cn(
-                            "px-4 py-2.5 text-right tabular-nums",
-                            isYours ? "text-fg" : "text-fg-muted",
+                            'px-4 py-2.5 text-right tabular-nums',
+                            isYours ? 'text-fg' : 'text-fg-muted'
                           )}
                         >
-                          {indexing ? "—" : (block.n_tx ?? "—")}
+                          {indexing ? '—' : (block.n_tx ?? '—')}
                         </td>
 
                         <td
                           className={cn(
-                            "px-4 py-2.5 text-right text-xs tabular-nums",
+                            'px-4 py-2.5 text-right text-xs tabular-nums',
                             isYours &&
                               (isVerium
-                                ? "font-semibold text-success"
-                                : "font-semibold text-accent"),
+                                ? 'font-semibold text-success'
+                                : 'font-semibold text-accent')
                           )}
                         >
-                          {indexing ? "—" : reward}
+                          {indexing ? '—' : reward}
                         </td>
 
                         {isDashboard && (
@@ -641,51 +602,45 @@ export function ExplorerRecentBlocks({
                             <td className="hidden px-4 py-2.5 text-right text-xs tabular-nums text-fg-muted sm:table-cell">
                               {!indexing && block.size != null
                                 ? `${formatNumber(block.size, 0)} B`
-                                : "—"}
+                                : '—'}
                             </td>
 
                             <td className="hidden px-4 py-2.5 text-right text-xs tabular-nums text-fg-muted md:table-cell">
-                              {indexing ? "—" : formatDifficulty(block.difficulty)}
+                              {indexing ? '—' : formatDifficulty(block.difficulty)}
                             </td>
                           </>
                         )}
 
                         <td className="max-w-[180px] px-4 py-2.5 text-xs">
                           {indexing ? (
-                            "—"
+                            '—'
                           ) : isYours ? (
                             block.miner_address ? (
                               <ExplorerLink
                                 coin={coin}
                                 target={{
-                                  kind: "address",
+                                  kind: 'address',
                                   address: block.miner_address,
                                 }}
                                 label="Your Wallet"
                                 className={cn(
-                                  "inline-flex max-w-full items-center gap-1.5 truncate font-medium",
+                                  'inline-flex max-w-full items-center gap-1.5 truncate font-medium',
                                   isVerium
-                                    ? "text-success hover:text-success"
-                                    : "text-accent hover:text-accent",
+                                    ? 'text-success hover:text-success'
+                                    : 'text-accent hover:text-accent'
                                 )}
                               />
                             ) : (
                               <span
                                 className={cn(
-                                  "inline-flex items-center gap-1.5 font-medium",
-                                  isVerium ? "text-success" : "text-accent",
+                                  'inline-flex items-center gap-1.5 font-medium',
+                                  isVerium ? 'text-success' : 'text-accent'
                                 )}
                               >
                                 {isVerium ? (
-                                  <Pickaxe
-                                    className="h-3 w-3 shrink-0 opacity-80"
-                                    aria-hidden
-                                  />
+                                  <Pickaxe className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
                                 ) : (
-                                  <Trophy
-                                    className="h-3 w-3 shrink-0 opacity-80"
-                                    aria-hidden
-                                  />
+                                  <Trophy className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
                                 )}
                                 You
                               </span>
@@ -695,7 +650,7 @@ export function ExplorerRecentBlocks({
                               <ExplorerLink
                                 coin={coin}
                                 target={{
-                                  kind: "address",
+                                  kind: 'address',
                                   address: minerLinkAddress,
                                 }}
                                 label={VERIUM_POOL_DISPLAY_NAME}
@@ -707,14 +662,14 @@ export function ExplorerRecentBlocks({
                               <ExplorerLink
                                 coin={coin}
                                 target={{
-                                  kind: "address",
+                                  kind: 'address',
                                   address: minerLinkAddress,
                                 }}
                                 label={block.miner_address}
                               />
                             )
                           ) : (
-                            "—"
+                            '—'
                           )}
                         </td>
                       </tr>

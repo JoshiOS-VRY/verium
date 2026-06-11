@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import { pushToast } from "@/lib/toast-store";
+import { useEffect } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { pushToast } from '@/lib/toast-store';
 
 /** Redirects light-wallet users away from full-node-only pages. */
 export function FullNodeOnlyRoute() {
@@ -12,9 +12,9 @@ export function FullNodeOnlyRoute() {
   useEffect(() => {
     if (!isLoading && isLight) {
       pushToast({
-        title: "Full node required",
+        title: 'Full node required',
         description: lightWalletCopy.fullNodeOnlyToast,
-        tone: "info",
+        tone: 'info',
       });
     }
   }, [isLight, isLoading, location.pathname]);

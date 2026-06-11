@@ -1,13 +1,12 @@
-OpenBSD build guide
-======================
+# OpenBSD build guide
+
 (updated for OpenBSD 6.2)
 
 This guide describes how to build veriumd and command-line utilities on OpenBSD.
 
 OpenBSD is most commonly used as a server OS, so this guide does not contain instructions for building the GUI.
 
-Preparation
--------------
+## Preparation
 
 Run the following as root to install the base dependencies for building:
 
@@ -54,32 +53,36 @@ export BDB_PREFIX="$PWD/db4"
 **Important**: use `gmake`, not `make`. The non-GNU `make` will exit with a horrible error.
 
 Preparation:
+
 ```bash
 export AUTOCONF_VERSION=2.69 # replace this with the autoconf version that you installed
 export AUTOMAKE_VERSION=1.15 # replace this with the automake version that you installed
 ./autogen.sh
 ```
+
 Make sure `BDB_PREFIX` is set to the appropriate path from the above steps.
 
 To configure with wallet:
+
 ```bash
 ./configure --with-gui=no CC=cc CXX=c++ \
     BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include"
 ```
 
 To configure without wallet:
+
 ```bash
 ./configure --disable-wallet --with-gui=no CC=cc CXX=c++
 ```
 
 Build and run the tests:
+
 ```bash
 gmake # use -jX here for parallelism
 gmake check
 ```
 
-Resource limits
--------------------
+## Resource limits
 
 If the build runs into out-of-memory errors, the instructions in this section
 might help.
@@ -97,4 +100,3 @@ If your user is in the `staff` group the limit can be raised with:
 The change will only affect the current shell and processes spawned by it. To
 make the change system-wide, change `datasize-cur` and `datasize-max` in
 `/etc/login.conf`, and reboot.
-

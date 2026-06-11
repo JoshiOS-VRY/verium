@@ -7,15 +7,9 @@ import {
   PackageOpen,
   ScanSearch,
   X,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { ExternalLinkButton } from "@/components/ExternalLinkButton";
+} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExternalLinkButton } from '@/components/ExternalLinkButton';
 import {
   BOOTSTRAP_URL_ARM,
   BOOTSTRAP_URL_X64,
@@ -26,10 +20,10 @@ import {
   DOCS_DOWNLOADS,
   DOCS_HOME,
   EXPLORER_HOME,
-} from "@/lib/verium-links";
-import { POOL_WEB_URL } from "@/lib/verium-pool";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import releases from "@/lib/releases-manifest.json";
+} from '@/lib/verium-links';
+import { POOL_WEB_URL } from '@/lib/verium-pool';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import releases from '@/lib/releases-manifest.json';
 
 interface ResourceCardProps {
   icon: typeof Globe;
@@ -39,21 +33,13 @@ interface ResourceCardProps {
   cta: string;
 }
 
-function ResourceCard({
-  icon: Icon,
-  title,
-  description,
-  href,
-  cta,
-}: ResourceCardProps) {
+function ResourceCard({ icon: Icon, title, description, href, cta }: ResourceCardProps) {
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <Icon className="h-4 w-4 text-fg-muted" />
-          <CardTitle className="!normal-case !tracking-normal !text-base">
-            {title}
-          </CardTitle>
+          <CardTitle className="!normal-case !tracking-normal !text-base">{title}</CardTitle>
         </div>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
@@ -73,17 +59,15 @@ export function Resources() {
         <CardHeader>
           <CardTitle>Verium {latest.version}</CardTitle>
           <CardDescription>
-            Latest official wallet release. Download the installer that matches
-            your operating system from the Vericonomy downloads page.
+            Latest official wallet release. Download the installer that matches your operating
+            system from the Vericonomy downloads page.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <ExternalLinkButton href={DOCS_DOWNLOADS} variant="primary">
             Open Downloads page
           </ExternalLinkButton>
-          <ExternalLinkButton href={CDN_RELEASES}>
-            Browse CDN releases
-          </ExternalLinkButton>
+          <ExternalLinkButton href={CDN_RELEASES}>Browse CDN releases</ExternalLinkButton>
         </CardContent>
       </Card>
 

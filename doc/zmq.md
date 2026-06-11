@@ -35,17 +35,17 @@ buffering or reassembly.
 
 The ZeroMQ feature in Verium requires ZeroMQ API version 4.x or
 newer. Typically, it is packaged by distributions as something like
-*libzmq3-dev*. The C++ wrapper for ZeroMQ is *not* needed.
+_libzmq3-dev_. The C++ wrapper for ZeroMQ is _not_ needed.
 
 In order to run the example Python client scripts in contrib/ one must
-also install *python3-zmq*, though this is not necessary for daemon
+also install _python3-zmq_, though this is not necessary for daemon
 operation.
 
 ## Enabling
 
 By default, the ZeroMQ feature is automatically compiled in if the
-necessary prerequisites are found.  To disable, use --disable-zmq
-during the *configure* step of building veriumd:
+necessary prerequisites are found. To disable, use --disable-zmq
+during the _configure_ step of building veriumd:
 
     $ ./configure --disable-zmq (other options)
 

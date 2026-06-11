@@ -32,53 +32,53 @@ The following instructions have been tested with Linux Debian and macOS.
 
 1. Clone the RapidCheck source code and cd into the repository.
 
-    ```shell
-    git clone https://github.com/emil-e/rapidcheck.git
-    cd rapidcheck
-    ```
+   ```shell
+   git clone https://github.com/emil-e/rapidcheck.git
+   cd rapidcheck
+   ```
 
 2. Build RapidCheck (requires CMake to be installed).
 
-    ```shell
-    cmake -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -DRC_ENABLE_BOOST_TEST=ON $(pwd)
-    make && make install
-    ```
+   ```shell
+   cmake -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true -DRC_ENABLE_BOOST_TEST=ON $(pwd)
+   make && make install
+   ```
 
 3. Configure Verium with RapidCheck.
 
-    `cd` to the directory of your local verium repository and run
-    `./configure`. In the output you should see:
+   `cd` to the directory of your local verium repository and run
+   `./configure`. In the output you should see:
 
-    ```shell
-    checking rapidcheck.h usability... yes
-    checking rapidcheck.h presence... yes
-    checking for rapidcheck.h... yes
-    [...]
-    Options used to compile and link:
-    [...]
-      with test     = yes
-        with prop   = yes
-    ```
+   ```shell
+   checking rapidcheck.h usability... yes
+   checking rapidcheck.h presence... yes
+   checking for rapidcheck.h... yes
+   [...]
+   Options used to compile and link:
+   [...]
+     with test     = yes
+       with prop   = yes
+   ```
 
 4. Build Verium with RapidCheck.
 
-    Now you can run `make` and should see the property-based tests compiled with
-    the unit tests:
+   Now you can run `make` and should see the property-based tests compiled with
+   the unit tests:
 
-    ```shell
-    Making all in src
-    [...]
-    CXX      test/gen/test_verium-crypto_gen.o
-    CXX      test/test_verium-key_properties.o
-    ```
+   ```shell
+   Making all in src
+   [...]
+   CXX      test/gen/test_verium-crypto_gen.o
+   CXX      test/test_verium-key_properties.o
+   ```
 
 5. Run the unit tests with `make check`. The property-based tests will be run
    with the unit tests.
 
-    ```shell
-    Running tests: crypto_tests from test/crypto_tests.cpp
-    [...]
-    Running tests: key_properties from test/key_properties.cpp
-    ```
+   ```shell
+   Running tests: crypto_tests from test/crypto_tests.cpp
+   [...]
+   Running tests: key_properties from test/key_properties.cpp
+   ```
 
 That's it! You are now running property-based tests in Verium.

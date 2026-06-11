@@ -1,5 +1,5 @@
-FreeBSD build guide
-======================
+# FreeBSD build guide
+
 (updated for FreeBSD 12.0)
 
 This guide describes how to build veriumd and command-line utilities on FreeBSD.
@@ -39,6 +39,7 @@ export BDB_PREFIX="$PWD/db4"
 **Important**: Use `gmake` (the non-GNU `make` will exit with an error):
 
 With wallet:
+
 ```shell
 ./autogen.sh
 ./configure --with-gui=no \
@@ -47,6 +48,7 @@ With wallet:
 ```
 
 Without wallet:
+
 ```shell
 ./autogen.sh
 ./configure --with-gui=no --disable-wallet

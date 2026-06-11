@@ -8,12 +8,12 @@ Modern desktop wallet for [Verium](https://vericonomy.com) (VRM) and [Vericoin](
 
 ## Overview
 
-| Legacy (`verium-qt` / `vericoin-qt`) | Vericonomy Wallet |
-| --- | --- |
-| Qt GUI embedded in the same process as the node | React UI in a Tauri webview |
-| In-process C++ interfaces | JSON-RPC to managed daemon subprocesses |
-| Separate apps per chain | Single app with coin switcher + blended dashboard |
-| Single monolithic binary | App + bundled `veriumd` + `vericoind` sidecars |
+| Legacy (`verium-qt` / `vericoin-qt`)            | Vericonomy Wallet                                 |
+| ----------------------------------------------- | ------------------------------------------------- |
+| Qt GUI embedded in the same process as the node | React UI in a Tauri webview                       |
+| In-process C++ interfaces                       | JSON-RPC to managed daemon subprocesses           |
+| Separate apps per chain                         | Single app with coin switcher + blended dashboard |
+| Single monolithic binary                        | App + bundled `veriumd` + `vericoind` sidecars    |
 
 Consensus, wallet cryptography, P2P, mining, and staking logic stay in the existing C++ cores. This app is a **control shell**: it starts/stops daemons, calls wallet/mining/staking RPCs, reads `debug.log`, and stores app preferences locally.
 
@@ -70,35 +70,35 @@ Sidecar binary resolution (`daemon.rs`): bundled `veriumd` next to the app → `
 
 ### Frontend design
 
-| Layer | Technology | Role |
-| --- | --- | --- |
-| UI | React 18, Tailwind CSS, Lucide icons | Pages and components |
-| Routing | React Router 6 | `/setup` wizard + shell routes under `AppShell` |
-| Server state | TanStack React Query 5 | RPC polling, mutations, cache invalidation |
-| Client prefs | Zustand | `user-preferences.ts`, `toast-store.ts` |
-| Side effects | Custom hooks in `hooks/` | Auto-mine, block-found chime, incoming-VRM toasts, theme |
-| IPC | `@tauri-apps/api` | All backend calls through `invoke()` |
+| Layer        | Technology                           | Role                                                     |
+| ------------ | ------------------------------------ | -------------------------------------------------------- |
+| UI           | React 18, Tailwind CSS, Lucide icons | Pages and components                                     |
+| Routing      | React Router 6                       | `/setup` wizard + shell routes under `AppShell`          |
+| Server state | TanStack React Query 5               | RPC polling, mutations, cache invalidation               |
+| Client prefs | Zustand                              | `user-preferences.ts`, `toast-store.ts`                  |
+| Side effects | Custom hooks in `hooks/`             | Auto-mine, block-found chime, incoming-VRM toasts, theme |
+| IPC          | `@tauri-apps/api`                    | All backend calls through `invoke()`                     |
 
 Global hooks mount once in `App.tsx`: theme, auto-mine, block-mined watcher/sound, incoming VRM watcher/notifications, Web Audio unlock.
 
 ### Backend modules (`src-tauri/src/`)
 
-| Module | Purpose |
-| --- | --- |
-| `lib.rs` | Tauri builder, plugins, command registration, startup/shutdown hooks |
-| `commands.rs` | All `#[tauri::command]` handlers (~60): wallet, mining, daemon, bootstrap, WSL |
-| `state.rs` | Shared `AppState` (config, miner state, daemon manager) |
-| `config.rs` | Datadir, `verium.conf`, RPC bootstrap, `daemon.json`, wallet path resolution |
-| `daemon.rs` | Sidecar detection, spawn/kill child process |
-| `rpc.rs` | reqwest JSON-RPC client (cookie / user+pass auth) |
-| `prefs.rs` | `prefs.json` load/save |
-| `addressbook.rs` | `addressbook.json` CRUD |
-| `bootstrap.rs` | Chain snapshot download from CDN |
-| `logs.rs` | Tail `debug.log`, corruption/sync-stall detection |
-| `explorer_api.rs` | Proxy to production explorer `/v1/:chain/wallet/*` compat API |
-| `pool_api.rs` | Pool stats (`pool.vericonomy.com/api/stats`) and Supabase read RPCs for miner dashboard |
-| `updates.rs` | Version check (CDN + bundled manifest) |
-| `wsl.rs` | Windows WSL dev: start/stop/rebuild `veriumd` in Linux |
+| Module            | Purpose                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| `lib.rs`          | Tauri builder, plugins, command registration, startup/shutdown hooks                    |
+| `commands.rs`     | All `#[tauri::command]` handlers (~60): wallet, mining, daemon, bootstrap, WSL          |
+| `state.rs`        | Shared `AppState` (config, miner state, daemon manager)                                 |
+| `config.rs`       | Datadir, `verium.conf`, RPC bootstrap, `daemon.json`, wallet path resolution            |
+| `daemon.rs`       | Sidecar detection, spawn/kill child process                                             |
+| `rpc.rs`          | reqwest JSON-RPC client (cookie / user+pass auth)                                       |
+| `prefs.rs`        | `prefs.json` load/save                                                                  |
+| `addressbook.rs`  | `addressbook.json` CRUD                                                                 |
+| `bootstrap.rs`    | Chain snapshot download from CDN                                                        |
+| `logs.rs`         | Tail `debug.log`, corruption/sync-stall detection                                       |
+| `explorer_api.rs` | Proxy to production explorer `/v1/:chain/wallet/*` compat API                           |
+| `pool_api.rs`     | Pool stats (`pool.vericonomy.com/api/stats`) and Supabase read RPCs for miner dashboard |
+| `updates.rs`      | Version check (CDN + bundled manifest)                                                  |
+| `wsl.rs`          | Windows WSL dev: start/stop/rebuild `veriumd` in Linux                                  |
 
 ---
 
@@ -130,29 +130,29 @@ desktop/verium-app/
 
 ### Frontend (`package.json`)
 
-| Package | Use |
-| --- | --- |
-| `react`, `react-dom`, `react-router-dom` | UI and routing |
-| `@tanstack/react-query` | Async state / RPC polling |
-| `zustand` | Preferences and toasts |
-| `recharts` | Mining hashrate chart |
-| `lucide-react`, `clsx`, `tailwind-merge` | Icons and styling |
-| `@tauri-apps/api` | IPC to Rust |
-| `@tauri-apps/plugin-dialog`, `plugin-fs`, `plugin-shell` | Native dialogs and shell |
-| `vite`, `typescript`, `tailwindcss` | Build toolchain |
+| Package                                                  | Use                       |
+| -------------------------------------------------------- | ------------------------- |
+| `react`, `react-dom`, `react-router-dom`                 | UI and routing            |
+| `@tanstack/react-query`                                  | Async state / RPC polling |
+| `zustand`                                                | Preferences and toasts    |
+| `recharts`                                               | Mining hashrate chart     |
+| `lucide-react`, `clsx`, `tailwind-merge`                 | Icons and styling         |
+| `@tauri-apps/api`                                        | IPC to Rust               |
+| `@tauri-apps/plugin-dialog`, `plugin-fs`, `plugin-shell` | Native dialogs and shell  |
+| `vite`, `typescript`, `tailwindcss`                      | Build toolchain           |
 
 ### Backend (`src-tauri/Cargo.toml`)
 
-| Crate | Use |
-| --- | --- |
-| `tauri` 2 + plugins | Desktop shell, dialog, fs, shell |
-| `tokio` | Async runtime, process spawn |
-| `reqwest` | HTTP JSON-RPC to `veriumd` |
-| `serde` / `serde_json` | Serialization |
-| `dirs` | Platform data/config paths |
-| `chrono`, `uuid` | Timestamps, IDs |
-| `zip` | Bootstrap archive extraction |
-| `tracing` | Structured logging (`RUST_LOG=info` in dev) |
+| Crate                  | Use                                         |
+| ---------------------- | ------------------------------------------- |
+| `tauri` 2 + plugins    | Desktop shell, dialog, fs, shell            |
+| `tokio`                | Async runtime, process spawn                |
+| `reqwest`              | HTTP JSON-RPC to `veriumd`                  |
+| `serde` / `serde_json` | Serialization                               |
+| `dirs`                 | Platform data/config paths                  |
+| `chrono`, `uuid`       | Timestamps, IDs                             |
+| `zip`                  | Bootstrap archive extraction                |
+| `tracing`              | Structured logging (`RUST_LOG=info` in dev) |
 
 ### External runtime
 
@@ -165,12 +165,12 @@ desktop/verium-app/
 
 ### Prerequisites
 
-| Platform | Install |
-| --- | --- |
-| **All** | [Node.js 20+](https://nodejs.org/), [Rust stable](https://rustup.rs/) |
+| Platform    | Install                                                                                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **All**     | [Node.js 20+](https://nodejs.org/), [Rust stable](https://rustup.rs/)                                                                                |
 | **Windows** | Visual Studio 2022 with **Desktop development with C++** (`link.exe`). Use `npm run tauri:dev` — it loads MSVC via `scripts/load-win-build-env.ps1`. |
-| **Linux** | WebKit/GTK dev packages (see CI list below) |
-| **macOS** | Xcode Command Line Tools |
+| **Linux**   | WebKit/GTK dev packages (see CI list below)                                                                                                          |
+| **macOS**   | Xcode Command Line Tools                                                                                                                             |
 
 ### Clone and run
 
@@ -224,13 +224,13 @@ CDN base: `https://files.vericonomy.com/vrm/releases/` (version from `src/lib/re
 
 ### npm scripts
 
-| Script | Description |
-| --- | --- |
-| `npm run dev` | Vite only (no Tauri shell) |
-| `npm run tauri:dev` | Full desktop app in dev mode |
-| `npm run tauri:build` | Production installer/bundle |
-| `npm run lint` | TypeScript project check |
-| `npm run build` | Frontend production build only |
+| Script                  | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `npm run dev`           | Vite only (no Tauri shell)                    |
+| `npm run tauri:dev`     | Full desktop app in dev mode                  |
+| `npm run tauri:build`   | Production installer/bundle                   |
+| `npm run lint`          | TypeScript project check                      |
+| `npm run build`         | Frontend production build only                |
 | `npm run fetch:veriumd` | Fetch/copy sidecar into `src-tauri/binaries/` |
 
 ### First launch (dev)
@@ -241,11 +241,11 @@ CDN base: `https://files.vericonomy.com/vrm/releases/` (version from `src/lib/re
 
 Data directory defaults match the legacy client so existing chain/wallet data is reused:
 
-| OS | Chain + wallet data | App prefs |
-| --- | --- | --- |
-| Windows | `%APPDATA%\Verium` | `%APPDATA%\Verium\desktop-app\` |
-| macOS | `~/Library/Application Support/Verium` | same tree / `desktop-app/` |
-| Linux | `~/.verium` | `~/.config/Verium/desktop-app/` |
+| OS      | Chain + wallet data                    | App prefs                       |
+| ------- | -------------------------------------- | ------------------------------- |
+| Windows | `%APPDATA%\Verium`                     | `%APPDATA%\Verium\desktop-app\` |
+| macOS   | `~/Library/Application Support/Verium` | same tree / `desktop-app/`      |
+| Linux   | `~/.verium`                            | `~/.config/Verium/desktop-app/` |
 
 Wallet file: `<datadir>/wallets/wallet.dat` (or legacy `<datadir>/wallet.dat`).  
 Wallet backups default to `<datadir>/backups/verium-wallet-YYYYMMDD-HHMMSS.dat`.
@@ -277,12 +277,12 @@ Tag releases with `desktop-v*` to trigger the draft GitHub Release job.
 
 ## Configuration files
 
-| File | Written by | Contents |
-| --- | --- | --- |
-| `<datadir>/verium.conf` | App first-run + Settings | RPC port, `rpcuser`/`rpcpassword`, chain flags |
-| `<datadir>/desktop-app/daemon.json` | App | Saved datadir, RPC host/port (no secrets) |
-| `<datadir>/desktop-app/prefs.json` | App | Theme, mining prefs, sounds, fees, setup flag |
-| `<datadir>/desktop-app/addressbook.json` | App | Address book entries |
+| File                                     | Written by               | Contents                                       |
+| ---------------------------------------- | ------------------------ | ---------------------------------------------- |
+| `<datadir>/verium.conf`                  | App first-run + Settings | RPC port, `rpcuser`/`rpcpassword`, chain flags |
+| `<datadir>/desktop-app/daemon.json`      | App                      | Saved datadir, RPC host/port (no secrets)      |
+| `<datadir>/desktop-app/prefs.json`       | App                      | Theme, mining prefs, sounds, fees, setup flag  |
+| `<datadir>/desktop-app/addressbook.json` | App                      | Address book entries                           |
 
 RPC console command history is stored in browser `localStorage` only (see [`docs/SECURITY.md`](../../docs/SECURITY.md)).
 
@@ -290,14 +290,14 @@ RPC console command history is stored in browser `localStorage` only (see [`docs
 
 ## Related documentation
 
-| Document | Topic |
-| --- | --- |
-| [`doc/desktop-modernization-plan.md`](../../doc/desktop-modernization-plan.md) | Migration strategy, RPC transport, phased rollout |
-| [`docs/SECURITY.md`](../../docs/SECURITY.md) | Passphrase handling, RPC exposure, storage |
-| [`TESTING.md`](TESTING.md) | Pre-release QA checklist |
-| [`doc/JSON-RPC-interface.md`](../../doc/JSON-RPC-interface.md) | `veriumd` RPC reference |
-| [`doc/verium-conf.md`](../../doc/verium-conf.md) | Daemon configuration options |
-| [`doc/build-windows.md`](../../doc/build-windows.md) | Building `veriumd` from source (for `VERIUMD_LOCAL`) |
+| Document                                                                       | Topic                                                |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [`doc/desktop-modernization-plan.md`](../../doc/desktop-modernization-plan.md) | Migration strategy, RPC transport, phased rollout    |
+| [`docs/SECURITY.md`](../../docs/SECURITY.md)                                   | Passphrase handling, RPC exposure, storage           |
+| [`TESTING.md`](TESTING.md)                                                     | Pre-release QA checklist                             |
+| [`doc/JSON-RPC-interface.md`](../../doc/JSON-RPC-interface.md)                 | `veriumd` RPC reference                              |
+| [`doc/verium-conf.md`](../../doc/verium-conf.md)                               | Daemon configuration options                         |
+| [`doc/build-windows.md`](../../doc/build-windows.md)                           | Building `veriumd` from source (for `VERIUMD_LOCAL`) |
 
 ---
 
@@ -305,13 +305,13 @@ RPC console command history is stored in browser `localStorage` only (see [`docs
 
 Pre-built installers are published on [GitHub Releases](https://github.com/JoshiOS-VRY/verium/releases) (`desktop-v*` tags).
 
-| Platform | Asset |
-| --- | --- |
-| Windows 10/11 (x64) | `Vericonomy_Wallet_<version>_Windows_x64.exe` |
-| macOS (Intel) | `Vericonomy_Wallet_<version>_macOS_Intel.dmg` |
-| macOS (Apple Silicon) | `Vericonomy_Wallet_<version>_macOS_AppleSilicon.dmg` |
-| Linux x64 | `Vericonomy_Wallet_<version>_Linux_x64.deb` or `.AppImage` |
-| Linux ARM64 | `Vericonomy_Wallet_<version>_Linux_ARM64.deb` or `.AppImage` |
+| Platform              | Asset                                                        |
+| --------------------- | ------------------------------------------------------------ |
+| Windows 10/11 (x64)   | `Vericonomy_Wallet_<version>_Windows_x64.exe`                |
+| macOS (Intel)         | `Vericonomy_Wallet_<version>_macOS_Intel.dmg`                |
+| macOS (Apple Silicon) | `Vericonomy_Wallet_<version>_macOS_AppleSilicon.dmg`         |
+| Linux x64             | `Vericonomy_Wallet_<version>_Linux_x64.deb` or `.AppImage`   |
+| Linux ARM64           | `Vericonomy_Wallet_<version>_Linux_ARM64.deb` or `.AppImage` |
 
 **Backup:** Settings → Wallet backup & passphrase → choose a **new** filename in the `backups` folder (never overwrite live `wallet.dat`).
 

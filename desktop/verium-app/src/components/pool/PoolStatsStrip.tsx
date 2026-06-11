@@ -1,16 +1,16 @@
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { AnimatedHashrate } from "@/components/AnimatedHashrate";
-import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { StatCell, StatGrid } from "@/components/ui/StatGrid";
-import { ExternalLinkButton } from "@/components/ExternalLinkButton";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { usePoolStatsQuery } from "@/hooks/usePoolQueries";
-import { hsToHm } from "@/lib/pool-format";
-import { POOL_DASHBOARD_POLL_MS } from "@/lib/mining-poll";
-import { POOL_WEB_URL } from "@/lib/verium-pool";
-import { timeAgo } from "@/lib/pool-format";
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { AnimatedHashrate } from '@/components/AnimatedHashrate';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { StatCell, StatGrid } from '@/components/ui/StatGrid';
+import { ExternalLinkButton } from '@/components/ExternalLinkButton';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { usePoolStatsQuery } from '@/hooks/usePoolQueries';
+import { hsToHm } from '@/lib/pool-format';
+import { POOL_DASHBOARD_POLL_MS } from '@/lib/mining-poll';
+import { POOL_WEB_URL } from '@/lib/verium-pool';
+import { timeAgo } from '@/lib/pool-format';
 
 export function PoolStatsStrip({ enabled = true }: { enabled?: boolean }) {
   const visible = useWindowVisible();
@@ -20,7 +20,7 @@ export function PoolStatsStrip({ enabled = true }: { enabled?: boolean }) {
   useEffect(() => {
     if (!enabled || !visible) return;
     const tick = () => {
-      void queryClient.invalidateQueries({ queryKey: ["pool", "stats"] });
+      void queryClient.invalidateQueries({ queryKey: ['pool', 'stats'] });
     };
     tick();
     const id = window.setInterval(tick, POOL_DASHBOARD_POLL_MS);
@@ -34,15 +34,12 @@ export function PoolStatsStrip({ enabled = true }: { enabled?: boolean }) {
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
         <CardTitle className="normal-case">Public Verium Mining Pool</CardTitle>
-        <ExternalLinkButton href={POOL_WEB_URL}>
-          Mining Pool Dashboard
-        </ExternalLinkButton>
+        <ExternalLinkButton href={POOL_WEB_URL}>Mining Pool Dashboard</ExternalLinkButton>
       </CardHeader>
       <CardContent>
         {stats.isError && !s ? (
           <p className="text-sm text-fg-muted">
-            Pool stats unavailable. Build with POOL_SUPABASE_ANON_KEY or check
-            network.
+            Pool stats unavailable. Build with POOL_SUPABASE_ANON_KEY or check network.
           </p>
         ) : (
           <>
@@ -53,36 +50,21 @@ export function PoolStatsStrip({ enabled = true }: { enabled?: boolean }) {
               />
               <StatCell
                 label="Active miners"
-                value={
-                  <AnimatedNumber
-                    value={s?.activeMiners ?? undefined}
-                    fractionDigits={0}
-                  />
-                }
+                value={<AnimatedNumber value={s?.activeMiners ?? undefined} fractionDigits={0} />}
               />
               <StatCell
                 label="Active workers"
-                value={
-                  <AnimatedNumber
-                    value={s?.activeWorkers ?? undefined}
-                    fractionDigits={0}
-                  />
-                }
+                value={<AnimatedNumber value={s?.activeWorkers ?? undefined} fractionDigits={0} />}
               />
               <StatCell
                 label="Blocks found"
                 value={
-                  <AnimatedNumber
-                    value={s?.blocksFoundTotal ?? undefined}
-                    fractionDigits={0}
-                  />
+                  <AnimatedNumber value={s?.blocksFoundTotal ?? undefined} fractionDigits={0} />
                 }
               />
               <StatCell
                 label="Pool fee"
-                value={
-                  s?.poolFeePct != null ? <span>{s.poolFeePct}%</span> : "—"
-                }
+                value={s?.poolFeePct != null ? <span>{s.poolFeePct}%</span> : '—'}
               />
             </StatGrid>
             {s?.lastBlockAt ? (

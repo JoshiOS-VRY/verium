@@ -16,31 +16,27 @@ import {
   explorerPeersHash,
   explorerProfitabilityHash,
   explorerRichlistHash,
-} from "@/lib/explorer-links";
+} from '@/lib/explorer-links';
 
-export const EXPLORER_HOME = explorerHome("verium");
-export const EXPLORER_LOGO_URL = explorerLogoUrl("verium");
-export const EXPLORER_REST_BASE =
-  "https://explorer.vericonomy.com/v1/vrm/wallet";
-export const EXPLORER_BLOCKS = explorerBlocksHash("verium");
-export const EXPLORER_PEERS = explorerPeersHash("verium");
-export const EXPLORER_EXTRACTION = explorerExtractionHash("verium");
-export const EXPLORER_RICHLIST = explorerRichlistHash("verium");
-export const EXPLORER_PROFITABILITY = explorerProfitabilityHash("verium");
+export const EXPLORER_HOME = explorerHome('verium');
+export const EXPLORER_LOGO_URL = explorerLogoUrl('verium');
+export const EXPLORER_REST_BASE = 'https://explorer.vericonomy.com/v1/vrm/wallet';
+export const EXPLORER_BLOCKS = explorerBlocksHash('verium');
+export const EXPLORER_PEERS = explorerPeersHash('verium');
+export const EXPLORER_EXTRACTION = explorerExtractionHash('verium');
+export const EXPLORER_RICHLIST = explorerRichlistHash('verium');
+export const EXPLORER_PROFITABILITY = explorerProfitabilityHash('verium');
 
-export const DOCS_HOME = "https://docs.vericonomy.com/";
-export const DOCS_DOWNLOADS = "https://docs.vericonomy.com/en/Downloads";
+export const DOCS_HOME = 'https://docs.vericonomy.com/';
+export const DOCS_DOWNLOADS = 'https://docs.vericonomy.com/en/Downloads';
 
-export const CDN_ROOT = "https://files.vericonomy.com/vrm/";
-export const CDN_RELEASES = "https://files.vericonomy.com/vrm/releases/";
-export const VERSION_FEED = "https://files.vericonomy.com/vrm/VERSION_VRM.json";
+export const CDN_ROOT = 'https://files.vericonomy.com/vrm/';
+export const CDN_RELEASES = 'https://files.vericonomy.com/vrm/releases/';
+export const VERSION_FEED = 'https://files.vericonomy.com/vrm/VERSION_VRM.json';
 
-export const BOOTSTRAP_URL_X64 =
-  "https://files.vericonomy.com/vrm/bootstrap/verium-bootstrap.zip";
-export const BOOTSTRAP_URL_ARM =
-  "https://files.vericonomy.com/vrm/bootstrap-arm/bootstrap.zip";
-export const BOOTSTRAP_CDN_INDEX =
-  "https://files.vericonomy.com/vrm/bootstrap/";
+export const BOOTSTRAP_URL_X64 = 'https://files.vericonomy.com/vrm/bootstrap/verium-bootstrap.zip';
+export const BOOTSTRAP_URL_ARM = 'https://files.vericonomy.com/vrm/bootstrap-arm/bootstrap.zip';
+export const BOOTSTRAP_CDN_INDEX = 'https://files.vericonomy.com/vrm/bootstrap/';
 
 /** Build candidate bootstrap URLs (canonical + recent dated archives). */
 export function bootstrapDownloadCandidates(): string[] {
@@ -55,8 +51,8 @@ export function bootstrapDownloadCandidates(): string[] {
   return urls;
 }
 
-export const COMMUNITY_WEBSITE = "https://staged.vericonomy.com";
-export const COMMUNITY_TWITTER = "https://twitter.com/vericonomy";
+export const COMMUNITY_WEBSITE = 'https://staged.vericonomy.com';
+export const COMMUNITY_TWITTER = 'https://twitter.com/vericonomy';
 
 /**
  * Default tx URL template. `%s` is replaced with the transaction hash, matching
@@ -66,40 +62,26 @@ export const COMMUNITY_TWITTER = "https://twitter.com/vericonomy";
  * The fragment path is the best guess for the current explorer build; users
  * can override it in Settings.
  */
-export const DEFAULT_TX_EXPLORER_TEMPLATE = defaultTxExplorerTemplate("verium");
+export const DEFAULT_TX_EXPLORER_TEMPLATE = defaultTxExplorerTemplate('verium');
 
-export const DEFAULT_BLOCK_EXPLORER_TEMPLATE =
-  defaultBlockExplorerTemplate("verium");
+export const DEFAULT_BLOCK_EXPLORER_TEMPLATE = defaultBlockExplorerTemplate('verium');
 
-export const DEFAULT_ADDRESS_EXPLORER_TEMPLATE =
-  defaultAddressExplorerTemplate("verium");
+export const DEFAULT_ADDRESS_EXPLORER_TEMPLATE = defaultAddressExplorerTemplate('verium');
 
 export function buildTxExplorerUrl(template: string, txid: string): string {
-  const safe =
-    template && template.includes("%s")
-      ? template
-      : DEFAULT_TX_EXPLORER_TEMPLATE;
-  return safe.replace("%s", encodeURIComponent(txid));
+  const safe = template && template.includes('%s') ? template : DEFAULT_TX_EXPLORER_TEMPLATE;
+  return safe.replace('%s', encodeURIComponent(txid));
 }
 
 export function buildBlockExplorerUrl(
   template: string,
-  blockHashOrHeight: string | number,
+  blockHashOrHeight: string | number
 ): string {
-  const safe =
-    template && template.includes("%s")
-      ? template
-      : DEFAULT_BLOCK_EXPLORER_TEMPLATE;
-  return safe.replace("%s", encodeURIComponent(String(blockHashOrHeight)));
+  const safe = template && template.includes('%s') ? template : DEFAULT_BLOCK_EXPLORER_TEMPLATE;
+  return safe.replace('%s', encodeURIComponent(String(blockHashOrHeight)));
 }
 
-export function buildAddressExplorerUrl(
-  template: string,
-  address: string,
-): string {
-  const safe =
-    template && template.includes("%s")
-      ? template
-      : DEFAULT_ADDRESS_EXPLORER_TEMPLATE;
-  return safe.replace("%s", encodeURIComponent(address));
+export function buildAddressExplorerUrl(template: string, address: string): string {
+  const safe = template && template.includes('%s') ? template : DEFAULT_ADDRESS_EXPLORER_TEMPLATE;
+  return safe.replace('%s', encodeURIComponent(address));
 }

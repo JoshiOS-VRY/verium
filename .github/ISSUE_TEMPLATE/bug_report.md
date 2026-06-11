@@ -4,7 +4,6 @@ about: Create a report to help us improve
 title: ''
 labels: Bug
 assignees: ''
-
 ---
 
 <!-- This issue tracker is only for technical issues related to Bitcoin Core.

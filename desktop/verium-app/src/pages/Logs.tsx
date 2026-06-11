@@ -1,19 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pause, Play, RefreshCcw, Square } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey, getCoinProfile } from "@/lib/coin/profile";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { tauriDebugLogStatus, tauriTailLogs } from "@/lib/rpc/client";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pause, Play, RefreshCcw, Square } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey, getCoinProfile } from '@/lib/coin/profile';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { tauriDebugLogStatus, tauriTailLogs } from '@/lib/rpc/client';
 
 const POLL_MS = 2_000;
 
@@ -29,7 +23,7 @@ export function Logs() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const logStatus = useQuery({
-    queryKey: coinQueryKey(coin, "debug-log-status"),
+    queryKey: coinQueryKey(coin, 'debug-log-status'),
     queryFn: () => tauriDebugLogStatus(coin),
     // Live tail uses the recursive poll below; avoid duplicate status refetches.
     refetchInterval: false,
@@ -41,7 +35,7 @@ export function Logs() {
       setLines(next);
       setError(null);
       await queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, "debug-log-status"),
+        queryKey: coinQueryKey(coin, 'debug-log-status'),
       });
     } catch (e) {
       setError(String(e));
@@ -66,7 +60,7 @@ export function Logs() {
           setLines(next);
           setError(null);
           void queryClient.invalidateQueries({
-            queryKey: coinQueryKey(coin, "debug-log-status"),
+            queryKey: coinQueryKey(coin, 'debug-log-status'),
           });
         }
       } catch (e) {
@@ -90,7 +84,7 @@ export function Logs() {
     if (!liveMode || paused) return;
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
+      behavior: 'smooth',
     });
   }, [lines, liveMode, paused]);
 
@@ -103,15 +97,11 @@ export function Logs() {
         <div>
           <CardTitle>Node logs</CardTitle>
           <CardDescription>
-            Tail of {profile.binaryName}{" "}
-            <span className="font-mono text-[11px]">debug.log</span>
+            Tail of {profile.binaryName} <span className="font-mono text-[11px]">debug.log</span>
             {logPath ? (
               <>
-                {" "}
-                at{" "}
-                <span className="break-all font-mono text-[11px] text-fg-muted">
-                  {logPath}
-                </span>
+                {' '}
+                at <span className="break-all font-mono text-[11px] text-fg-muted">{logPath}</span>
               </>
             ) : (
               <> from your data directory.</>
@@ -119,16 +109,8 @@ export function Logs() {
           </CardDescription>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {liveMode ? (
-            <Badge tone="success">Live</Badge>
-          ) : (
-            <Badge tone="neutral">Paused</Badge>
-          )}
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => void refreshOnce()}
-          >
+          {liveMode ? <Badge tone="success">Live</Badge> : <Badge tone="neutral">Paused</Badge>}
+          <Button size="sm" variant="secondary" onClick={() => void refreshOnce()}>
             <RefreshCcw className="h-3.5 w-3.5" /> Refresh
           </Button>
           {!liveMode ? (
@@ -140,11 +122,7 @@ export function Logs() {
               <Play className="h-3.5 w-3.5" /> Resume
             </Button>
           ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setPaused(true)}
-            >
+            <Button size="sm" variant="secondary" onClick={() => setPaused(true)}>
               <Pause className="h-3.5 w-3.5" /> Pause
             </Button>
           )}
@@ -181,9 +159,9 @@ export function Logs() {
                   No log lines yet.
                   {logPath ? (
                     <>
-                      {" "}
-                      Start the {profile.binaryName} node from Setup or Settings —
-                      logging writes to the path above once the daemon runs.
+                      {' '}
+                      Start the {profile.binaryName} node from Setup or Settings — logging writes to
+                      the path above once the daemon runs.
                     </>
                   ) : (
                     <> Start live tail or refresh.</>
@@ -193,10 +171,7 @@ export function Logs() {
             </div>
           ) : (
             lines.map((line, i) => (
-              <div
-                key={`${i}-${line.slice(0, 24)}`}
-                className="whitespace-pre-wrap"
-              >
+              <div key={`${i}-${line.slice(0, 24)}`} className="whitespace-pre-wrap">
                 {line}
               </div>
             ))

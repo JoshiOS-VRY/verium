@@ -1,17 +1,11 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, ShieldCheck, ShieldX } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { WalletUnlockGate } from "@/components/WalletUnlockGate";
-import { rpcWalletSignMessage, rpcWalletVerifyMessage } from "@/lib/rpc/client";
-import { useActiveCoin } from "@/lib/coin/context";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { CheckCircle2, ShieldCheck, ShieldX } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { WalletUnlockGate } from '@/components/WalletUnlockGate';
+import { rpcWalletSignMessage, rpcWalletVerifyMessage } from '@/lib/rpc/client';
+import { useActiveCoin } from '@/lib/coin/context';
 
 export function SignVerify() {
   return (
@@ -29,8 +23,8 @@ export function SignVerify() {
 
 function SignCard() {
   const coin = useActiveCoin();
-  const [address, setAddress] = useState("");
-  const [message, setMessage] = useState("");
+  const [address, setAddress] = useState('');
+  const [message, setMessage] = useState('');
 
   const sign = useMutation({
     mutationFn: () => rpcWalletSignMessage(coin, address.trim(), message),
@@ -43,8 +37,7 @@ function SignCard() {
           <ShieldCheck className="h-4 w-4 text-accent" /> Sign message
         </CardTitle>
         <CardDescription>
-          Produce a cryptographic signature for a message using an address you
-          own.
+          Produce a cryptographic signature for a message using an address you own.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
@@ -73,11 +66,9 @@ function SignCard() {
           onClick={() => sign.mutate()}
           disabled={!address.trim() || !message || sign.isPending}
         >
-          {sign.isPending ? "Signing…" : "Sign message"}
+          {sign.isPending ? 'Signing…' : 'Sign message'}
         </Button>
-        {sign.error && (
-          <div className="text-xs text-danger">{String(sign.error)}</div>
-        )}
+        {sign.error && <div className="text-xs text-danger">{String(sign.error)}</div>}
         {sign.data && (
           <div className="flex flex-col gap-1">
             <label className="text-xs text-fg-muted">Signature</label>
@@ -91,7 +82,7 @@ function SignCard() {
               size="sm"
               variant="ghost"
               onClick={() => {
-                void navigator.clipboard.writeText(sign.data ?? "");
+                void navigator.clipboard.writeText(sign.data ?? '');
               }}
             >
               Copy signature
@@ -105,13 +96,12 @@ function SignCard() {
 
 function VerifyCard() {
   const coin = useActiveCoin();
-  const [address, setAddress] = useState("");
-  const [signature, setSignature] = useState("");
-  const [message, setMessage] = useState("");
+  const [address, setAddress] = useState('');
+  const [signature, setSignature] = useState('');
+  const [message, setMessage] = useState('');
 
   const verify = useMutation({
-    mutationFn: () =>
-      rpcWalletVerifyMessage(coin, address.trim(), signature.trim(), message),
+    mutationFn: () => rpcWalletVerifyMessage(coin, address.trim(), signature.trim(), message),
   });
 
   return (
@@ -158,15 +148,11 @@ function VerifyCard() {
         <Button
           size="sm"
           onClick={() => verify.mutate()}
-          disabled={
-            !address.trim() || !signature.trim() || !message || verify.isPending
-          }
+          disabled={!address.trim() || !signature.trim() || !message || verify.isPending}
         >
-          {verify.isPending ? "Verifying…" : "Verify signature"}
+          {verify.isPending ? 'Verifying…' : 'Verify signature'}
         </Button>
-        {verify.error && (
-          <div className="text-xs text-danger">{String(verify.error)}</div>
-        )}
+        {verify.error && <div className="text-xs text-danger">{String(verify.error)}</div>}
         {verify.data === true && (
           <div className="flex items-center gap-2 rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
             <CheckCircle2 className="h-4 w-4" /> Signature is valid.

@@ -1,6 +1,6 @@
-import { create } from "zustand";
+import { create } from 'zustand';
 
-export type ToastTone = "success" | "info";
+export type ToastTone = 'success' | 'info';
 
 export interface ToastItem {
   id: string;
@@ -15,7 +15,7 @@ const DEFAULT_DURATION_MS = 6_000;
 
 interface ToastState {
   toasts: ToastItem[];
-  push: (toast: Omit<ToastItem, "id">) => string;
+  push: (toast: Omit<ToastItem, 'id'>) => string;
   dismiss: (id: string) => void;
 }
 
@@ -25,7 +25,7 @@ export const useToastStore = create<ToastState>((set) => ({
     const id = crypto.randomUUID();
     const next: ToastItem = {
       id,
-      tone: "info",
+      tone: 'info',
       durationMs: DEFAULT_DURATION_MS,
       ...toast,
     };
@@ -41,7 +41,7 @@ export const useToastStore = create<ToastState>((set) => ({
   },
 }));
 
-export function pushToast(toast: Omit<ToastItem, "id">): string {
+export function pushToast(toast: Omit<ToastItem, 'id'>): string {
   return useToastStore.getState().push(toast);
 }
 

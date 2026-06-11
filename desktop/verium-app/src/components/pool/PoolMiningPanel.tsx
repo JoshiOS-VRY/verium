@@ -1,27 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { PoolMiningControls } from "@/components/pool/PoolMiningControls";
-import {
-  MiningHashrateChart,
-  type HashSample,
-} from "@/components/MiningHashrateChart";
-import { ExternalLinkButton } from "@/components/ExternalLinkButton";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { PoolMiningControls } from '@/components/pool/PoolMiningControls';
+import { MiningHashrateChart, type HashSample } from '@/components/MiningHashrateChart';
+import { ExternalLinkButton } from '@/components/ExternalLinkButton';
+import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import {
   resolvePoolDashboardAddress,
   suggestPoolPayoutAddress,
-} from "@/lib/pool-dashboard-address";
-import { fetchPoolMinerStatus } from "@/lib/pool-miner-api";
-import { rpcListAddressGroupings } from "@/lib/rpc/client";
-import { poolMinerUrl, POOL_WEB_URL } from "@/lib/verium-pool";
-import type { UserPreferences } from "@/lib/user-preferences";
-import { useUserPreferences } from "@/lib/user-preferences";
-import type { CpuTopology } from "@/lib/mining-opt";
+} from '@/lib/pool-dashboard-address';
+import { fetchPoolMinerStatus } from '@/lib/pool-miner-api';
+import { rpcListAddressGroupings } from '@/lib/rpc/client';
+import { poolMinerUrl, POOL_WEB_URL } from '@/lib/verium-pool';
+import type { UserPreferences } from '@/lib/user-preferences';
+import { useUserPreferences } from '@/lib/user-preferences';
+import type { CpuTopology } from '@/lib/mining-opt';
 
 export function PoolMiningPanel({
   prefs,
@@ -66,19 +59,17 @@ export function PoolMiningPanel({
   const prefsLoaded = useUserPreferences((s) => s.loaded);
 
   const addresses = useQuery({
-    queryKey: coinQueryKey("verium", "listaddressgroupings"),
-    queryFn: () => rpcListAddressGroupings("verium"),
+    queryKey: coinQueryKey('verium', 'listaddressgroupings'),
+    queryFn: () => rpcListAddressGroupings('verium'),
     enabled,
     staleTime: 30_000,
   });
 
   const dashboardAddress = resolvePoolDashboardAddress(prefs, addresses.data);
-  const dashboardHref = dashboardAddress
-    ? poolMinerUrl(dashboardAddress)
-    : POOL_WEB_URL;
+  const dashboardHref = dashboardAddress ? poolMinerUrl(dashboardAddress) : POOL_WEB_URL;
 
   const localStatus = useQuery({
-    queryKey: ["pool-miner", "status"],
+    queryKey: ['pool-miner', 'status'],
     queryFn: fetchPoolMinerStatus,
     enabled,
     refetchInterval: false,
@@ -108,9 +99,7 @@ export function PoolMiningPanel({
     const last = lastSampleRef.current;
     if (last && localHashrate === last.hr && now - last.t < 4000) return;
     lastSampleRef.current = { t: now, hr: localHashrate };
-    setSamples((prev) =>
-      [...prev, { t: now, hashrate: localHashrate }].slice(-60),
-    );
+    setSamples((prev) => [...prev, { t: now, hashrate: localHashrate }].slice(-60));
   }, [localHashrate, localPoolMining]);
 
   const sessionAvg = useMemo(() => {

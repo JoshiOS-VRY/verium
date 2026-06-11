@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle } from 'lucide-react';
 
 export interface SetupStep {
   id: string;
@@ -25,10 +25,8 @@ export function SetupStepIndicator({
             ) : (
               <Circle className="h-3.5 w-3.5" />
             )}
-            <span className={reached ? "text-fg" : ""}>{s.label}</span>
-            {idx < steps.length - 1 && (
-              <span className="text-fg-subtle">/</span>
-            )}
+            <span className={reached ? 'text-fg' : ''}>{s.label}</span>
+            {idx < steps.length - 1 && <span className="text-fg-subtle">/</span>}
           </li>
         );
       })}

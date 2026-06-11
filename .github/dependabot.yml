@@ -8,9 +8,9 @@ updates:
     groups:
       npm-production:
         patterns:
-          - "*"
+          - '*'
         exclude-patterns:
-          - "@tauri-apps/*"
+          - '@tauri-apps/*'
 
   - package-ecosystem: cargo
     directory: /desktop/verium-app/src-tauri

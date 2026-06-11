@@ -5,8 +5,8 @@
 // React-side wrappers for Binary Chain v3 (DACE) RPC commands.
 // See vericoin/doc/dace/ for the protocol specifications.
 
-import { invoke } from "@tauri-apps/api/core";
-import type { CoinId } from "@/lib/coin/profile";
+import { invoke } from '@tauri-apps/api/core';
+import type { CoinId } from '@/lib/coin/profile';
 
 /** DACE activation status and live state. Returned by `binarychain_status`. */
 export interface BinaryChainStatus {
@@ -53,33 +53,24 @@ export interface BinaryChainAnchor {
   committee_root: string;
 }
 
-export async function rpcBinaryChainStatus(
-  coin: CoinId,
-): Promise<BinaryChainStatus> {
-  return invoke<BinaryChainStatus>("binarychain_status", { coin });
+export async function rpcBinaryChainStatus(coin: CoinId): Promise<BinaryChainStatus> {
+  return invoke<BinaryChainStatus>('binarychain_status', { coin });
 }
 
-export async function rpcBinaryChainMetrics(
-  coin: CoinId,
-): Promise<BinaryChainMetrics> {
-  return invoke<BinaryChainMetrics>("binarychain_metrics", { coin });
+export async function rpcBinaryChainMetrics(coin: CoinId): Promise<BinaryChainMetrics> {
+  return invoke<BinaryChainMetrics>('binarychain_metrics', { coin });
 }
 
-export async function rpcBinaryChainAnchor(
-  coin: CoinId,
-): Promise<BinaryChainAnchor | null> {
-  const result = await invoke<BinaryChainAnchor | null>(
-    "binarychain_anchor",
-    { coin },
-  );
+export async function rpcBinaryChainAnchor(coin: CoinId): Promise<BinaryChainAnchor | null> {
+  const result = await invoke<BinaryChainAnchor | null>('binarychain_anchor', { coin });
   return result ?? null;
 }
 
 export async function rpcBinaryChainRedeemClaim(
   coin: CoinId,
-  leafHash: string,
+  leafHash: string
 ): Promise<{ txid: string }> {
-  return invoke<{ txid: string }>("binarychain_redeem_claim", {
+  return invoke<{ txid: string }>('binarychain_redeem_claim', {
     coin,
     leafHash,
   });
@@ -88,9 +79,9 @@ export async function rpcBinaryChainRedeemClaim(
 export async function rpcBinaryChainRegisterTicket(
   coin: CoinId,
   stakeOutpoint: string,
-  operatorPubkey: string,
+  operatorPubkey: string
 ): Promise<{ txid: string; ticket_id: string }> {
-  return invoke("binarychain_register_ticket", {
+  return invoke('binarychain_register_ticket', {
     coin,
     stakeOutpoint,
     operatorPubkey,
@@ -99,9 +90,9 @@ export async function rpcBinaryChainRegisterTicket(
 
 export async function rpcBinaryChainUnbondTicket(
   coin: CoinId,
-  ticketId: string,
+  ticketId: string
 ): Promise<{ txid: string }> {
-  return invoke("binarychain_unbond_ticket", { coin, ticketId });
+  return invoke('binarychain_unbond_ticket', { coin, ticketId });
 }
 
 export interface BinaryChainFundResult {
@@ -115,11 +106,11 @@ export interface BinaryChainFundResult {
 export async function rpcBinaryChainFundWallet(
   coin: CoinId,
   nblocks = 10,
-  address?: string,
+  address?: string
 ): Promise<BinaryChainFundResult> {
-  return invoke<BinaryChainFundResult>("binarychain_fund_wallet", {
+  return invoke<BinaryChainFundResult>('binarychain_fund_wallet', {
     coin,
     nblocks,
-    address: address ?? "",
+    address: address ?? '',
   });
 }

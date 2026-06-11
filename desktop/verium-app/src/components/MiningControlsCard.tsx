@@ -1,21 +1,12 @@
-import { ChevronDown } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { MiningThreadControls } from "@/components/MiningThreadControls";
-import { MiningRewardAddressControls } from "@/components/MiningRewardAddressControls";
-import type { MiningRewardAddressMode } from "@/lib/mining-reward-address";
-import type { CpuTopology } from "@/lib/mining-opt";
-import { clearMiningStoppedByUser } from "@/lib/mining-session";
-import {
-  playBlockMinedSound,
-  unlockBlockMinedAudio,
-} from "@/lib/block-mined-sound";
-import { cn } from "@/lib/utils";
+import { ChevronDown } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { MiningThreadControls } from '@/components/MiningThreadControls';
+import { MiningRewardAddressControls } from '@/components/MiningRewardAddressControls';
+import type { MiningRewardAddressMode } from '@/lib/mining-reward-address';
+import type { CpuTopology } from '@/lib/mining-opt';
+import { clearMiningStoppedByUser } from '@/lib/mining-session';
+import { playBlockMinedSound, unlockBlockMinedAudio } from '@/lib/block-mined-sound';
+import { cn } from '@/lib/utils';
 
 interface MiningControlsCardProps {
   autoAdjustThreads: boolean;
@@ -55,8 +46,8 @@ function BehaviorToggle({
   return (
     <label
       className={cn(
-        "flex cursor-pointer gap-3 rounded-md border border-border bg-bg-subtle/50 px-3 py-2.5",
-        disabled && "cursor-not-allowed opacity-60",
+        'flex cursor-pointer gap-3 rounded-md border border-border bg-bg-subtle/50 px-3 py-2.5',
+        disabled && 'cursor-not-allowed opacity-60'
       )}
     >
       <input
@@ -100,8 +91,8 @@ export function MiningControlsCard({
       <CardHeader>
         <CardTitle className="normal-case">Configuration</CardTitle>
         <CardDescription>
-          Thread count and reward destination. Stop the miner before changing
-          threads or address mode.
+          Thread count and reward destination. Stop the miner before changing threads or address
+          mode.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -129,9 +120,7 @@ export function MiningControlsCard({
           </summary>
           <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">
-                Behavior
-              </p>
+              <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Behavior</p>
               <BehaviorToggle
                 checked={autoMineOnOpen}
                 disabled={controlsDisabled}

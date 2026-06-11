@@ -1,21 +1,15 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, KeyRound, Shield, Smartphone } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { ExportRecoveryPhrasePanel } from "@/components/ExportRecoveryPhrasePanel";
-import { RecoveryPhraseWizard } from "@/components/RecoveryPhraseWizard";
-import { RestoreFromPhraseForm } from "@/components/RestoreFromPhraseForm";
-import { TwoFactorEnrollmentPanel } from "@/components/TwoFactorEnrollmentPanel";
-import { useActiveCoin } from "@/lib/coin/context";
-import { useWalletMode } from "@/hooks/useWalletMode";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, KeyRound, Shield, Smartphone } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { ExportRecoveryPhrasePanel } from '@/components/ExportRecoveryPhrasePanel';
+import { RecoveryPhraseWizard } from '@/components/RecoveryPhraseWizard';
+import { RestoreFromPhraseForm } from '@/components/RestoreFromPhraseForm';
+import { TwoFactorEnrollmentPanel } from '@/components/TwoFactorEnrollmentPanel';
+import { useActiveCoin } from '@/lib/coin/context';
+import { useWalletMode } from '@/hooks/useWalletMode';
 import {
   autoLockGetConfig,
   autoLockSetConfig,
@@ -27,10 +21,10 @@ import {
   twoFactorStatus,
   type AutoLockConfig,
   type SpendingControlsConfig,
-} from "@/lib/security/client";
+} from '@/lib/security/client';
 
 const totpInputClass =
-  "h-8 w-32 rounded-md border border-border bg-bg-subtle px-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-1 focus:ring-accent/30";
+  'h-8 w-32 rounded-md border border-border bg-bg-subtle px-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-1 focus:ring-accent/30';
 
 const DEFAULT_AUTO_LOCK: AutoLockConfig = {
   enabled: false,
@@ -49,41 +43,35 @@ export function Security() {
   const coin = useActiveCoin();
   const { isLight } = useWalletMode();
   const queryClient = useQueryClient();
-  const [totpCode, setTotpCode] = useState("");
+  const [totpCode, setTotpCode] = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showPhraseRestore, setShowPhraseRestore] = useState(false);
-  const [walletUnlockPass, setWalletUnlockPass] = useState("");
+  const [walletUnlockPass, setWalletUnlockPass] = useState('');
 
-  const twoFa = useQuery({ queryKey: ["two-factor"], queryFn: twoFactorStatus });
-  const autoLock = useQuery({ queryKey: ["auto-lock"], queryFn: autoLockGetConfig });
-  const spending = useQuery({ queryKey: ["spending-controls"], queryFn: spendingControlsGet });
+  const twoFa = useQuery({ queryKey: ['two-factor'], queryFn: twoFactorStatus });
+  const autoLock = useQuery({ queryKey: ['auto-lock'], queryFn: autoLockGetConfig });
+  const spending = useQuery({ queryKey: ['spending-controls'], queryFn: spendingControlsGet });
   const isHd = useQuery({
-    queryKey: ["wallet-is-hd", coin],
+    queryKey: ['wallet-is-hd', coin],
     queryFn: () => recoveryWalletIsHd(coin),
   });
 
   const disable2fa = useMutation({
     mutationFn: (code: string) => twoFactorDisable(code),
     onSuccess: () => {
-      setTotpCode("");
-      queryClient.invalidateQueries({ queryKey: ["two-factor"] });
+      setTotpCode('');
+      queryClient.invalidateQueries({ queryKey: ['two-factor'] });
     },
   });
   const applyHd = useMutation({
-    mutationFn: ({
-      phrase,
-      unlockPassphrase,
-    }: {
-      phrase: string;
-      unlockPassphrase?: string;
-    }) =>
+    mutationFn: ({ phrase, unlockPassphrase }: { phrase: string; unlockPassphrase?: string }) =>
       recoveryApplyHdSeed(coin, phrase, undefined, unlockPassphrase),
     onSuccess: async () => {
-      setWalletUnlockPass("");
+      setWalletUnlockPass('');
       setShowRecovery(false);
-      queryClient.setQueryData(["wallet-is-hd", coin], true);
-      await queryClient.invalidateQueries({ queryKey: ["wallet-is-hd", coin] });
+      queryClient.setQueryData(['wallet-is-hd', coin], true);
+      await queryClient.invalidateQueries({ queryKey: ['wallet-is-hd', coin] });
     },
   });
 
@@ -92,13 +80,13 @@ export function Security() {
   const saveAutoLock = async (patch: Partial<AutoLockConfig>) => {
     const current = { ...DEFAULT_AUTO_LOCK, ...autoLock.data };
     await autoLockSetConfig({ ...current, ...patch });
-    queryClient.invalidateQueries({ queryKey: ["auto-lock"] });
+    queryClient.invalidateQueries({ queryKey: ['auto-lock'] });
   };
 
   const saveSpending = async (patch: Partial<SpendingControlsConfig>) => {
     const current = await spendingControlsGet();
     await spendingControlsSave({ ...current, ...patch });
-    queryClient.invalidateQueries({ queryKey: ["spending-controls"] });
+    queryClient.invalidateQueries({ queryKey: ['spending-controls'] });
   };
 
   const autoLockCfg = { ...DEFAULT_AUTO_LOCK, ...autoLock.data };
@@ -111,8 +99,8 @@ export function Security() {
         <p className="mt-1 text-sm text-fg-muted">
           Recovery phrase, 2FA, spending controls, and auto-lock.
           {isLight
-            ? " Light wallets use an encrypted keystore — export your recovery phrase regularly."
-            : " wallet.dat backups are in Settings."}
+            ? ' Light wallets use an encrypted keystore — export your recovery phrase regularly.'
+            : ' wallet.dat backups are in Settings.'}
         </p>
       </div>
 
@@ -123,8 +111,8 @@ export function Security() {
           </CardTitle>
           <CardDescription>
             {walletIsHd || isLight
-              ? "Export, restore, or rotate access using your recovery phrase (or HD master xprv). wallet.dat backup is in Settings."
-              : "Upgrade to HD to generate a recovery phrase."}
+              ? 'Export, restore, or rotate access using your recovery phrase (or HD master xprv). wallet.dat backup is in Settings.'
+              : 'Upgrade to HD to generate a recovery phrase.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -136,8 +124,8 @@ export function Security() {
           )}
           {(walletIsHd || isLight) && (
             <p className="text-xs text-success">
-              HD recovery is enabled. To restore keys from a phrase, use the form below
-              (replaces wallet keys — back up wallet.dat first).
+              HD recovery is enabled. To restore keys from a phrase, use the form below (replaces
+              wallet keys — back up wallet.dat first).
             </p>
           )}
           {!walletIsHd && !isLight && !showRecovery && (
@@ -172,7 +160,7 @@ export function Security() {
                   if (showPhraseRestore) setShowPhraseRestore(false);
                 }}
               >
-                {showExport ? "Hide export" : "Export recovery phrase"}
+                {showExport ? 'Hide export' : 'Export recovery phrase'}
               </Button>
               {showExport && <ExportRecoveryPhrasePanel />}
               <Button
@@ -183,7 +171,7 @@ export function Security() {
                   if (showExport) setShowExport(false);
                 }}
               >
-                {showPhraseRestore ? "Hide" : "Restore from recovery phrase"}
+                {showPhraseRestore ? 'Hide' : 'Restore from recovery phrase'}
               </Button>
               {showPhraseRestore && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
@@ -191,7 +179,7 @@ export function Security() {
                     onRestored={() => {
                       setShowPhraseRestore(false);
                       void queryClient.invalidateQueries({
-                        queryKey: ["wallet-is-hd", coin],
+                        queryKey: ['wallet-is-hd', coin],
                       });
                     }}
                   />
@@ -199,12 +187,8 @@ export function Security() {
               )}
             </div>
           )}
-          {applyHd.isPending && (
-            <p className="text-xs text-fg-muted">Applying HD seed…</p>
-          )}
-          {applyHd.error && (
-            <p className="text-xs text-danger">{String(applyHd.error)}</p>
-          )}
+          {applyHd.isPending && <p className="text-xs text-fg-muted">Applying HD seed…</p>}
+          {applyHd.error && <p className="text-xs text-danger">{String(applyHd.error)}</p>}
         </CardContent>
       </Card>
 
@@ -218,8 +202,8 @@ export function Security() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Badge tone={twoFa.data?.enabled ? "success" : "neutral"}>
-            {twoFa.data?.enabled ? "Enabled" : "Disabled"}
+          <Badge tone={twoFa.data?.enabled ? 'success' : 'neutral'}>
+            {twoFa.data?.enabled ? 'Enabled' : 'Disabled'}
           </Badge>
           {!twoFa.data?.enabled && <TwoFactorEnrollmentPanel showStartButton />}
           {twoFa.data?.enabled && (
@@ -230,9 +214,7 @@ export function Security() {
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={totpCode}
-                onChange={(e) =>
-                  setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                }
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="Code to disable"
                 className={totpInputClass}
               />
@@ -285,9 +267,7 @@ export function Security() {
               max={1440}
               disabled={!autoLockCfg.enabled}
               value={Math.round(autoLockCfg.idle_seconds / 60)}
-              onChange={(e) =>
-                void saveAutoLock({ idle_seconds: Number(e.target.value) * 60 })
-              }
+              onChange={(e) => void saveAutoLock({ idle_seconds: Number(e.target.value) * 60 })}
               className="h-8 w-20 rounded border border-border px-2 text-sm disabled:opacity-50"
             />
           </div>
@@ -306,9 +286,7 @@ export function Security() {
             <input
               type="checkbox"
               checked={spendingCfg.clipboard_guard_enabled}
-              onChange={(e) =>
-                void saveSpending({ clipboard_guard_enabled: e.target.checked })
-              }
+              onChange={(e) => void saveSpending({ clipboard_guard_enabled: e.target.checked })}
               className="accent-accent"
             />
             Clipboard hijack detection on send
@@ -341,12 +319,10 @@ export function Security() {
               type="number"
               min={0}
               step="0.01"
-              value={spendingCfg.daily_spend_cap_vrm ?? ""}
+              value={spendingCfg.daily_spend_cap_vrm ?? ''}
               onChange={(e) =>
                 void saveSpending({
-                  daily_spend_cap_vrm: e.target.value
-                    ? Number(e.target.value)
-                    : null,
+                  daily_spend_cap_vrm: e.target.value ? Number(e.target.value) : null,
                 })
               }
               className="h-8 w-28 rounded border border-border px-2"
@@ -358,12 +334,10 @@ export function Security() {
               type="number"
               min={0}
               step="0.01"
-              value={spendingCfg.daily_spend_cap_vrc ?? ""}
+              value={spendingCfg.daily_spend_cap_vrc ?? ''}
               onChange={(e) =>
                 void saveSpending({
-                  daily_spend_cap_vrc: e.target.value
-                    ? Number(e.target.value)
-                    : null,
+                  daily_spend_cap_vrc: e.target.value ? Number(e.target.value) : null,
                 })
               }
               className="h-8 w-28 rounded border border-border px-2"

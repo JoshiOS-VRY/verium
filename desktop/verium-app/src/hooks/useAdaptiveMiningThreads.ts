@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useUserPreferences } from "@/lib/user-preferences";
+import { useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useUserPreferences } from '@/lib/user-preferences';
 import {
   ADAPTIVE_MINING_POLL_MS,
   adaptiveMiningCeiling,
@@ -11,15 +11,11 @@ import {
   MINING_THREADS_MIN,
   nextAdaptiveMiningThreads,
   type AdaptiveThreadState,
-} from "@/lib/mining-opt";
-import { miningRewardAddressForStart } from "@/lib/mining-reward-address";
-import {
-  rpcGetMinerState,
-  rpcMinerStart,
-  type MinerLocalState,
-} from "@/lib/rpc/client";
+} from '@/lib/mining-opt';
+import { miningRewardAddressForStart } from '@/lib/mining-reward-address';
+import { rpcGetMinerState, rpcMinerStart, type MinerLocalState } from '@/lib/rpc/client';
 
-const VERIUM = "verium" as const;
+const VERIUM = 'verium' as const;
 
 /**
  * While CPU mining is active and auto-adjust is enabled, polls system CPU
@@ -30,18 +26,17 @@ export function useAdaptiveMiningThreads() {
   const prefs = useUserPreferences((s) => s.prefs);
   const loaded = useUserPreferences((s) => s.loaded);
   const autoAdjust = prefs.auto_adjust_mine_threads !== false;
-  const enabled =
-    loaded && prefs.verium_enabled !== false && autoAdjust;
+  const enabled = loaded && prefs.verium_enabled !== false && autoAdjust;
 
   const topology = useQuery({
-    queryKey: ["cpu-topology"],
+    queryKey: ['cpu-topology'],
     queryFn: fetchCpuTopology,
     staleTime: 60_000,
     enabled,
   });
 
   const minerState = useQuery({
-    queryKey: coinQueryKey(VERIUM, "get_miner_state"),
+    queryKey: coinQueryKey(VERIUM, 'get_miner_state'),
     queryFn: () => rpcGetMinerState(VERIUM),
     refetchInterval: false,
     enabled,
@@ -64,7 +59,7 @@ export function useAdaptiveMiningThreads() {
     const tick = async () => {
       if (applyingRef.current) return;
       const live = queryClient.getQueryData<MinerLocalState>(
-        coinQueryKey(VERIUM, "get_miner_state"),
+        coinQueryKey(VERIUM, 'get_miner_state')
       );
       if (!live?.active) return;
       const current = live.threads ?? 0;
@@ -85,7 +80,7 @@ export function useAdaptiveMiningThreads() {
         ceiling,
         MINING_THREADS_MIN,
         snapshot,
-        adaptiveStateRef.current,
+        adaptiveStateRef.current
       );
       adaptiveStateRef.current = state;
 
@@ -93,17 +88,10 @@ export function useAdaptiveMiningThreads() {
 
       applyingRef.current = true;
       try {
-        const updated = await rpcMinerStart(
-          VERIUM,
-          next,
-          miningRewardAddressForStart(prefs),
-        );
-        queryClient.setQueryData(
-          coinQueryKey(VERIUM, "get_miner_state"),
-          updated,
-        );
+        const updated = await rpcMinerStart(VERIUM, next, miningRewardAddressForStart(prefs));
+        queryClient.setQueryData(coinQueryKey(VERIUM, 'get_miner_state'), updated);
         void queryClient.invalidateQueries({
-          queryKey: coinQueryKey(VERIUM, "getmininginfo"),
+          queryKey: coinQueryKey(VERIUM, 'getmininginfo'),
         });
       } catch {
         /* keep current threads on RPC failure */

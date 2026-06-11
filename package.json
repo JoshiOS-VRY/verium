@@ -1,0 +1,12 @@
+{
+  "name": "verium",
+  "private": true,
+  "description": "Verium (VRM) full node and Vericonomy desktop wallet monorepo.",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}

@@ -1,6 +1,6 @@
-import type { CoinId } from "@/lib/coin/profile";
-import { getCoinProfile } from "@/lib/coin/profile";
-import { formatNumber } from "@/lib/utils";
+import type { CoinId } from '@/lib/coin/profile';
+import { getCoinProfile } from '@/lib/coin/profile';
+import { formatNumber } from '@/lib/utils';
 
 const SATS_PER_COIN = 100_000_000;
 
@@ -46,7 +46,7 @@ export function formatRecipientLine(
     amount: number;
     address: string;
     label?: string;
-  },
+  }
 ): string {
   const amount = formatCoinAmount(options.amount, coin, 8);
   const label = options.label?.trim();
@@ -60,10 +60,10 @@ export { SATS_PER_COIN };
 
 /** @deprecated use formatCoinAmount(amount, "verium") */
 export function formatVrm(amount: number, digits = 8): string {
-  return formatCoinAmount(amount, "verium", digits);
+  return formatCoinAmount(amount, 'verium', digits);
 }
 
 /** @deprecated use formatCoinAmountCompact(amount, "verium") */
 export function formatVrmCompact(amount: number): string {
-  return formatCoinAmountCompact(amount, "verium");
+  return formatCoinAmountCompact(amount, 'verium');
 }

@@ -1,8 +1,8 @@
-export type CoinId = "verium" | "vericoin";
+export type CoinId = 'verium' | 'vericoin';
 
 export interface CoinProfile {
   id: CoinId;
-  symbol: "VRM" | "VRC";
+  symbol: 'VRM' | 'VRC';
   displayName: string;
   tagline: string;
   binaryName: string;
@@ -10,7 +10,7 @@ export interface CoinProfile {
   chainArg?: string;
   defaultRpcPort: number;
   defaultP2pPort: number;
-  earnMode: "mining" | "staking";
+  earnMode: 'mining' | 'staking';
   confirmationsMatured: number;
   /** Production explorer host (see Rust `explorer_api_base` for `/v1/:chain/wallet`). */
   explorerApiBase: string;
@@ -20,43 +20,43 @@ export interface CoinProfile {
 
 export const COIN_PROFILES: Record<CoinId, CoinProfile> = {
   verium: {
-    id: "verium",
-    symbol: "VRM",
-    displayName: "Verium",
-    tagline: "Reserve",
-    binaryName: "veriumd",
-    confFilename: "vericonomy.conf",
+    id: 'verium',
+    symbol: 'VRM',
+    displayName: 'Verium',
+    tagline: 'Reserve',
+    binaryName: 'veriumd',
+    confFilename: 'vericonomy.conf',
     defaultRpcPort: 33987,
     defaultP2pPort: 36988,
-    earnMode: "mining",
+    earnMode: 'mining',
     confirmationsMatured: 100,
-    explorerApiBase: "https://explorer.vericonomy.com",
-    bootstrapCdn: "https://files.vericonomy.com/vrm/bootstrap",
-    accentClass: "bg-accent/15 text-accent border-accent/30",
+    explorerApiBase: 'https://explorer.vericonomy.com',
+    bootstrapCdn: 'https://files.vericonomy.com/vrm/bootstrap',
+    accentClass: 'bg-accent/15 text-accent border-accent/30',
   },
   vericoin: {
-    id: "vericoin",
-    symbol: "VRC",
-    displayName: "Vericoin",
-    tagline: "Currency",
-    binaryName: "vericoind",
-    confFilename: "vericonomy.conf",
-    chainArg: "-vericoin",
+    id: 'vericoin',
+    symbol: 'VRC',
+    displayName: 'Vericoin',
+    tagline: 'Currency',
+    binaryName: 'vericoind',
+    confFilename: 'vericonomy.conf',
+    chainArg: '-vericoin',
     defaultRpcPort: 58683,
     defaultP2pPort: 58684,
-    earnMode: "staking",
+    earnMode: 'staking',
     confirmationsMatured: 500,
-    explorerApiBase: "https://explorer.vericonomy.com",
-    bootstrapCdn: "https://files.vericonomy.com/vrc/bootstrap",
-    accentClass: "bg-bg-panel text-fg-muted border-border-strong",
+    explorerApiBase: 'https://explorer.vericonomy.com',
+    bootstrapCdn: 'https://files.vericonomy.com/vrc/bootstrap',
+    accentClass: 'bg-bg-panel text-fg-muted border-border-strong',
   },
 };
 
-export const ALL_COINS: CoinId[] = ["verium", "vericoin"];
+export const ALL_COINS: CoinId[] = ['verium', 'vericoin'];
 
 export const COIN_LOGO_URLS: Record<CoinId, string> = {
-  verium: "/img/vericonomy/verium-logo.svg",
-  vericoin: "/img/vericonomy/vericoin-logo.svg",
+  verium: '/img/vericonomy/verium-logo.svg',
+  vericoin: '/img/vericonomy/vericoin-logo.svg',
 };
 
 export function getCoinProfile(coin: CoinId): CoinProfile {
@@ -64,7 +64,7 @@ export function getCoinProfile(coin: CoinId): CoinProfile {
 }
 
 export function isValidCoinId(value: string): value is CoinId {
-  return value === "verium" || value === "vericoin";
+  return value === 'verium' || value === 'vericoin';
 }
 
 export function coinQueryKey(coin: CoinId, ...parts: unknown[]): unknown[] {
@@ -74,10 +74,10 @@ export function coinQueryKey(coin: CoinId, ...parts: unknown[]): unknown[] {
 /** INI section in `vericonomy.conf` for the given coin and network mode. */
 export function getNodeConfSection(
   coin: CoinId,
-  networkMode: "mainnet" | "binarytest" = "mainnet",
+  networkMode: 'mainnet' | 'binarytest' = 'mainnet'
 ): string {
-  if (networkMode === "binarytest") {
-    return coin === "verium" ? "binarytest-verium" : "binarytest-vericoin";
+  if (networkMode === 'binarytest') {
+    return coin === 'verium' ? 'binarytest-verium' : 'binarytest-vericoin';
   }
-  return coin === "verium" ? "verium" : "vericoin";
+  return coin === 'verium' ? 'verium' : 'vericoin';
 }

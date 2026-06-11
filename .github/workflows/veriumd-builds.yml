@@ -4,16 +4,16 @@ on:
   push:
     branches: [main, master]
     paths:
-      - "src/crypto/**"
-      - "src/miner.cpp"
-      - "configure.ac"
-      - ".github/workflows/veriumd-builds.yml"
+      - 'src/crypto/**'
+      - 'src/miner.cpp'
+      - 'configure.ac'
+      - '.github/workflows/veriumd-builds.yml'
   pull_request:
     paths:
-      - "src/crypto/**"
-      - "src/miner.cpp"
-      - "configure.ac"
-      - ".github/workflows/veriumd-builds.yml"
+      - 'src/crypto/**'
+      - 'src/miner.cpp'
+      - 'configure.ac'
+      - '.github/workflows/veriumd-builds.yml'
   workflow_dispatch:
 
 defaults:

@@ -1,5 +1,5 @@
-import type { BlockchainInfo, PeerInfo } from "@/lib/rpc/client";
-import type { CoinId } from "@/lib/coin/profile";
+import type { BlockchainInfo, PeerInfo } from '@/lib/rpc/client';
+import type { CoinId } from '@/lib/coin/profile';
 
 const ONE_WEEK_SECONDS = 7 * 24 * 60 * 60;
 const HEADER_LAG_THRESHOLD = 1_000;
@@ -11,7 +11,7 @@ export const BOOTSTRAP_SYNC_PROGRESS_THRESHOLD = 0.95;
 /** UI + mining gate: within this many blocks of headers/network tip counts as synced. */
 export const SYNCED_BLOCK_LAG_THRESHOLD = 2;
 
-export type ChainSyncPhase = "offline" | "syncing" | "catching-up" | "synced";
+export type ChainSyncPhase = 'offline' | 'syncing' | 'catching-up' | 'synced';
 
 export interface ChainSyncContext {
   connected?: boolean;
@@ -21,43 +21,37 @@ export interface ChainSyncContext {
 
 export function chainSyncPhase(
   info: BlockchainInfo | undefined,
-  ctx: ChainSyncContext = {},
+  ctx: ChainSyncContext = {}
 ): ChainSyncPhase {
   if (!info) {
     return chainSyncPhaseFromCounts(undefined, undefined, undefined, ctx);
   }
-  return chainSyncPhaseFromCounts(
-    info.blocks,
-    info.headers,
-    info.initialblockdownload,
-    ctx,
-  );
+  return chainSyncPhaseFromCounts(info.blocks, info.headers, info.initialblockdownload, ctx);
 }
 
 export function chainSyncPhaseFromCounts(
   blocks: number | undefined,
   headers: number | undefined,
   initialBlockDownload: boolean | undefined,
-  ctx: ChainSyncContext = {},
+  ctx: ChainSyncContext = {}
 ): ChainSyncPhase {
-  if (ctx.connected === false) return "offline";
-  if (blocks == null || ctx.syncStalled) return "syncing";
-  if (initialBlockDownload) return "syncing";
+  if (ctx.connected === false) return 'offline';
+  if (blocks == null || ctx.syncStalled) return 'syncing';
+  if (initialBlockDownload) return 'syncing';
   const localTarget = headers ?? blocks;
-  const target =
-    ctx.networkTip != null ? Math.max(localTarget, ctx.networkTip) : localTarget;
+  const target = ctx.networkTip != null ? Math.max(localTarget, ctx.networkTip) : localTarget;
   const behind = blocksBehindNetwork(blocks, target);
   if (behind != null && behind > SYNCED_BLOCK_LAG_THRESHOLD) {
-    return "catching-up";
+    return 'catching-up';
   }
-  return "synced";
+  return 'synced';
 }
 
 export function isChainSynced(
   info: BlockchainInfo | undefined,
-  ctx: ChainSyncContext = {},
+  ctx: ChainSyncContext = {}
 ): boolean {
-  return chainSyncPhase(info, ctx) === "synced";
+  return chainSyncPhase(info, ctx) === 'synced';
 }
 
 function headerLag(info: BlockchainInfo): number {
@@ -67,7 +61,7 @@ function headerLag(info: BlockchainInfo): number {
 /** Best estimate of how far the node still needs to sync. */
 export function syncTargetHeight(
   info: BlockchainInfo | undefined,
-  networkTip?: number,
+  networkTip?: number
 ): number | undefined {
   if (!info) return networkTip;
   const localTarget = info.headers ?? info.blocks;
@@ -77,26 +71,19 @@ export function syncTargetHeight(
 
 export function blocksBehindNetwork(
   localBlocks: number | undefined,
-  targetHeight: number | undefined,
+  targetHeight: number | undefined
 ): number | undefined {
   if (localBlocks == null || targetHeight == null) return undefined;
   return Math.max(0, targetHeight - localBlocks);
 }
 
-function isNearNetworkTip(
-  info: BlockchainInfo,
-  networkTip?: number,
-): boolean {
+function isNearNetworkTip(info: BlockchainInfo, networkTip?: number): boolean {
   const progress = info.verificationprogress ?? 0;
   const lag = headerLag(info);
   const target = syncTargetHeight(info, networkTip);
   const behind = blocksBehindNetwork(info.blocks, target);
 
-  if (
-    progress >= NEAR_TIP_PROGRESS &&
-    info.blocks > NEAR_TIP_BLOCKS &&
-    lag < NEAR_TIP_HEADER_LAG
-  ) {
+  if (progress >= NEAR_TIP_PROGRESS && info.blocks > NEAR_TIP_BLOCKS && lag < NEAR_TIP_HEADER_LAG) {
     return true;
   }
 
@@ -127,7 +114,7 @@ export function shouldOfferBootstrap(
   info: BlockchainInfo | undefined,
   _peers: PeerInfo[] | undefined,
   dismissedAt?: number,
-  networkTip?: number,
+  networkTip?: number
 ): boolean {
   if (!info) return false;
   if (!info.initialblockdownload) return false;
@@ -154,7 +141,7 @@ export function shouldOfferBootstrap(
 
 export function bootstrapImportedAtForCoin(
   importedAtByCoin: Partial<Record<CoinId, number>> | undefined,
-  coin: CoinId,
+  coin: CoinId
 ): number | undefined {
   return importedAtByCoin?.[coin];
 }

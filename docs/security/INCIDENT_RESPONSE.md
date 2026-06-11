@@ -13,21 +13,21 @@ Include:
 
 ## Intake timeline (target)
 
-| Stage | Target |
-| --- | --- |
-| Acknowledgment | 2 business days |
-| Triage severity | 5 business days |
+| Stage                  | Target                           |
+| ---------------------- | -------------------------------- |
+| Acknowledgment         | 2 business days                  |
+| Triage severity        | 5 business days                  |
 | Fix or mitigation plan | 15 business days (critical/high) |
-| Coordinated disclosure | After fix shipped or 90 days |
+| Coordinated disclosure | After fix shipped or 90 days     |
 
 ## Severity classes
 
-| Class | Examples |
-| --- | --- |
+| Class    | Examples                                                      |
+| -------- | ------------------------------------------------------------- |
 | Critical | Remote key extraction without user action, 2FA bypass on send |
-| High | Plaintext secret persistence, unrestricted RPC in production |
-| Medium | Information leak in logs, weak defaults |
-| Low | UX security issues, documentation gaps |
+| High     | Plaintext secret persistence, unrestricted RPC in production  |
+| Medium   | Information leak in logs, weak defaults                       |
+| Low      | UX security issues, documentation gaps                        |
 
 ## Hotfix process
 

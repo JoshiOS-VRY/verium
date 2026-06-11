@@ -1,14 +1,8 @@
-import { Loader2 } from "lucide-react";
-import { getCoinProfile, type CoinId } from "@/lib/coin/profile";
-import type { NodeStatus } from "@/lib/rpc/client";
+import { Loader2 } from 'lucide-react';
+import { getCoinProfile, type CoinId } from '@/lib/coin/profile';
+import type { NodeStatus } from '@/lib/rpc/client';
 
-export function DaemonConnectingBanner({
-  coin,
-  status,
-}: {
-  coin: CoinId;
-  status?: NodeStatus;
-}) {
+export function DaemonConnectingBanner({ coin, status }: { coin: CoinId; status?: NodeStatus }) {
   const profile = getCoinProfile(coin);
   const reindexing = status?.reindex_in_progress === true;
   const detail = status?.error?.trim();

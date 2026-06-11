@@ -4,6 +4,6 @@ export interface ShutdownProgress {
   percent: number;
 }
 
-export const SHUTDOWN_PROGRESS_EVENT = "shutdown-progress";
+export const SHUTDOWN_PROGRESS_EVENT = 'shutdown-progress';
 
-export const SHUTDOWN_FALLBACK_MESSAGE = "Preparing to quit…";
+export const SHUTDOWN_FALLBACK_MESSAGE = 'Preparing to quit…';

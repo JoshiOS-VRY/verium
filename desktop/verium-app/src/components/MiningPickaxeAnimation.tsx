@@ -1,16 +1,16 @@
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
 export interface MiningPickaxeAnimationProps {
   active?: boolean;
   booting?: boolean;
-  size?: "xs" | "sm" | "md";
+  size?: 'xs' | 'sm' | 'md';
   className?: string;
 }
 
 const sizeClass = {
-  xs: "h-3.5 w-[18px]",
-  sm: "h-4 w-5",
-  md: "h-5 w-6",
+  xs: 'h-3.5 w-[18px]',
+  sm: 'h-4 w-5',
+  md: 'h-5 w-6',
 } as const;
 
 /**
@@ -19,28 +19,21 @@ const sizeClass = {
 export function MiningPickaxeAnimation({
   active = false,
   booting = false,
-  size = "sm",
+  size = 'sm',
   className,
 }: MiningPickaxeAnimationProps) {
   const live = active || booting;
-  const pickaxeTone = booting
-    ? "text-warning"
-    : active
-      ? "text-success"
-      : "text-fg-muted";
+  const pickaxeTone = booting ? 'text-warning' : active ? 'text-success' : 'text-fg-muted';
 
   return (
     <span
-      className={cn(
-        "relative inline-flex shrink-0 items-center justify-center",
-        className,
-      )}
+      className={cn('relative inline-flex shrink-0 items-center justify-center', className)}
       aria-hidden
     >
       <svg
         viewBox="0 0 32 26"
         fill="none"
-        className={cn("overflow-visible", sizeClass[size])}
+        className={cn('overflow-visible', sizeClass[size])}
         role="img"
       >
         {/* Rock base */}
@@ -50,20 +43,8 @@ export function MiningPickaxeAnimation({
           strokeWidth="0.6"
         />
         {/* Ore veins in the rock */}
-        <ellipse
-          cx="11.5"
-          cy="20.2"
-          rx="2.2"
-          ry="1.1"
-          className="fill-warning/55"
-        />
-        <ellipse
-          cx="17.8"
-          cy="21"
-          rx="1.6"
-          ry="0.85"
-          className="fill-warning/40"
-        />
+        <ellipse cx="11.5" cy="20.2" rx="2.2" ry="1.1" className="fill-warning/55" />
+        <ellipse cx="17.8" cy="21" rx="1.6" ry="0.85" className="fill-warning/40" />
         <path
           d="M14 18.2L15.8 19.6"
           className="stroke-warning/50"
@@ -73,8 +54,8 @@ export function MiningPickaxeAnimation({
 
         {/* Chips flying off the strike point */}
         <g
-          className={cn(live && "mining-ore-chips")}
-          style={booting ? { animationDuration: "1.35s" } : undefined}
+          className={cn(live && 'mining-ore-chips')}
+          style={booting ? { animationDuration: '1.35s' } : undefined}
         >
           <circle cx="11" cy="19.8" r="0.55" className="fill-warning/80" />
           <circle cx="13.2" cy="20.6" r="0.4" className="fill-warning/60" />
@@ -90,8 +71,8 @@ export function MiningPickaxeAnimation({
         <g
           className={cn(
             pickaxeTone,
-            live && (booting ? "mining-pickaxe-swing-slow" : "mining-pickaxe-swing"),
-            !live && "-rotate-[22deg]",
+            live && (booting ? 'mining-pickaxe-swing-slow' : 'mining-pickaxe-swing'),
+            !live && '-rotate-[22deg]'
           )}
         >
           <path

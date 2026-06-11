@@ -1,15 +1,12 @@
-import { useEffect, useState } from "react";
-import { Cpu, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Card, CardContent } from "@/components/ui/Card";
-import { MiningPickaxeAnimation } from "@/components/MiningPickaxeAnimation";
-import {
-  MinerBootBadge,
-  MinerHashrateDisplay,
-} from "@/components/MinerBootIndicator";
-import { formatSessionDuration } from "@/lib/mining-revenue";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { Cpu, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Card, CardContent } from '@/components/ui/Card';
+import { MiningPickaxeAnimation } from '@/components/MiningPickaxeAnimation';
+import { MinerBootBadge, MinerHashrateDisplay } from '@/components/MinerBootIndicator';
+import { formatSessionDuration } from '@/lib/mining-revenue';
+import { cn } from '@/lib/utils';
 
 export interface MiningHeroProps {
   active: boolean;
@@ -36,10 +33,7 @@ function StartBlockerHint({
   syncStalled,
   staticAddressMissing,
   blocksBehind,
-}: Pick<
-  MiningHeroProps,
-  "chainSynced" | "syncStalled" | "staticAddressMissing" | "blocksBehind"
->) {
+}: Pick<MiningHeroProps, 'chainSynced' | 'syncStalled' | 'staticAddressMissing' | 'blocksBehind'>) {
   if (syncStalled) {
     return <span className="text-danger">Sync is stalled.</span>;
   }
@@ -49,7 +43,7 @@ function StartBlockerHint({
         Wait for the node to reach the network tip
         {blocksBehind != null && blocksBehind > 0
           ? ` (~${blocksBehind.toLocaleString()} blocks behind)`
-          : ""}
+          : ''}
         .
       </span>
     );
@@ -107,16 +101,14 @@ export function MiningHero({
           Stopping…
         </>
       ) : (
-        "Stop mining"
+        'Stop mining'
       )}
     </Button>
   ) : (
     <Button
       size="lg"
       onClick={onStart}
-      disabled={
-        startPending || !chainSynced || syncStalled || staticAddressMissing
-      }
+      disabled={startPending || !chainSynced || syncStalled || staticAddressMissing}
       className="h-11 shrink-0 px-6 text-base font-semibold shadow-md sm:min-w-[10.5rem]"
     >
       {startPending ? (
@@ -125,7 +117,7 @@ export function MiningHero({
           Starting…
         </>
       ) : (
-        "Start mining"
+        'Start mining'
       )}
     </Button>
   );
@@ -133,7 +125,7 @@ export function MiningHero({
   return (
     <Card
       className={cn(
-        live && "border-accent/25 bg-gradient-to-br from-bg-panel via-bg-panel to-accent/5",
+        live && 'border-accent/25 bg-gradient-to-br from-bg-panel via-bg-panel to-accent/5'
       )}
     >
       <CardContent className="flex flex-col gap-4 py-5">
@@ -147,11 +139,7 @@ export function MiningHero({
               />
               <h2 className="text-lg font-semibold text-fg">CPU miner</h2>
               {minerBooting || active ? (
-                <MinerBootBadge
-                  booting={minerBooting}
-                  active={active}
-                  activeLabel="Running"
-                />
+                <MinerBootBadge booting={minerBooting} active={active} activeLabel="Running" />
               ) : (
                 <Badge tone="neutral">Stopped</Badge>
               )}
@@ -174,8 +162,8 @@ export function MiningHero({
             ) : (
               <div className="rounded-lg border border-dashed border-border bg-bg-subtle/40 px-4 py-5 text-center sm:text-left">
                 <p className="text-sm text-fg-muted">
-                  Solo CPU mining on this wallet. Configure threads below, then
-                  start when your node is synced.
+                  Solo CPU mining on this wallet. Configure threads below, then start when your node
+                  is synced.
                 </p>
                 <p className="mt-2 text-xs text-fg-subtle">
                   <StartBlockerHint
@@ -198,9 +186,7 @@ export function MiningHero({
                 </div>
                 <div>
                   <span className="text-fg-subtle">Threads </span>
-                  <span className="font-semibold tabular-nums text-fg">
-                    {displayThreads}
-                  </span>
+                  <span className="font-semibold tabular-nums text-fg">{displayThreads}</span>
                 </div>
                 {sessionAvg != null && sessionAvg > 0 && !minerBooting && (
                   <div>
@@ -232,15 +218,12 @@ export function MiningHero({
           </div>
         </div>
 
-        {mutationError && (
-          <p className="text-xs text-danger">{String(mutationError)}</p>
-        )}
+        {mutationError && <p className="text-xs text-danger">{String(mutationError)}</p>}
 
         {!live && (
           <div className="flex items-center gap-2 text-xs text-fg-muted">
             <Cpu className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Built-in Verium CPU miner — rewards pay to your wallet per reward
-            address settings.
+            Built-in Verium CPU miner — rewards pay to your wallet per reward address settings.
           </div>
         )}
       </CardContent>

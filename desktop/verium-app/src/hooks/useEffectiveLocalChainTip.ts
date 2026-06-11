@@ -1,13 +1,13 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
-import { useLightServerConnected } from "@/hooks/useLightServerConnected";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { coinQueryKey, type CoinId } from "@/lib/coin/profile";
-import { pushChainTip, useChainTip } from "@/lib/chain-tip-store";
-import { fetchExplorerBlocks } from "@/lib/explorer-api";
-import { rpcGetBlockchainInfo } from "@/lib/rpc/client";
+import { useLightServerConnected } from '@/hooks/useLightServerConnected';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import { pushChainTip, useChainTip } from '@/lib/chain-tip-store';
+import { fetchExplorerBlocks } from '@/lib/explorer-api';
+import { rpcGetBlockchainInfo } from '@/lib/rpc/client';
 
 /**
  * Local tip for live block feeds: max(chain-tip watcher, `getblockchaininfo`).
@@ -21,7 +21,7 @@ export function useEffectiveLocalChainTip(coin: CoinId) {
   const chainTip = useChainTip(coin);
 
   const blockchain = useQuery({
-    queryKey: coinQueryKey(coin, "getblockchaininfo"),
+    queryKey: coinQueryKey(coin, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(coin),
     enabled: !isLight && visible,
     refetchInterval: false,
@@ -29,7 +29,7 @@ export function useEffectiveLocalChainTip(coin: CoinId) {
   });
 
   const explorerBlocks = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-blocks", 10),
+    queryKey: coinQueryKey(coin, 'explorer-blocks', 10),
     queryFn: () => fetchExplorerBlocks(coin, 10),
     enabled: isLight && visible,
     staleTime: 5_000,
@@ -45,14 +45,11 @@ export function useEffectiveLocalChainTip(coin: CoinId) {
     effectiveStoreHeight >= rpcHeight
       ? chainTip.tip?.hash
       : (blockchain.data?.bestblockhash ?? chainTip.tip?.hash);
-  const time =
-    effectiveStoreHeight >= rpcHeight ? (chainTip.tip?.time ?? 0) : 0;
+  const time = effectiveStoreHeight >= rpcHeight ? (chainTip.tip?.time ?? 0) : 0;
 
   useEffect(() => {
     if (!isLight || lightHeight <= 0) return;
-    const indexed = explorerBlocks.data?.find(
-      (block) => block.height === lightHeight,
-    );
+    const indexed = explorerBlocks.data?.find((block) => block.height === lightHeight);
     if (indexed?.hash && indexed.time > 0) {
       if (
         chainTip.tip?.hash === indexed.hash &&
@@ -106,14 +103,7 @@ export function useEffectiveLocalChainTip(coin: CoinId) {
       hash: rpcHash,
       time: 0,
     });
-  }, [
-    blockchain.data?.bestblockhash,
-    chainTip.tip?.hash,
-    coin,
-    isLight,
-    rpcHeight,
-    storeHeight,
-  ]);
+  }, [blockchain.data?.bestblockhash, chainTip.tip?.hash, coin, isLight, rpcHeight, storeHeight]);
 
   return {
     height,

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Coins, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { Coins, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
 
 interface FeeRateDialogProps {
   open: boolean;
@@ -12,19 +12,13 @@ interface FeeRateDialogProps {
 }
 
 const PRESETS: { id: string; rate: number; label: string; hint: string }[] = [
-  { id: "min", rate: 0.0001, label: "Economy", hint: "Cheapest, may take longer." },
-  { id: "default", rate: 0.001, label: "Default", hint: "Recommended for typical sends." },
-  { id: "fast", rate: 0.005, label: "Fast", hint: "Prioritized inclusion." },
-  { id: "priority", rate: 0.01, label: "Priority", hint: "Heavy fee — for urgent sends." },
+  { id: 'min', rate: 0.0001, label: 'Economy', hint: 'Cheapest, may take longer.' },
+  { id: 'default', rate: 0.001, label: 'Default', hint: 'Recommended for typical sends.' },
+  { id: 'fast', rate: 0.005, label: 'Fast', hint: 'Prioritized inclusion.' },
+  { id: 'priority', rate: 0.01, label: 'Priority', hint: 'Heavy fee — for urgent sends.' },
 ];
 
-export function FeeRateDialog({
-  open,
-  current,
-  symbol,
-  onClose,
-  onApply,
-}: FeeRateDialogProps) {
+export function FeeRateDialog({ open, current, symbol, onClose, onApply }: FeeRateDialogProps) {
   const [draft, setDraft] = useState(current.toString());
 
   useEffect(() => {
@@ -34,10 +28,10 @@ export function FeeRateDialog({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -81,19 +75,17 @@ export function FeeRateDialog({
                   type="button"
                   onClick={() => setDraft(preset.rate.toString())}
                   className={cn(
-                    "flex flex-col items-start gap-1 rounded-md border px-3 py-2 text-left transition-colors",
+                    'flex flex-col items-start gap-1 rounded-md border px-3 py-2 text-left transition-colors',
                     active
-                      ? "border-accent bg-accent/10"
-                      : "border-border bg-bg-subtle hover:border-border-strong",
+                      ? 'border-accent bg-accent/10'
+                      : 'border-border bg-bg-subtle hover:border-border-strong'
                   )}
                 >
                   <span className="text-sm font-medium">{preset.label}</span>
                   <span className="text-[11px] tabular-nums text-fg-muted">
                     {preset.rate.toFixed(8)} {symbol}/kB
                   </span>
-                  <span className="text-[11px] text-fg-subtle">
-                    {preset.hint}
-                  </span>
+                  <span className="text-[11px] text-fg-subtle">{preset.hint}</span>
                 </button>
               );
             })}
@@ -108,17 +100,14 @@ export function FeeRateDialog({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               className={cn(
-                "h-9 rounded-md border bg-bg-subtle px-3 text-sm tabular-nums outline-none",
-                valid
-                  ? "border-border focus:border-accent"
-                  : "border-danger focus:border-danger",
+                'h-9 rounded-md border bg-bg-subtle px-3 text-sm tabular-nums outline-none',
+                valid ? 'border-border focus:border-accent' : 'border-danger focus:border-danger'
               )}
             />
           </div>
 
           <div className="text-[11px] text-fg-subtle">
-            Fees are paid per kilobyte of transaction size. Typical sends are
-            around 0.2 kB.
+            Fees are paid per kilobyte of transaction size. Typical sends are around 0.2 kB.
           </div>
         </div>
 

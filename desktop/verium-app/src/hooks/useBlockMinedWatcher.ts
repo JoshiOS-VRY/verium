@@ -1,13 +1,13 @@
-import { useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useChainSynced } from "@/hooks/useChainSynced";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { useWalletTransactions } from "@/hooks/useWalletTransactions";
-import { subscribeChainTip } from "@/lib/chain-tip-store";
-import { addSeenTxid } from "@/lib/seen-txid-set";
-import { walletTransactionsQueryKey } from "@/lib/wallet-transactions-query";
-import { type TransactionItem } from "@/lib/rpc/client";
+import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useChainSynced } from '@/hooks/useChainSynced';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useWalletTransactions } from '@/hooks/useWalletTransactions';
+import { subscribeChainTip } from '@/lib/chain-tip-store';
+import { addSeenTxid } from '@/lib/seen-txid-set';
+import { walletTransactionsQueryKey } from '@/lib/wallet-transactions-query';
+import { type TransactionItem } from '@/lib/rpc/client';
 
 export interface BlockMinedEvent {
   height: number;
@@ -35,12 +35,12 @@ function emitBlockMined(event: BlockMinedEvent): void {
 
 /** Fallback wallet poll; new coinbase detection is normally driven by chain tip events. */
 const TIP_RECHECK_MS = 2_500;
-const VERIUM = "verium" as const;
+const VERIUM = 'verium' as const;
 /** Older mined txs seeded on first poll; fresher ones may still chime. */
 const FRESH_MINED_SEED_GRACE_SEC = 180;
 
 function isMinedCoinbase(tx: TransactionItem): boolean {
-  return tx.category === "generate" || tx.category === "immature";
+  return tx.category === 'generate' || tx.category === 'immature';
 }
 
 function minedSortKey(tx: TransactionItem): number {

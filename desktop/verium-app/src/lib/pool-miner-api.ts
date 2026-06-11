@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
 
 export interface PoolMinerStartConfig {
   stratumUrl: string;
@@ -9,7 +9,7 @@ export interface PoolMinerStartConfig {
   backupUrl?: string;
 }
 
-export type PoolMinerBackend = "sidecar" | "native" | string;
+export type PoolMinerBackend = 'sidecar' | 'native' | string;
 
 export interface PoolMinerStatus {
   running: boolean;
@@ -50,23 +50,21 @@ export interface PoolMinerMemoryLimits {
 }
 
 export function detectPoolMiner(): Promise<PoolMinerDetectResult> {
-  return invoke<PoolMinerDetectResult>("pool_miner_detect");
+  return invoke<PoolMinerDetectResult>('pool_miner_detect');
 }
 
 export function fetchPoolMinerStatus(): Promise<PoolMinerStatus> {
-  return invoke<PoolMinerStatus>("pool_miner_status");
+  return invoke<PoolMinerStatus>('pool_miner_status');
 }
 
 export function fetchPoolMinerMemoryLimits(): Promise<PoolMinerMemoryLimits> {
-  return invoke<PoolMinerMemoryLimits>("pool_miner_memory_limits");
+  return invoke<PoolMinerMemoryLimits>('pool_miner_memory_limits');
 }
 
-export function startPoolMiner(
-  config: PoolMinerStartConfig,
-): Promise<void> {
-  return invoke("pool_miner_start", { config });
+export function startPoolMiner(config: PoolMinerStartConfig): Promise<void> {
+  return invoke('pool_miner_start', { config });
 }
 
 export function stopPoolMiner(): Promise<void> {
-  return invoke("pool_miner_stop");
+  return invoke('pool_miner_stop');
 }

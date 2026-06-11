@@ -1,14 +1,10 @@
-import { useEffect, useState } from "react";
-import { HelpCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import type { CoinId } from "@/lib/coin/profile";
-import { estimateSendFee } from "@/lib/send-fee-estimate";
-import {
-  formatCoinAlternates,
-  formatCoinAmount,
-  formatRecipientLine,
-} from "@/lib/units";
-import { cn, formatNumber } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { HelpCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import type { CoinId } from '@/lib/coin/profile';
+import { estimateSendFee } from '@/lib/send-fee-estimate';
+import { formatCoinAlternates, formatCoinAmount, formatRecipientLine } from '@/lib/units';
+import { cn, formatNumber } from '@/lib/utils';
 
 const CONFIRM_DELAY_SEC = 3;
 const FIRST_SEND_CONFIRM_DELAY_SEC = 8;
@@ -43,9 +39,7 @@ export function SendConfirmDialog({
   onConfirm,
   onCancel,
 }: SendConfirmDialogProps) {
-  const delaySec = extraConfirmDelay
-    ? FIRST_SEND_CONFIRM_DELAY_SEC
-    : CONFIRM_DELAY_SEC;
+  const delaySec = extraConfirmDelay ? FIRST_SEND_CONFIRM_DELAY_SEC : CONFIRM_DELAY_SEC;
   const [secDelay, setSecDelay] = useState(delaySec);
 
   useEffect(() => {
@@ -66,20 +60,18 @@ export function SendConfirmDialog({
     if (!open) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !confirming) onCancel();
+      if (event.key === 'Escape' && !confirming) onCancel();
     };
 
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, confirming, onCancel]);
 
   if (!open) return null;
 
   const sendAmount = recipients.reduce((sum, row) => sum + row.amount, 0);
   const feeEstimate = estimateSendFee(feeRatePerKb, recipients.length);
-  const totalDebited = subtractFeeFromAmount
-    ? sendAmount
-    : sendAmount + feeEstimate.totalFee;
+  const totalDebited = subtractFeeFromAmount ? sendAmount : sendAmount + feeEstimate.totalFee;
   const multiple = recipients.length > 1;
 
   return (
@@ -109,16 +101,11 @@ export function SendConfirmDialog({
 
           <div className="min-w-0 flex-1 space-y-3 text-sm">
             <div>
-              <p className="font-medium text-fg">
-                Are you sure you want to send?
-              </p>
-              <p className="mt-1 text-xs text-fg-muted">
-                Please, review your transaction.
-              </p>
+              <p className="font-medium text-fg">Are you sure you want to send?</p>
+              <p className="mt-1 text-xs text-fg-muted">Please, review your transaction.</p>
               {extraConfirmDelay && !confirming && (
                 <p className="mt-2 text-xs text-warning">
-                  First send to this address — extra review time before confirm
-                  is enabled.
+                  First send to this address — extra review time before confirm is enabled.
                 </p>
               )}
               {confirming && (
@@ -127,13 +114,9 @@ export function SendConfirmDialog({
                   role="status"
                   aria-live="polite"
                 >
-                  <Loader2
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin"
-                    aria-hidden
-                  />
+                  <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
                   <span>
-                    Signing and broadcasting your transaction. This may take a
-                    few seconds.
+                    Signing and broadcasting your transaction. This may take a few seconds.
                   </span>
                 </div>
               )}
@@ -148,8 +131,7 @@ export function SendConfirmDialog({
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-fg-muted">
-                  {recipients.length} recipients — review each address and
-                  amount before confirming.
+                  {recipients.length} recipients — review each address and amount before confirming.
                 </p>
                 <ul className="max-h-40 space-y-2 overflow-y-auto rounded-md border border-border bg-bg-subtle/60 p-3">
                   {recipients.map((row) => (
@@ -172,14 +154,14 @@ export function SendConfirmDialog({
                 {multiple ? (
                   <>
                     {formatCoinAmount(feeEstimate.feePerTx, coin, 8)} per transaction (
-                    {formatNumber(feeEstimate.sizeKb, 3)} kB) ·{" "}
+                    {formatNumber(feeEstimate.sizeKb, 3)} kB) ·{' '}
                     <span className="font-semibold tabular-nums text-danger">
                       {formatCoinAmount(feeEstimate.totalFee, coin, 8)} total
                     </span>
                   </>
                 ) : (
                   <>
-                    ({formatNumber(feeEstimate.sizeKb, 3)} kB):{" "}
+                    ({formatNumber(feeEstimate.sizeKb, 3)} kB):{' '}
                     <span className="font-semibold tabular-nums text-danger">
                       {formatCoinAmount(feeEstimate.feePerTx, coin, 8)}
                     </span>
@@ -187,8 +169,7 @@ export function SendConfirmDialog({
                 )}
               </p>
               <p className="text-[11px] text-fg-subtle">
-                Estimated from the configured fee rate. Actual fee may differ
-                slightly.
+                Estimated from the configured fee rate. Actual fee may differ slightly.
               </p>
             </div>
 
@@ -196,7 +177,7 @@ export function SendConfirmDialog({
 
             <div>
               <p className="text-sm">
-                <span className="font-semibold">Total Amount:</span>{" "}
+                <span className="font-semibold">Total Amount:</span>{' '}
                 <span className="font-semibold tabular-nums">
                   {formatCoinAmount(totalDebited, coin, 8)}
                 </span>
@@ -228,7 +209,7 @@ export function SendConfirmDialog({
             size="sm"
             disabled={secDelay > 0 || confirming}
             onClick={onConfirm}
-            className={cn((secDelay > 0 || confirming) && "min-w-[5.5rem]")}
+            className={cn((secDelay > 0 || confirming) && 'min-w-[5.5rem]')}
           >
             {confirming ? (
               <>
@@ -238,7 +219,7 @@ export function SendConfirmDialog({
             ) : secDelay > 0 ? (
               `Yes (${secDelay})`
             ) : (
-              "Yes"
+              'Yes'
             )}
           </Button>
         </div>

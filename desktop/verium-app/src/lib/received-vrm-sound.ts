@@ -1,7 +1,4 @@
-import {
-  getSharedAudioContext,
-  unlockSharedWebAudio,
-} from "@/lib/web-audio";
+import { getSharedAudioContext, unlockSharedWebAudio } from '@/lib/web-audio';
 
 /** Soft two-note chime for incoming VRM (Web Audio — no asset file). */
 
@@ -15,7 +12,7 @@ export async function playReceivedVrmSound(): Promise<void> {
 
   try {
     await unlockSharedWebAudio();
-    if (ctx.state !== "running") return;
+    if (ctx.state !== 'running') return;
 
     const now = ctx.currentTime;
     const notes = [440, 554.37]; // A4 · C#5
@@ -23,7 +20,7 @@ export async function playReceivedVrmSound(): Promise<void> {
     for (let i = 0; i < notes.length; i += 1) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "sine";
+      osc.type = 'sine';
       osc.frequency.value = notes[i]!;
       osc.connect(gain);
       gain.connect(ctx.destination);

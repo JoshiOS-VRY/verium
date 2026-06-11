@@ -1,12 +1,12 @@
-import { Check } from "lucide-react";
+import { Check } from 'lucide-react';
 import {
   blocksUntilSpendable,
   confirmationProgress,
   confirmationStatusLabel,
   isFullyConfirmed,
   requiredConfirmations,
-} from "@/lib/confirmations";
-import { cn } from "@/lib/utils";
+} from '@/lib/confirmations';
+import { cn } from '@/lib/utils';
 
 interface ConfirmationProgressProps {
   confirmations: number;
@@ -32,22 +32,19 @@ export function ConfirmationProgress({
   const offset = CIRCUMFERENCE * (1 - progress);
 
   const ringColor = complete
-    ? "stroke-success"
+    ? 'stroke-success'
     : progress > 0
-      ? category === "immature" || category === "generate"
-        ? "stroke-warning"
-        : "stroke-accent"
-      : "stroke-fg-subtle";
+      ? category === 'immature' || category === 'generate'
+        ? 'stroke-warning'
+        : 'stroke-accent'
+      : 'stroke-fg-subtle';
 
   return (
     <div
-      className={cn("inline-flex items-center justify-end gap-2", className)}
+      className={cn('inline-flex items-center justify-end gap-2', className)}
       title={confirmationStatusLabel(confirmations, category)}
     >
-      <div
-        className="relative shrink-0"
-        style={{ width: SIZE, height: SIZE }}
-      >
+      <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
         <svg
           width={SIZE}
           height={SIZE}
@@ -68,7 +65,7 @@ export function ConfirmationProgress({
             cy={CENTER}
             r={RADIUS}
             fill="none"
-            className={cn(ringColor, "transition-[stroke-dashoffset] duration-300")}
+            className={cn(ringColor, 'transition-[stroke-dashoffset] duration-300')}
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
@@ -87,9 +84,7 @@ export function ConfirmationProgress({
       <span className="min-w-[4rem] text-right text-xs tabular-nums text-fg-muted">
         {confirmations}/{required}
         {remaining > 0 && (
-          <span className="block text-[10px] text-fg-subtle">
-            −{remaining} left
-          </span>
+          <span className="block text-[10px] text-fg-subtle">−{remaining} left</span>
         )}
       </span>
     </div>

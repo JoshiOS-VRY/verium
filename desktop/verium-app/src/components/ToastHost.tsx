@@ -1,15 +1,9 @@
-import { useEffect } from "react";
-import { X } from "lucide-react";
-import { useToastStore, type ToastItem } from "@/lib/toast-store";
-import { cn } from "@/lib/utils";
+import { useEffect } from 'react';
+import { X } from 'lucide-react';
+import { useToastStore, type ToastItem } from '@/lib/toast-store';
+import { cn } from '@/lib/utils';
 
-function ToastCard({
-  toast,
-  onDismiss,
-}: {
-  toast: ToastItem;
-  onDismiss: () => void;
-}) {
+function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
   useEffect(() => {
     const ms = toast.durationMs ?? 6_000;
     const timer = window.setTimeout(onDismiss, ms);
@@ -21,16 +15,16 @@ function ToastCard({
       role="status"
       aria-live="polite"
       className={cn(
-        "toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-sm",
-        toast.tone === "success"
-          ? "border-success/40 bg-bg-panel/95"
-          : "border-border bg-bg-panel/95",
+        'toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-sm',
+        toast.tone === 'success'
+          ? 'border-success/40 bg-bg-panel/95'
+          : 'border-border bg-bg-panel/95'
       )}
     >
       <div
         className={cn(
-          "mt-0.5 h-2 w-2 shrink-0 rounded-full",
-          toast.tone === "success" ? "bg-success" : "bg-accent",
+          'mt-0.5 h-2 w-2 shrink-0 rounded-full',
+          toast.tone === 'success' ? 'bg-success' : 'bg-accent'
         )}
         aria-hidden
       />
@@ -64,11 +58,7 @@ export function ToastHost() {
       aria-label="Notifications"
     >
       {toasts.map((toast) => (
-        <ToastCard
-          key={toast.id}
-          toast={toast}
-          onDismiss={() => dismiss(toast.id)}
-        />
+        <ToastCard key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
       ))}
     </div>
   );

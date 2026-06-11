@@ -11,9 +11,11 @@ This guide explains how to connect external Verium wallets to your testnet.
 ## Network Configuration
 
 ### Current Setup
+
 The testnet exposes these RPC ports:
+
 - **Node 1 (Primary)**: Port 36988
-- **Node 2**: Port 36991  
+- **Node 2**: Port 36991
 - **Node 3**: Port 36993
 
 ### For External Access
@@ -27,28 +29,30 @@ You need to ensure the RPC ports are accessible from external networks.
 If your Mac Pro is on the same network as the testnet server:
 
 1. **Find the testnet server IP**:
+
    ```bash
    # On the testnet server
    ip addr show | grep inet
    ```
 
 2. **Configure your Verium wallet** on Mac Pro:
-   
+
    Create a `verium-testnet.conf` file in your Verium data directory:
+
    ```ini
    # Verium Testnet Configuration for Mac Pro
    testnet=1
-   
+
    # Connect to your testnet server
    server=1
    rpcuser=testnet_user
    rpcpassword=testnet_password
    rpcallowip=127.0.0.1
-   
+
    # Connect to the testnet
    connect=<TESTNET_SERVER_IP>:36989
    addnode=<TESTNET_SERVER_IP>:36989
-   
+
    # Optional: Enable RPC for wallet operations
    rpcport=36999
    ```
@@ -63,6 +67,7 @@ If your Mac Pro is on the same network as the testnet server:
 If you only need to send transactions via RPC:
 
 1. **Configure wallet for RPC connection**:
+
    ```ini
    # Verium Testnet RPC Configuration
    testnet=1
@@ -91,14 +96,15 @@ Other users can connect to your testnet by:
    - Port numbers (36988, 36991, 36993)
 
 2. **Configuring their Verium client**:
+
    ```ini
    # External user configuration
    testnet=1
-   
+
    # Connect to your testnet
    connect=<YOUR_SERVER_IP>:36989
    addnode=<YOUR_SERVER_IP>:36989
-   
+
    # RPC access (if needed)
    server=1
    rpcuser=testnet_user
@@ -111,6 +117,7 @@ Other users can connect to your testnet by:
 For external access, ensure:
 
 1. **Firewall Configuration**:
+
    ```bash
    # Allow testnet ports
    sudo ufw allow 36988/tcp  # RPC port
@@ -127,6 +134,7 @@ For external access, ensure:
 ## Security Considerations
 
 ### Current Setup (Development Only)
+
 - RPC credentials are hardcoded
 - No SSL/TLS encryption
 - Open to all IPs (0.0.0.0/0)
@@ -134,12 +142,14 @@ For external access, ensure:
 ### For Production Use
 
 1. **Change RPC credentials**:
+
    ```ini
    rpcuser=your_secure_username
    rpcpassword=your_secure_password
    ```
 
 2. **Restrict RPC access**:
+
    ```ini
    # Only allow specific IPs
    rpcallowip=192.168.1.0/24
@@ -156,18 +166,21 @@ For external access, ensure:
 ## Testing Connections
 
 ### Test RPC Connection
+
 ```bash
 # From external machine
 verium-cli -testnet -rpcuser=testnet_user -rpcpassword=testnet_password -rpcconnect=<SERVER_IP> -rpcport=36988 getblockchaininfo
 ```
 
 ### Test P2P Connection
+
 ```bash
 # Check if node accepts connections
 telnet <SERVER_IP> 36989
 ```
 
 ### Test Explorer Access
+
 Open in browser: `http://<SERVER_IP>:3003`
 
 ## Troubleshooting
@@ -175,12 +188,14 @@ Open in browser: `http://<SERVER_IP>:3003`
 ### Wallet Won't Connect
 
 1. **Check network connectivity**:
+
    ```bash
    ping <SERVER_IP>
    telnet <SERVER_IP> 36989
    ```
 
 2. **Check firewall rules**:
+
    ```bash
    sudo ufw status
    ```
@@ -193,6 +208,7 @@ Open in browser: `http://<SERVER_IP>:3003`
 ### RPC Connection Failed
 
 1. **Verify RPC is enabled**:
+
    ```bash
    docker exec verium-testnet-node1 verium-cli -conf=/root/.verium/verium.conf getnetworkinfo
    ```
@@ -206,6 +222,7 @@ Open in browser: `http://<SERVER_IP>:3003`
 ### Blockchain Sync Issues
 
 1. **Check if testnet has blocks**:
+
    ```bash
    ./manage-verium-testnet.sh info
    ```
@@ -218,6 +235,7 @@ Open in browser: `http://<SERVER_IP>:3003`
 ## Example Configurations
 
 ### Mac Pro Wallet (Full Node)
+
 ```ini
 # ~/.verium/verium-testnet.conf
 testnet=1
@@ -236,6 +254,7 @@ datadir=~/.verium-testnet
 ```
 
 ### External User (Light Client)
+
 ```ini
 # ~/.verium/verium-testnet.conf
 testnet=1
@@ -273,6 +292,7 @@ Internet
 ## Support
 
 For connection issues:
+
 1. Check the testnet logs: `./manage-verium-testnet.sh logs`
 2. Verify network connectivity
 3. Check firewall and router settings

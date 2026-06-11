@@ -113,39 +113,39 @@ find output/ -type f -print0 | sort -z | xargs -r0 sha256sum
 
 #### Recognized environment variables
 
-* _**HOSTS**_
+- _**HOSTS**_
 
   Override the space-separated list of platform triples for which to perform a
-  bootstrappable build. _(defaults to "i686-linux-gnu x86\_64-linux-gnu
+  bootstrappable build. _(defaults to "i686-linux-gnu x86_64-linux-gnu
   arm-linux-gnueabihf aarch64-linux-gnu riscv64-linux-gnu")_
 
   > Windows and OS X platform triplet support are WIP.
 
-* _**SOURCES_PATH**_
+- _**SOURCES_PATH**_
 
   Set the depends tree download cache for sources. This is passed through to the
   depends tree. Setting this to the same directory across multiple builds of the
   depends tree can eliminate unnecessary redownloading of package sources.
 
-* _**MAX_JOBS**_
+- _**MAX_JOBS**_
 
   Override the maximum number of jobs to run simultaneously, you might want to
   do so on a memory-limited machine. This may be passed to `make` as in `make
-  --jobs="$MAX_JOBS"` or `xargs` as in `xargs -P"$MAX_JOBS"`. _(defaults to the
+--jobs="$MAX_JOBS"` or `xargs` as in `xargs -P"$MAX_JOBS"`. _(defaults to the
   value of `nproc` outside the container)_
 
-* _**SOURCE_DATE_EPOCH**_
+- _**SOURCE_DATE_EPOCH**_
 
   Override the reference UNIX timestamp used for bit-for-bit reproducibility,
   the variable name conforms to [standard][r12e/source-date-epoch]. _(defaults
   to the output of `$(git log --format=%at -1)`)_
 
-* _**V**_
+- _**V**_
 
   If non-empty, will pass `V=1` to all `make` invocations, making `make` output
   verbose.
 
-* _**ADDITIONAL_GUIX_ENVIRONMENT_FLAGS**_
+- _**ADDITIONAL_GUIX_ENVIRONMENT_FLAGS**_
 
   Additional flags to be passed to `guix environment`. For a fully-bootstrapped
   build, set this to `--bootstrap --no-substitutes` (refer to the [security
@@ -216,7 +216,6 @@ repository and will likely put one up soon.
 
 [b17e]: http://bootstrappable.org/
 [r12e/source-date-epoch]: https://reproducible-builds.org/docs/source-date-epoch/
-
 [guix/install.sh]: https://git.savannah.gnu.org/cgit/guix.git/plain/etc/guix-install.sh
 [guix/bin-install]: https://www.gnu.org/software/guix/manual/en/html_node/Binary-Installation.html
 [guix/env-setup]: https://www.gnu.org/software/guix/manual/en/html_node/Build-Environment-Setup.html
@@ -224,6 +223,5 @@ repository and will likely put one up soon.
 [guix/substitute-server-auth]: https://www.gnu.org/software/guix/manual/en/html_node/Substitute-Server-Authorization.html
 [guix/inferiors]: https://www.gnu.org/software/guix/manual/en/html_node/Inferiors.html
 [guix/channels]: https://www.gnu.org/software/guix/manual/en/html_node/Channels.html
-
 [debian/guix-package]: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=850644
 [fanquake/guix-docker]: https://github.com/fanquake/core-review/tree/master/guix

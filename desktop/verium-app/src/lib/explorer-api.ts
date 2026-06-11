@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { CoinId } from "@/lib/coin/profile";
+import { invoke } from '@tauri-apps/api/core';
+import type { CoinId } from '@/lib/coin/profile';
 
 export interface ExplorerStats {
   network_hash?: number;
@@ -73,27 +73,21 @@ export interface ExplorerPeerEntry {
 }
 
 export function isExplorerApiEnabled(): Promise<boolean> {
-  return invoke<boolean>("is_explorer_api_enabled");
+  return invoke<boolean>('is_explorer_api_enabled');
 }
 
 export function fetchExplorerStats(coin: CoinId): Promise<ExplorerStats> {
-  return invoke<ExplorerStats>("fetch_explorer_stats", { coin });
+  return invoke<ExplorerStats>('fetch_explorer_stats', { coin });
 }
 
-export function fetchExplorerBlocks(
-  coin: CoinId,
-  limit = 10,
-): Promise<ExplorerBlock[]> {
-  return invoke<ExplorerBlock[]>("fetch_explorer_blocks", { coin, limit });
+export function fetchExplorerBlocks(coin: CoinId, limit = 10): Promise<ExplorerBlock[]> {
+  return invoke<ExplorerBlock[]>('fetch_explorer_blocks', { coin, limit });
 }
 
 /** Coinbase output, miner, and header fields from the local node (production-safe). */
-export function fetchLocalBlocksForFeed(
-  coin: CoinId,
-  heights: number[],
-): Promise<ExplorerBlock[]> {
+export function fetchLocalBlocksForFeed(coin: CoinId, heights: number[]): Promise<ExplorerBlock[]> {
   if (heights.length === 0) return Promise.resolve([]);
-  return invoke<ExplorerBlock[]>("fetch_local_blocks_for_feed", {
+  return invoke<ExplorerBlock[]>('fetch_local_blocks_for_feed', {
     coin,
     heights,
   });
@@ -102,10 +96,10 @@ export function fetchLocalBlocksForFeed(
 /** Block detail from explorer `/block/:height` (light wallet recent-blocks feed). */
 export function fetchExplorerBlocksForFeed(
   coin: CoinId,
-  heights: number[],
+  heights: number[]
 ): Promise<ExplorerBlock[]> {
   if (heights.length === 0) return Promise.resolve([]);
-  return invoke<ExplorerBlock[]>("fetch_explorer_blocks_for_feed_cmd", {
+  return invoke<ExplorerBlock[]>('fetch_explorer_blocks_for_feed_cmd', {
     coin,
     heights,
   });
@@ -113,9 +107,9 @@ export function fetchExplorerBlocksForFeed(
 
 export function fetchExplorerTransactions(
   coin: CoinId,
-  limit = 25,
+  limit = 25
 ): Promise<ExplorerTransaction[]> {
-  return invoke<ExplorerTransaction[]>("fetch_explorer_transactions", {
+  return invoke<ExplorerTransaction[]>('fetch_explorer_transactions', {
     coin,
     limit,
   });
@@ -124,9 +118,9 @@ export function fetchExplorerTransactions(
 export function fetchExplorerExtraction(
   coin: CoinId,
   limit = 20,
-  period = "month",
+  period = 'month'
 ): Promise<ExplorerExtractionEntry[]> {
-  return invoke<ExplorerExtractionEntry[]>("fetch_explorer_extraction", {
+  return invoke<ExplorerExtractionEntry[]>('fetch_explorer_extraction', {
     coin,
     limit,
     period,
@@ -134,13 +128,13 @@ export function fetchExplorerExtraction(
 }
 
 export function fetchExplorerChainTips(coin: CoinId): Promise<ExplorerChainTip[]> {
-  return invoke<ExplorerChainTip[]>("fetch_explorer_chain_tips", { coin });
+  return invoke<ExplorerChainTip[]>('fetch_explorer_chain_tips', { coin });
 }
 
 export function fetchExplorerPeers(coin: CoinId): Promise<ExplorerPeerEntry[]> {
-  return invoke<ExplorerPeerEntry[]>("fetch_explorer_peers_cmd", { coin });
+  return invoke<ExplorerPeerEntry[]>('fetch_explorer_peers_cmd', { coin });
 }
 
 export function getExplorerLogoUrl(coin: CoinId): Promise<string> {
-  return invoke<string>("get_explorer_logo_url", { coin });
+  return invoke<string>('get_explorer_logo_url', { coin });
 }

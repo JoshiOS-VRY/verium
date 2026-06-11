@@ -2,10 +2,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 import {
   rpcBinaryChainStatus,
   rpcBinaryChainMetrics,
@@ -14,31 +14,21 @@ import {
   rpcBinaryChainRegisterTicket,
   rpcBinaryChainRedeemClaim,
   type BinaryChainFundResult,
-} from "@/lib/rpc/dace";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useActiveCoin } from "@/lib/coin/context";
-import { getCoinProfile } from "@/lib/coin/profile";
-import { useNetworkMode } from "@/lib/network-mode";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import type { CoinId } from "@/lib/coin/profile";
+} from '@/lib/rpc/dace';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useActiveCoin } from '@/lib/coin/context';
+import { getCoinProfile } from '@/lib/coin/profile';
+import { useNetworkMode } from '@/lib/network-mode';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import type { CoinId } from '@/lib/coin/profile';
 
 const REFRESH_MS = 10_000;
 
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint?: string;
-}) {
+function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <div className="border border-zinc-700 rounded-md p-3 bg-zinc-900/50">
-      <div className="text-xs uppercase tracking-wide text-zinc-400">
-        {label}
-      </div>
+      <div className="text-xs uppercase tracking-wide text-zinc-400">{label}</div>
       <div className="text-lg font-semibold mt-1">{value}</div>
       {hint && <div className="text-xs text-zinc-500 mt-1">{hint}</div>}
     </div>
@@ -48,8 +38,8 @@ function Stat({
 function isRpcWarmupError(err: unknown): boolean {
   const msg = String(err);
   return (
-    msg.includes("rpc error -28") ||
-    msg.includes("rpc error -10") ||
+    msg.includes('rpc error -28') ||
+    msg.includes('rpc error -10') ||
     /warming up/i.test(msg) ||
     /loading block index/i.test(msg)
   );
@@ -58,9 +48,7 @@ function isRpcWarmupError(err: unknown): boolean {
 function isDaceRpcMissing(err: unknown): boolean {
   const msg = String(err);
   return (
-    msg.includes("rpc error -32601") ||
-    /method not found/i.test(msg) ||
-    /unknown method/i.test(msg)
+    msg.includes('rpc error -32601') || /method not found/i.test(msg) || /unknown method/i.test(msg)
   );
 }
 
@@ -71,38 +59,36 @@ function daceQueryRetry(failureCount: number, err: unknown): boolean {
 }
 
 function BinaryChainHeights() {
-  const vrc = useDaemonStatus("vericoin");
-  const vrm = useDaemonStatus("verium");
+  const vrc = useDaemonStatus('vericoin');
+  const vrm = useDaemonStatus('verium');
 
   const rows: {
     coin: CoinId;
     label: string;
     status: ReturnType<typeof useDaemonStatus>;
   }[] = [
-    { coin: "vericoin", label: "Vericoin (VRC)", status: vrc },
-    { coin: "verium", label: "Verium (VRM)", status: vrm },
+    { coin: 'vericoin', label: 'Vericoin (VRC)', status: vrc },
+    { coin: 'verium', label: 'Verium (VRM)', status: vrm },
   ];
 
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {rows.map(({ coin: rowCoin, label, status }) => {
         const blocks = status.data?.blocks;
-        const chain = status.data?.chain ?? "…";
+        const chain = status.data?.chain ?? '…';
         const connected = status.data?.connected === true;
         return (
           <div
             key={rowCoin}
             className="rounded-md border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-sm"
           >
-            <div className="text-xs uppercase tracking-wide text-zinc-400">
-              {label}
-            </div>
+            <div className="text-xs uppercase tracking-wide text-zinc-400">{label}</div>
             <div className="mt-1 font-semibold tabular-nums">
               {connected
-                ? `#${blocks?.toLocaleString() ?? "?"} · ${chain}`
+                ? `#${blocks?.toLocaleString() ?? '?'} · ${chain}`
                 : status.isConnecting
-                  ? "Connecting…"
-                  : "Offline"}
+                  ? 'Connecting…'
+                  : 'Offline'}
             </div>
           </div>
         );
@@ -117,13 +103,12 @@ export function BinaryChain() {
   const networkMode = useNetworkMode();
   const { data: daemon, isConnecting } = useDaemonStatus(coin);
   const visible = useWindowVisible();
-  const mode = networkMode.data?.mode ?? "mainnet";
-  const rpcReady =
-    daemon?.connected === true && !daemon?.warming_up && !isConnecting;
+  const mode = networkMode.data?.mode ?? 'mainnet';
+  const rpcReady = daemon?.connected === true && !daemon?.warming_up && !isConnecting;
   const refreshInterval = visible ? REFRESH_MS : false;
 
   const status = useQuery({
-    queryKey: ["binarychain_status", mode, coin],
+    queryKey: ['binarychain_status', mode, coin],
     queryFn: () => rpcBinaryChainStatus(coin),
     enabled: rpcReady,
     refetchInterval: refreshInterval,
@@ -132,7 +117,7 @@ export function BinaryChain() {
   });
 
   const metrics = useQuery({
-    queryKey: ["binarychain_metrics", mode, coin],
+    queryKey: ['binarychain_metrics', mode, coin],
     queryFn: () => rpcBinaryChainMetrics(coin),
     enabled: rpcReady && status.isSuccess,
     refetchInterval: refreshInterval,
@@ -140,7 +125,7 @@ export function BinaryChain() {
   });
 
   const anchor = useQuery({
-    queryKey: ["binarychain_anchor", mode, coin],
+    queryKey: ['binarychain_anchor', mode, coin],
     queryFn: () => rpcBinaryChainAnchor(coin),
     enabled: rpcReady && status.isSuccess,
     refetchInterval: refreshInterval,
@@ -152,8 +137,8 @@ export function BinaryChain() {
       <div className="p-6 space-y-3">
         <h1 className="text-2xl font-bold">Binary Chain</h1>
         <p className="text-sm text-zinc-400">
-          DACE status is shown on the isolated binarytest network. Switch
-          network mode in Settings to use the DACE test chain.
+          DACE status is shown on the isolated binarytest network. Switch network mode in Settings
+          to use the DACE test chain.
         </p>
         <Link to="/settings" className="text-sm text-accent underline">
           Open Settings → Network
@@ -172,15 +157,15 @@ export function BinaryChain() {
               ? `Connecting to ${profile.binaryName} on binarytest (RPC port ${
                   networkMode.data?.coin_endpoints
                     .find((e) => e.coin === coin)
-                    ?.rpc_url.split(":")
-                    .pop() ?? "…"
+                    ?.rpc_url.split(':')
+                    .pop() ?? '…'
                 })…`
               : `${profile.displayName} is loading the chain index…`}
           </span>
         </div>
         <p className="text-sm text-zinc-500">
-          Binary Chain RPC becomes available once the node finishes startup. On
-          a fresh binarytest datadir this can take up to a minute.
+          Binary Chain RPC becomes available once the node finishes startup. On a fresh binarytest
+          datadir this can take up to a minute.
         </p>
       </div>
     );
@@ -215,31 +200,28 @@ export function BinaryChain() {
             DACE-enabled {profile.binaryName} required
           </h1>
           <p className="text-sm text-zinc-300">
-            The wallet connected to {profile.binaryName}, but this binary does
-            not expose <code className="text-xs">binarychain_status</code>. The
-            sidecar downloaded from production releases does not include DACE
-            yet — you need a build from the unified{" "}
+            The wallet connected to {profile.binaryName}, but this binary does not expose{' '}
+            <code className="text-xs">binarychain_status</code>. The sidecar downloaded from
+            production releases does not include DACE yet — you need a build from the unified{' '}
             <code className="text-xs">vericoin/</code> tree.
           </p>
           <ol className="list-decimal list-inside text-sm text-zinc-400 space-y-2">
             <li>
-              Build:{" "}
+              Build:{' '}
               <code className="text-xs">
                 cd vericoin && ./configure --enable-verium --without-gui && make
               </code>
             </li>
             <li>
-              Point the wallet at it: set{" "}
-              <code className="text-xs">VERIUMD_LOCAL</code> /{" "}
-              <code className="text-xs">VERICOIND_LOCAL</code> and run{" "}
-              <code className="text-xs">npm run fetch:veriumd</code>, or set the
-              path in Settings → Daemon connection.
+              Point the wallet at it: set <code className="text-xs">VERIUMD_LOCAL</code> /{' '}
+              <code className="text-xs">VERICOIND_LOCAL</code> and run{' '}
+              <code className="text-xs">npm run fetch:veriumd</code>, or set the path in Settings →
+              Daemon connection.
             </li>
             <li>Restart the wallet and start the binarytest daemon again.</li>
           </ol>
           <p className="text-xs text-zinc-500">
-            Specs: vericoin/doc/dace/ · Harness:
-            vericoin/test/binarychain/README.md
+            Specs: vericoin/doc/dace/ · Harness: vericoin/test/binarychain/README.md
           </p>
         </div>
       );
@@ -258,9 +240,7 @@ export function BinaryChain() {
 
   if (!status.data) {
     return (
-      <div className="p-6 text-zinc-400">
-        No Binary Chain status returned from the daemon.
-      </div>
+      <div className="p-6 text-zinc-400">No Binary Chain status returned from the daemon.</div>
     );
   }
 
@@ -278,24 +258,22 @@ export function BinaryChain() {
           </span>
         </div>
         <p className="text-sm text-zinc-400">
-          DACE — Dual-Anchor Coupled Epochs.{" "}
-          {s.activated
-            ? "Rules active on this chain."
-            : "Pre-activation (below DACE height)."}{" "}
+          DACE — Dual-Anchor Coupled Epochs.{' '}
+          {s.activated ? 'Rules active on this chain.' : 'Pre-activation (below DACE height).'}{' '}
           Play-money test network only.
         </p>
         <p className="mt-2 text-xs text-zinc-500">
-          Status below is read from{" "}
+          Status below is read from{' '}
           <span className="font-semibold text-zinc-300">
             {profile.displayName} ({profile.binaryName})
           </span>
-          . Switch the sidebar coin to query the other daemon; both chains must
-          advance for DACE coupling.
+          . Switch the sidebar coin to query the other daemon; both chains must advance for DACE
+          coupling.
         </p>
         {!s.activated && (
           <p className="mt-2 text-xs text-zinc-500">
-            Binarytest activates DACE at block 50 on both chains. Mine/stake
-            forward or use the test harness scripts to advance height.
+            Binarytest activates DACE at block 50 on both chains. Mine/stake forward or use the test
+            harness scripts to advance height.
           </p>
         )}
       </header>
@@ -306,24 +284,19 @@ export function BinaryChain() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold mb-3">
-          Status · {profile.symbol}
-        </h2>
+        <h2 className="text-lg font-semibold mb-3">Status · {profile.symbol}</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Stat label="Activated" value={s.activated ? "Yes" : "No"} />
+          <Stat label="Activated" value={s.activated ? 'Yes' : 'No'} />
           <Stat label="Current epoch" value={s.current_epoch.toString()} />
           <Stat
             label="Stale-coupled"
-            value={s.stale_coupled ? "Yes" : "No"}
+            value={s.stale_coupled ? 'Yes' : 'No'}
             hint={s.stale_reason}
           />
-          <Stat
-            label="Bonded tickets active"
-            value={s.bonded_tickets_active.toString()}
-          />
+          <Stat label="Bonded tickets active" value={s.bonded_tickets_active.toString()} />
           <Stat
             label="Total bonded"
-            value={`${s.bonded_tickets_total_amount.toFixed(2)} ${coin === "vericoin" ? "VRC" : "VRM"}`}
+            value={`${s.bonded_tickets_total_amount.toFixed(2)} ${coin === 'vericoin' ? 'VRC' : 'VRM'}`}
           />
           <Stat
             label="Paired header lag p95"
@@ -344,20 +317,17 @@ export function BinaryChain() {
               <span className="text-zinc-400">beacon_ref:</span> {a.beacon_ref}
             </div>
             <div className="truncate">
-              <span className="text-zinc-400">vrc_checkpoint:</span>{" "}
-              {a.vrc_checkpoint_hash} @ {a.vrc_checkpoint_height}
+              <span className="text-zinc-400">vrc_checkpoint:</span> {a.vrc_checkpoint_hash} @{' '}
+              {a.vrc_checkpoint_height}
             </div>
             <div className="truncate">
-              <span className="text-zinc-400">committee_root:</span>{" "}
-              {a.committee_root}
+              <span className="text-zinc-400">committee_root:</span> {a.committee_root}
             </div>
             <div className="truncate">
-              <span className="text-zinc-400">reward_root_vrc_prev:</span>{" "}
-              {a.reward_root_vrc_prev}
+              <span className="text-zinc-400">reward_root_vrc_prev:</span> {a.reward_root_vrc_prev}
             </div>
             <div className="truncate">
-              <span className="text-zinc-400">reward_root_vrm_prev:</span>{" "}
-              {a.reward_root_vrm_prev}
+              <span className="text-zinc-400">reward_root_vrm_prev:</span> {a.reward_root_vrm_prev}
             </div>
           </div>
         </section>
@@ -367,37 +337,19 @@ export function BinaryChain() {
         <section>
           <h2 className="text-lg font-semibold mb-3">Threat-model metrics</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Stat
-              label="Divergent beacons"
-              value={m.divergent_beacon_selections.toString()}
-            />
-            <Stat
-              label="Reorgs at beacon"
-              value={m.reorgs_at_beacon.toString()}
-            />
-            <Stat
-              label="Missed votes"
-              value={m.committee_missed_votes.toString()}
-            />
-            <Stat
-              label="Foreign payee rejects"
-              value={m.foreign_payee_rejections.toString()}
-            />
+            <Stat label="Divergent beacons" value={m.divergent_beacon_selections.toString()} />
+            <Stat label="Reorgs at beacon" value={m.reorgs_at_beacon.toString()} />
+            <Stat label="Missed votes" value={m.committee_missed_votes.toString()} />
+            <Stat label="Foreign payee rejects" value={m.foreign_payee_rejections.toString()} />
             <Stat
               label="Consecutive missed anchors"
               value={m.consecutive_missed_anchors.toString()}
             />
-            <Stat
-              label="IBD replay diffs"
-              value={m.ibd_replay_consensus_diffs.toString()}
-            />
-            <Stat
-              label="Recovery anchors built"
-              value={m.recovery_anchors_built.toString()}
-            />
+            <Stat label="IBD replay diffs" value={m.ibd_replay_consensus_diffs.toString()} />
+            <Stat label="Recovery anchors built" value={m.recovery_anchors_built.toString()} />
             <Stat
               label="Top-10 ticket share"
-              value={(m.top10_ticket_share * 100).toFixed(1) + "%"}
+              value={(m.top10_ticket_share * 100).toFixed(1) + '%'}
               hint={`seat/bonded ratio ${m.seat_to_bonded_ratio_top10.toFixed(2)}`}
             />
           </div>
@@ -409,48 +361,39 @@ export function BinaryChain() {
   );
 }
 
-function BinaryChainActions({
-  coin,
-  mode,
-}: {
-  coin: "verium" | "vericoin";
-  mode: string;
-}) {
+function BinaryChainActions({ coin, mode }: { coin: 'verium' | 'vericoin'; mode: string }) {
   const qc = useQueryClient();
   const [fundBlocks, setFundBlocks] = useState(10);
-  const [stakeOutpoint, setStakeOutpoint] = useState("");
-  const [operatorPubkey, setOperatorPubkey] = useState("");
-  const [leafHash, setLeafHash] = useState("");
-  const [fundResult, setFundResult] = useState<BinaryChainFundResult | null>(
-    null,
-  );
+  const [stakeOutpoint, setStakeOutpoint] = useState('');
+  const [operatorPubkey, setOperatorPubkey] = useState('');
+  const [leafHash, setLeafHash] = useState('');
+  const [fundResult, setFundResult] = useState<BinaryChainFundResult | null>(null);
 
   const fund = useMutation({
     mutationFn: () => rpcBinaryChainFundWallet(coin, fundBlocks),
     onSuccess: (r) => {
       setFundResult(r);
-      qc.invalidateQueries({ queryKey: coinQueryKey(coin, "getwalletinfo") });
+      qc.invalidateQueries({ queryKey: coinQueryKey(coin, 'getwalletinfo') });
       qc.invalidateQueries({
-        queryKey: coinQueryKey(coin, "getblockchaininfo"),
+        queryKey: coinQueryKey(coin, 'getblockchaininfo'),
       });
       qc.invalidateQueries({
-        queryKey: coinQueryKey("vericoin", "daemon-status"),
+        queryKey: coinQueryKey('vericoin', 'daemon-status'),
       });
       qc.invalidateQueries({
-        queryKey: coinQueryKey("verium", "daemon-status"),
+        queryKey: coinQueryKey('verium', 'daemon-status'),
       });
-      qc.invalidateQueries({ queryKey: ["binarychain_status", mode, coin] });
-      qc.invalidateQueries({ queryKey: ["binarychain_metrics", mode, coin] });
-      qc.invalidateQueries({ queryKey: ["binarychain_anchor", mode, coin] });
+      qc.invalidateQueries({ queryKey: ['binarychain_status', mode, coin] });
+      qc.invalidateQueries({ queryKey: ['binarychain_metrics', mode, coin] });
+      qc.invalidateQueries({ queryKey: ['binarychain_anchor', mode, coin] });
     },
   });
 
   const register = useMutation({
-    mutationFn: () =>
-      rpcBinaryChainRegisterTicket(coin, stakeOutpoint, operatorPubkey),
+    mutationFn: () => rpcBinaryChainRegisterTicket(coin, stakeOutpoint, operatorPubkey),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["binarychain_status", mode, coin] });
-      qc.invalidateQueries({ queryKey: ["binarychain_metrics", mode, coin] });
+      qc.invalidateQueries({ queryKey: ['binarychain_status', mode, coin] });
+      qc.invalidateQueries({ queryKey: ['binarychain_metrics', mode, coin] });
     },
   });
 
@@ -463,13 +406,11 @@ function BinaryChainActions({
       <h2 className="text-lg font-semibold">Actions</h2>
 
       <div className="border border-zinc-700 rounded-md p-4 bg-zinc-900/30 space-y-2">
-        <div className="text-sm font-medium text-zinc-200">
-          Fund test wallet
-        </div>
+        <div className="text-sm font-medium text-zinc-200">Fund test wallet</div>
         <p className="text-xs text-zinc-400">
-          Mine PoW blocks to a new wallet address so you have spendable{" "}
-          {coin === "vericoin" ? "VRC" : "VRM"} for sends, staking, or ticket
-          registration. Binarytest only.
+          Mine PoW blocks to a new wallet address so you have spendable{' '}
+          {coin === 'vericoin' ? 'VRC' : 'VRM'} for sends, staking, or ticket registration.
+          Binarytest only.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-zinc-400">Blocks:</label>
@@ -487,28 +428,23 @@ function BinaryChainActions({
             onClick={() => fund.mutate()}
             className="rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-zinc-900 text-sm font-semibold px-3 py-1.5"
           >
-            {fund.isPending ? "Mining…" : "Fund"}
+            {fund.isPending ? 'Mining…' : 'Fund'}
           </button>
         </div>
-        {fund.error && (
-          <p className="text-xs text-red-400">{String(fund.error)}</p>
-        )}
+        {fund.error && <p className="text-xs text-red-400">{String(fund.error)}</p>}
         {fundResult && (
           <p className="text-xs text-zinc-300">
-            Mined {fundResult.blocks.length} blocks to{" "}
+            Mined {fundResult.blocks.length} blocks to{' '}
             <span className="font-mono">{fundResult.address}</span>
           </p>
         )}
       </div>
 
       <div className="border border-zinc-700 rounded-md p-4 bg-zinc-900/30 space-y-2">
-        <div className="text-sm font-medium text-zinc-200">
-          Register bonded ticket
-        </div>
+        <div className="text-sm font-medium text-zinc-200">Register bonded ticket</div>
         <p className="text-xs text-zinc-400">
-          VRC-side committee membership. Provide a stake outpoint (txid:vout)
-          holding TicketStakeUnit and the operator pubkey that will sign Joint
-          Anchors.
+          VRC-side committee membership. Provide a stake outpoint (txid:vout) holding
+          TicketStakeUnit and the operator pubkey that will sign Joint Anchors.
         </p>
         <input
           type="text"
@@ -530,26 +466,21 @@ function BinaryChainActions({
           onClick={() => register.mutate()}
           className="rounded bg-zinc-200 hover:bg-white disabled:opacity-50 text-zinc-900 text-sm font-semibold px-3 py-1.5"
         >
-          {register.isPending ? "Registering…" : "Register ticket"}
+          {register.isPending ? 'Registering…' : 'Register ticket'}
         </button>
-        {register.error && (
-          <p className="text-xs text-red-400">{String(register.error)}</p>
-        )}
+        {register.error && <p className="text-xs text-red-400">{String(register.error)}</p>}
         {register.data && (
           <p className="text-xs text-emerald-300">
-            Registered. Active from epoch{" "}
-            {String((register.data as any).active_from_epoch)}.
+            Registered. Active from epoch {String((register.data as any).active_from_epoch)}.
           </p>
         )}
       </div>
 
       <div className="border border-zinc-700 rounded-md p-4 bg-zinc-900/30 space-y-2">
-        <div className="text-sm font-medium text-zinc-200">
-          Redeem reward claim
-        </div>
+        <div className="text-sm font-medium text-zinc-200">Redeem reward claim</div>
         <p className="text-xs text-zinc-400">
-          Spend a DACE cross-chain reward leaf into the local chain. The leaf
-          hash comes from an activated Joint Anchor's reward accumulator.
+          Spend a DACE cross-chain reward leaf into the local chain. The leaf hash comes from an
+          activated Joint Anchor's reward accumulator.
         </p>
         <input
           type="text"
@@ -564,15 +495,11 @@ function BinaryChainActions({
           onClick={() => redeem.mutate()}
           className="rounded bg-zinc-200 hover:bg-white disabled:opacity-50 text-zinc-900 text-sm font-semibold px-3 py-1.5"
         >
-          {redeem.isPending ? "Redeeming…" : "Redeem"}
+          {redeem.isPending ? 'Redeeming…' : 'Redeem'}
         </button>
-        {redeem.error && (
-          <p className="text-xs text-red-400">{String(redeem.error)}</p>
-        )}
+        {redeem.error && <p className="text-xs text-red-400">{String(redeem.error)}</p>}
         {redeem.data && (
-          <p className="text-xs text-emerald-300">
-            {String((redeem.data as any).status ?? "ok")}
-          </p>
+          <p className="text-xs text-emerald-300">{String((redeem.data as any).status ?? 'ok')}</p>
         )}
       </div>
     </section>

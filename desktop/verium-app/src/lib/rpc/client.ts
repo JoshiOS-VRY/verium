@@ -1,9 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { CoinId } from "@/lib/coin/profile";
-import {
-  parseVericoinMiningInfo,
-  type VericoinMiningInfo,
-} from "@/lib/staking-stats";
+import { invoke } from '@tauri-apps/api/core';
+import type { CoinId } from '@/lib/coin/profile';
+import { parseVericoinMiningInfo, type VericoinMiningInfo } from '@/lib/staking-stats';
 
 export type { VericoinMiningInfo };
 
@@ -187,23 +184,23 @@ export interface CoinProfileSummary {
 }
 
 export async function rpcGetCoinProfiles(): Promise<CoinProfileSummary[]> {
-  return invoke<CoinProfileSummary[]>("get_coin_profiles");
+  return invoke<CoinProfileSummary[]>('get_coin_profiles');
 }
 
 export async function rpcGetNodeStatus(coin: CoinId): Promise<NodeStatus> {
-  return invoke<NodeStatus>("get_node_status", { coin });
+  return invoke<NodeStatus>('get_node_status', { coin });
 }
 
 export async function rpcGetBlockchainInfo(coin: CoinId): Promise<BlockchainInfo> {
-  return invoke<BlockchainInfo>("get_blockchain_info", { coin });
+  return invoke<BlockchainInfo>('get_blockchain_info', { coin });
 }
 
 export async function rpcGetNetworkInfo(coin: CoinId): Promise<NetworkInfo> {
-  return invoke<NetworkInfo>("get_network_info", { coin });
+  return invoke<NetworkInfo>('get_network_info', { coin });
 }
 
 export async function rpcGetPeerInfo(coin: CoinId): Promise<PeerInfo[]> {
-  return invoke<PeerInfo[]>("get_peer_info", { coin });
+  return invoke<PeerInfo[]>('get_peer_info', { coin });
 }
 
 export interface AddedNodeInfo {
@@ -212,52 +209,52 @@ export interface AddedNodeInfo {
 }
 
 export async function rpcGetAddedNodeInfo(coin: CoinId): Promise<AddedNodeInfo[]> {
-  return invoke<AddedNodeInfo[]>("get_added_node_info", { coin });
+  return invoke<AddedNodeInfo[]>('get_added_node_info', { coin });
 }
 
 export async function rpcAddNode(
   coin: CoinId,
   node: string,
-  command: "add" | "onetry" | "remove",
+  command: 'add' | 'onetry' | 'remove'
 ): Promise<void> {
-  return invoke<void>("add_node", { coin, node, command });
+  return invoke<void>('add_node', { coin, node, command });
 }
 
 export async function rpcGetMiningInfo(coin: CoinId): Promise<MiningInfo> {
-  return invoke<MiningInfo>("get_mining_info", { coin });
+  return invoke<MiningInfo>('get_mining_info', { coin });
 }
 
 export async function rpcGetVericoinMiningInfo(): Promise<VericoinMiningInfo | null> {
-  const raw = await invoke<unknown>("get_mining_info", { coin: "vericoin" });
+  const raw = await invoke<unknown>('get_mining_info', { coin: 'vericoin' });
   return parseVericoinMiningInfo(raw);
 }
 
 export async function rpcGetWalletInfo(coin: CoinId): Promise<WalletInfo | null> {
-  return invoke<WalletInfo | null>("get_wallet_info", { coin });
+  return invoke<WalletInfo | null>('get_wallet_info', { coin });
 }
 
 export async function rpcGetNewAddress(coin: CoinId, label?: string): Promise<string> {
-  return invoke<string>("get_new_address", { coin, label: label ?? "" });
+  return invoke<string>('get_new_address', { coin, label: label ?? '' });
 }
 
 export async function rpcListTransactions(
   coin: CoinId,
   count = 25,
-  skip = 0,
+  skip = 0
 ): Promise<TransactionItem[]> {
-  return invoke<TransactionItem[]>("list_transactions", { coin, count, skip });
+  return invoke<TransactionItem[]>('list_transactions', { coin, count, skip });
 }
 
 export async function rpcListAddressGroupings(coin: CoinId): Promise<string[]> {
-  return invoke<string[]>("list_address_groupings", { coin });
+  return invoke<string[]>('list_address_groupings', { coin });
 }
 
 export async function rpcMinerStart(
   coin: CoinId,
   threads: number,
-  rewardAddress?: string,
+  rewardAddress?: string
 ): Promise<MinerLocalState> {
-  return invoke<MinerLocalState>("miner_start", {
+  return invoke<MinerLocalState>('miner_start', {
     coin,
     threads,
     rewardAddress: rewardAddress?.trim() || null,
@@ -265,36 +262,36 @@ export async function rpcMinerStart(
 }
 
 export async function rpcMinerStop(coin: CoinId): Promise<MinerLocalState> {
-  return invoke<MinerLocalState>("miner_stop", { coin });
+  return invoke<MinerLocalState>('miner_stop', { coin });
 }
 
 export async function rpcGetMinerState(coin: CoinId): Promise<MinerLocalState> {
-  return invoke<MinerLocalState>("get_miner_state", { coin });
+  return invoke<MinerLocalState>('get_miner_state', { coin });
 }
 
 export async function rpcStakingStart(coin: CoinId): Promise<StakingLocalState> {
-  return invoke<StakingLocalState>("staking_start", { coin });
+  return invoke<StakingLocalState>('staking_start', { coin });
 }
 
 export async function rpcStakingStop(coin: CoinId): Promise<StakingLocalState> {
-  return invoke<StakingLocalState>("staking_stop", { coin });
+  return invoke<StakingLocalState>('staking_stop', { coin });
 }
 
 export async function rpcGetStakingState(coin: CoinId): Promise<StakingLocalState> {
-  return invoke<StakingLocalState>("get_staking_state", { coin });
+  return invoke<StakingLocalState>('get_staking_state', { coin });
 }
 
 export async function rpcReserveBalanceSet(coin: CoinId, amount: number): Promise<void> {
-  return invoke<void>("reserve_balance_set", { coin, amount });
+  return invoke<void>('reserve_balance_set', { coin, amount });
 }
 
 export async function rpcWalletUnlock(
   coin: CoinId,
   passphrase: string,
   timeoutSeconds: number,
-  mintingOnly?: boolean,
+  mintingOnly?: boolean
 ): Promise<void> {
-  return invoke<void>("wallet_unlock", {
+  return invoke<void>('wallet_unlock', {
     coin,
     passphrase,
     timeoutSeconds,
@@ -303,11 +300,11 @@ export async function rpcWalletUnlock(
 }
 
 export async function rpcWalletLock(coin: CoinId): Promise<void> {
-  return invoke<void>("wallet_lock", { coin });
+  return invoke<void>('wallet_lock', { coin });
 }
 
 export async function tauriTryAutoUnlockWallet(coin: CoinId): Promise<boolean> {
-  return invoke<boolean>("try_auto_unlock_wallet", { coin });
+  return invoke<boolean>('try_auto_unlock_wallet', { coin });
 }
 
 export async function rpcSendToAddress(
@@ -317,13 +314,13 @@ export async function rpcSendToAddress(
   comment?: string,
   totpCode?: string,
   walletPassphrase?: string,
-  extraConfirmed = true,
+  extraConfirmed = true
 ): Promise<string> {
-  return invoke<string>("send_to_address", {
+  return invoke<string>('send_to_address', {
     coin,
     address,
     amount,
-    comment: comment ?? "",
+    comment: comment ?? '',
     totpCode: totpCode?.trim() || null,
     walletPassphrase: walletPassphrase?.trim() || null,
     extraConfirmed,
@@ -338,18 +335,18 @@ export interface WalletCreateResult {
 
 export async function rpcWalletCreateEncrypted(
   coin: CoinId,
-  passphrase: string,
+  passphrase: string
 ): Promise<WalletCreateResult> {
-  return invoke<WalletCreateResult>("wallet_create_encrypted", { coin, passphrase });
+  return invoke<WalletCreateResult>('wallet_create_encrypted', { coin, passphrase });
 }
 
 export async function rpcWalletChangePassphrase(
   coin: CoinId,
   oldPassphrase: string,
   newPassphrase: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<void> {
-  return invoke<void>("wallet_change_passphrase", {
+  return invoke<void>('wallet_change_passphrase', {
     coin,
     oldPassphrase,
     newPassphrase,
@@ -365,13 +362,13 @@ export interface WalletBackupResult {
 
 export async function rpcWalletBackup(
   coin: CoinId,
-  destinationPath: string,
+  destinationPath: string
 ): Promise<WalletBackupResult> {
-  return invoke<WalletBackupResult>("wallet_backup", { coin, destinationPath });
+  return invoke<WalletBackupResult>('wallet_backup', { coin, destinationPath });
 }
 
 export async function openWalletBackupFolder(coin: CoinId): Promise<string> {
-  return invoke<string>("open_wallet_backup_folder", { coin });
+  return invoke<string>('open_wallet_backup_folder', { coin });
 }
 
 export interface WalletRestoreResult {
@@ -385,9 +382,9 @@ export interface WalletRestoreResult {
 export async function rpcWalletRestore(
   coin: CoinId,
   sourcePath: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<WalletRestoreResult> {
-  return invoke<WalletRestoreResult>("wallet_restore", {
+  return invoke<WalletRestoreResult>('wallet_restore', {
     coin,
     sourcePath,
     totpCode: totpCode?.trim() || null,
@@ -397,9 +394,9 @@ export async function rpcWalletRestore(
 export async function rpcWalletDumpPrivKey(
   coin: CoinId,
   address: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<string> {
-  return invoke<string>("wallet_dump_privkey", {
+  return invoke<string>('wallet_dump_privkey', {
     coin,
     address,
     totpCode: totpCode?.trim() || null,
@@ -411,9 +408,9 @@ export async function rpcWalletImportPrivKey(
   privkey: string,
   label?: string,
   rescan = true,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<void> {
-  return invoke<void>("wallet_import_privkey", {
+  return invoke<void>('wallet_import_privkey', {
     coin,
     privkey,
     label,
@@ -425,18 +422,18 @@ export async function rpcWalletImportPrivKey(
 export async function rpcWalletSignMessage(
   coin: CoinId,
   address: string,
-  message: string,
+  message: string
 ): Promise<string> {
-  return invoke<string>("wallet_sign_message", { coin, address, message });
+  return invoke<string>('wallet_sign_message', { coin, address, message });
 }
 
 export async function rpcWalletVerifyMessage(
   coin: CoinId,
   address: string,
   signature: string,
-  message: string,
+  message: string
 ): Promise<boolean> {
-  return invoke<boolean>("wallet_verify_message", {
+  return invoke<boolean>('wallet_verify_message', {
     coin,
     address,
     signature,
@@ -445,7 +442,7 @@ export async function rpcWalletVerifyMessage(
 }
 
 export async function rpcWalletSetTxFee(coin: CoinId, feeRatePerKb: number): Promise<boolean> {
-  return invoke<boolean>("wallet_set_tx_fee", { coin, feeRateVrmPerKb: feeRatePerKb });
+  return invoke<boolean>('wallet_set_tx_fee', { coin, feeRateVrmPerKb: feeRatePerKb });
 }
 
 export interface UnspentOutput {
@@ -462,9 +459,9 @@ export interface UnspentOutput {
 export async function rpcWalletListUnspent(
   coin: CoinId,
   minconf = 1,
-  maxconf = 9_999_999,
+  maxconf = 9_999_999
 ): Promise<UnspentOutput[]> {
-  return invoke<UnspentOutput[]>("wallet_list_unspent", { coin, minconf, maxconf });
+  return invoke<UnspentOutput[]>('wallet_list_unspent', { coin, minconf, maxconf });
 }
 
 export interface WalletSendInput {
@@ -480,9 +477,9 @@ export async function rpcWalletSendWithInputs(
   feeRatePerKb?: number,
   totpCode?: string,
   walletPassphrase?: string,
-  extraConfirmed = true,
+  extraConfirmed = true
 ): Promise<string> {
-  return invoke<string>("wallet_send_with_inputs", {
+  return invoke<string>('wallet_send_with_inputs', {
     coin,
     inputs,
     outputs,
@@ -494,12 +491,8 @@ export async function rpcWalletSendWithInputs(
   });
 }
 
-export async function rpcRaw(
-  coin: CoinId,
-  method: string,
-  params?: unknown[],
-): Promise<unknown> {
-  return invoke<unknown>("rpc_raw_call", { coin, method, params: params ?? [] });
+export async function rpcRaw(coin: CoinId, method: string, params?: unknown[]): Promise<unknown> {
+  return invoke<unknown>('rpc_raw_call', { coin, method, params: params ?? [] });
 }
 
 export interface WalletFileStatus {
@@ -516,7 +509,7 @@ export interface WalletFileStatus {
 }
 
 export async function tauriWalletFileStatus(coin: CoinId): Promise<WalletFileStatus> {
-  return invoke<WalletFileStatus>("wallet_file_status", { coin });
+  return invoke<WalletFileStatus>('wallet_file_status', { coin });
 }
 
 export interface FirstRunConfigResult {
@@ -525,11 +518,11 @@ export interface FirstRunConfigResult {
 }
 
 export async function tauriEnsureFirstRun(coin: CoinId): Promise<FirstRunConfigResult> {
-  return invoke<FirstRunConfigResult>("ensure_first_run", { coin });
+  return invoke<FirstRunConfigResult>('ensure_first_run', { coin });
 }
 
 export async function tauriRestartAfterEncrypt(coin: CoinId): Promise<EnsureConnectResult> {
-  return invoke<EnsureConnectResult>("restart_after_encrypt", { coin });
+  return invoke<EnsureConnectResult>('restart_after_encrypt', { coin });
 }
 
 export interface DiagnosticBundle {
@@ -543,52 +536,52 @@ export interface DiagnosticBundle {
 }
 
 export async function tauriDiagnosticBundle(coin: CoinId): Promise<DiagnosticBundle> {
-  return invoke<DiagnosticBundle>("diagnostic_bundle", { coin });
+  return invoke<DiagnosticBundle>('diagnostic_bundle', { coin });
 }
 
 export async function rpcGetConfig(coin: CoinId): Promise<DaemonConfig> {
-  return invoke<DaemonConfig>("get_daemon_config", { coin });
+  return invoke<DaemonConfig>('get_daemon_config', { coin });
 }
 
 export async function rpcSetConfig(
   coin: CoinId,
-  partial: DaemonConfigPartial,
+  partial: DaemonConfigPartial
 ): Promise<DaemonConfig> {
-  return invoke<DaemonConfig>("set_daemon_config", { coin, partial });
+  return invoke<DaemonConfig>('set_daemon_config', { coin, partial });
 }
 
 export async function tauriTestRpcConnection(
   coin: CoinId,
-  partial?: DaemonConfigPartial,
+  partial?: DaemonConfigPartial
 ): Promise<RpcTestResult> {
-  return invoke<RpcTestResult>("test_rpc_connection", { coin, partial: partial ?? null });
+  return invoke<RpcTestResult>('test_rpc_connection', { coin, partial: partial ?? null });
 }
 
 export async function tauriSetupRpcCredentials(
   coin: CoinId,
-  partial?: DaemonConfigPartial,
+  partial?: DaemonConfigPartial
 ): Promise<RpcCredentialsSetup> {
-  return invoke<RpcCredentialsSetup>("setup_rpc_credentials", {
+  return invoke<RpcCredentialsSetup>('setup_rpc_credentials', {
     coin,
     partial: partial ?? null,
   });
 }
 
 export async function tauriStartDaemon(coin: CoinId): Promise<void> {
-  return invoke<void>("start_daemon", { coin });
+  return invoke<void>('start_daemon', { coin });
 }
 
 export async function tauriStopDaemon(coin: CoinId): Promise<void> {
-  return invoke<void>("stop_daemon", { coin });
+  return invoke<void>('stop_daemon', { coin });
 }
 
 /** Gracefully stop miners, stakers, daemons, and exit the wallet. */
 export async function tauriQuitWallet(): Promise<void> {
-  return invoke<void>("quit_wallet");
+  return invoke<void>('quit_wallet');
 }
 
 export async function tauriRestartDaemon(coin: CoinId): Promise<void> {
-  return invoke<void>("restart_daemon", { coin });
+  return invoke<void>('restart_daemon', { coin });
 }
 
 export interface NodeConfFile {
@@ -600,15 +593,15 @@ export interface NodeConfFile {
 export type VeriumConfFile = NodeConfFile;
 
 export async function tauriReadNodeConf(coin: CoinId): Promise<NodeConfFile> {
-  return invoke<NodeConfFile>("read_verium_conf", { coin });
+  return invoke<NodeConfFile>('read_verium_conf', { coin });
 }
 
 export async function tauriWriteNodeConf(
   coin: CoinId,
   content: string,
-  totpCode?: string,
+  totpCode?: string
 ): Promise<NodeConfFile> {
-  return invoke<NodeConfFile>("write_verium_conf", {
+  return invoke<NodeConfFile>('write_verium_conf', {
     coin,
     content,
     totpCode: totpCode?.trim() || null,
@@ -616,7 +609,7 @@ export async function tauriWriteNodeConf(
 }
 
 export async function tauriOpenNodeConf(coin: CoinId): Promise<string> {
-  return invoke<string>("open_verium_conf", { coin });
+  return invoke<string>('open_verium_conf', { coin });
 }
 
 export interface DebugLogStatus {
@@ -625,18 +618,18 @@ export interface DebugLogStatus {
 }
 
 export async function tauriDebugLogStatus(coin: CoinId): Promise<DebugLogStatus> {
-  return invoke<DebugLogStatus>("debug_log_status", { coin });
+  return invoke<DebugLogStatus>('debug_log_status', { coin });
 }
 
 export async function tauriTailLogs(coin: CoinId, lines = 200): Promise<string[]> {
-  return invoke<string[]>("tail_logs", { coin, lines });
+  return invoke<string[]>('tail_logs', { coin, lines });
 }
 
 export interface UpdateInfo {
   current: string;
   latest?: string;
   update_available: boolean;
-  source: "cdn" | "manifest" | "none";
+  source: 'cdn' | 'manifest' | 'none';
   download_url?: string;
   release_notes_url?: string;
   cdn_version?: string;
@@ -644,7 +637,7 @@ export interface UpdateInfo {
 }
 
 export async function tauriCheckForUpdates(): Promise<UpdateInfo> {
-  return invoke<UpdateInfo>("check_for_updates");
+  return invoke<UpdateInfo>('check_for_updates');
 }
 
 export interface EnsureConnectResult {
@@ -662,11 +655,11 @@ export interface DaemonRuntimeStatus {
 }
 
 export async function tauriDetectDaemonRuntime(coin: CoinId): Promise<DaemonRuntimeStatus> {
-  return invoke<DaemonRuntimeStatus>("detect_veriumd_runtime", { coin });
+  return invoke<DaemonRuntimeStatus>('detect_veriumd_runtime', { coin });
 }
 
 export async function tauriEnsureDaemonConnected(coin: CoinId): Promise<EnsureConnectResult> {
-  return invoke<EnsureConnectResult>("ensure_daemon_connected", { coin });
+  return invoke<EnsureConnectResult>('ensure_daemon_connected', { coin });
 }
 
 export interface ChainRepairResult {
@@ -677,80 +670,74 @@ export interface ChainRepairResult {
 
 export async function tauriRepairChain(
   coin: CoinId,
-  mode: "bootstrap" | "reindex-chainstate" | "reindex",
+  mode: 'bootstrap' | 'reindex-chainstate' | 'reindex'
 ): Promise<ChainRepairResult> {
-  return invoke<ChainRepairResult>("repair_chain", { coin, mode });
+  return invoke<ChainRepairResult>('repair_chain', { coin, mode });
 }
 
 export async function tauriNodeRetry(coin: CoinId): Promise<void> {
-  return invoke<void>("node_retry", { coin });
+  return invoke<void>('node_retry', { coin });
 }
 
 export async function tauriNodeClearInvalidBlock(coin: CoinId): Promise<string> {
-  return invoke<string>("node_clear_invalid_block", { coin });
+  return invoke<string>('node_clear_invalid_block', { coin });
 }
 
 export async function tauriNodeResetCredentials(coin: CoinId): Promise<void> {
-  return invoke<void>("node_reset_credentials", { coin });
+  return invoke<void>('node_reset_credentials', { coin });
 }
 
 export interface DaemonBinaryStatus {
   found: boolean;
   path?: string;
-  source:
-    | "sidecar"
-    | "env"
-    | "adjacenttoapp"
-    | "path"
-    | "systemdefault"
-    | "none";
+  source: 'sidecar' | 'env' | 'adjacenttoapp' | 'path' | 'systemdefault' | 'none';
   manageable: boolean;
-  runtime: "bundled" | "windows" | "native" | "none";
+  runtime: 'bundled' | 'windows' | 'native' | 'none';
   coin?: string;
   stub_sidecar?: boolean;
   missing_hint?: string;
 }
 
 export async function tauriDetectDaemon(coin: CoinId): Promise<DaemonBinaryStatus> {
-  return invoke<DaemonBinaryStatus>("detect_daemon", { coin });
+  return invoke<DaemonBinaryStatus>('detect_daemon', { coin });
 }
 
 export async function tauriImportBootstrap(
   coin: CoinId,
-  localPath?: string | null,
+  localPath?: string | null
 ): Promise<{
   success: boolean;
   message: string;
   restart_hint?: string;
 }> {
-  return invoke("import_bootstrap", {
+  return invoke('import_bootstrap', {
     coin,
     localPath: localPath ?? null,
   });
 }
 
 export async function tauriCancelBootstrap(coin: CoinId): Promise<void> {
-  return invoke<void>("cancel_bootstrap", { coin });
+  return invoke<void>('cancel_bootstrap', { coin });
 }
 
 export async function tauriFetchExplorerStats(coin: CoinId) {
-  return invoke("fetch_explorer_stats", { coin });
+  return invoke('fetch_explorer_stats', { coin });
 }
 
 export async function tauriFetchExplorerBlocks(coin: CoinId, limit?: number) {
-  return invoke("fetch_explorer_blocks", { coin, limit });
+  return invoke('fetch_explorer_blocks', { coin, limit });
 }
 
 export async function tauriFetchExplorerTransactions(coin: CoinId, limit?: number) {
-  return invoke("fetch_explorer_transactions", { coin, limit });
+  return invoke('fetch_explorer_transactions', { coin, limit });
 }
 
 export async function tauriGetExplorerLogoUrl(coin: CoinId): Promise<string> {
-  return invoke<string>("get_explorer_logo_url", { coin });
+  return invoke<string>('get_explorer_logo_url', { coin });
 }
 
 export async function tauriIsExplorerApiEnabled(): Promise<boolean> {
-  return invoke<boolean>("is_explorer_api_enabled");
+  return invoke<boolean>('is_explorer_api_enabled');
 }
 
 export interface AddressBookEntry {
@@ -764,16 +751,16 @@ export interface AddressBookEntry {
 }
 
 export async function tauriAddressBookList(coin: CoinId): Promise<AddressBookEntry[]> {
-  return invoke<AddressBookEntry[]>("address_book_list", { coin });
+  return invoke<AddressBookEntry[]>('address_book_list', { coin });
 }
 
 export async function tauriAddressBookUpsert(
   coin: CoinId,
-  entry: AddressBookEntry,
+  entry: AddressBookEntry
 ): Promise<AddressBookEntry> {
-  return invoke<AddressBookEntry>("address_book_upsert", { coin, entry });
+  return invoke<AddressBookEntry>('address_book_upsert', { coin, entry });
 }
 
 export async function tauriAddressBookDelete(coin: CoinId, id: string): Promise<void> {
-  return invoke<void>("address_book_delete", { coin, id });
+  return invoke<void>('address_book_delete', { coin, id });
 }

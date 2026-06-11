@@ -1,24 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
-import type { CoinId } from "@/lib/coin/profile";
+import { useQuery } from '@tanstack/react-query';
+import type { CoinId } from '@/lib/coin/profile';
 import {
   fetchWalletTransactions,
   WALLET_TX_BACKGROUND_POLL_MS,
   WALLET_TX_POLL_INTERVAL_MS,
   walletTransactionsQueryKey,
-} from "@/lib/wallet-transactions-query";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
+} from '@/lib/wallet-transactions-query';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 
-export function useWalletTransactions(
-  coin: CoinId,
-  options?: { enabled?: boolean },
-) {
+export function useWalletTransactions(coin: CoinId, options?: { enabled?: boolean }) {
   const visible = useWindowVisible();
   return useQuery({
     queryKey: walletTransactionsQueryKey(coin),
     queryFn: () => fetchWalletTransactions(coin),
-    refetchInterval: visible
-      ? WALLET_TX_POLL_INTERVAL_MS
-      : WALLET_TX_BACKGROUND_POLL_MS,
+    refetchInterval: visible ? WALLET_TX_POLL_INTERVAL_MS : WALLET_TX_BACKGROUND_POLL_MS,
     enabled: options?.enabled ?? true,
     retry: 0,
     gcTime: 30_000,

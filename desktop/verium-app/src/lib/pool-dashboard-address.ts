@@ -1,8 +1,8 @@
-import type { UserPreferences } from "@/lib/user-preferences";
-import { staticMiningAddressConfigured } from "@/lib/mining-reward-address";
+import type { UserPreferences } from '@/lib/user-preferences';
+import { staticMiningAddressConfigured } from '@/lib/mining-reward-address';
 
 export function poolPayoutAddressConfigured(
-  prefs: Pick<UserPreferences, "pool_payout_address">,
+  prefs: Pick<UserPreferences, 'pool_payout_address'>
 ): boolean {
   return Boolean(prefs.pool_payout_address?.trim());
 }
@@ -11,11 +11,9 @@ export function poolPayoutAddressConfigured(
 export function resolvePoolDashboardAddress(
   prefs: Pick<
     UserPreferences,
-    | "pool_payout_address"
-    | "mining_reward_address_mode"
-    | "mining_reward_address"
+    'pool_payout_address' | 'mining_reward_address_mode' | 'mining_reward_address'
   >,
-  addresses?: string[],
+  addresses?: string[]
 ): string | undefined {
   const explicit = prefs.pool_payout_address?.trim();
   if (explicit) {
@@ -24,21 +22,18 @@ export function resolvePoolDashboardAddress(
   if (staticMiningAddressConfigured(prefs)) {
     return prefs.mining_reward_address?.trim();
   }
-  const first = addresses?.find((a) => a?.trim().startsWith("V"));
+  const first = addresses?.find((a) => a?.trim().startsWith('V'));
   return first?.trim();
 }
 
 /** Default pool payout when user has not chosen one yet. */
 export function suggestPoolPayoutAddress(
-  prefs: Pick<
-    UserPreferences,
-    "mining_reward_address_mode" | "mining_reward_address"
-  >,
-  addresses?: string[],
+  prefs: Pick<UserPreferences, 'mining_reward_address_mode' | 'mining_reward_address'>,
+  addresses?: string[]
 ): string | undefined {
   if (staticMiningAddressConfigured(prefs)) {
     return prefs.mining_reward_address?.trim();
   }
-  const first = addresses?.find((a) => a?.trim().startsWith("V"));
+  const first = addresses?.find((a) => a?.trim().startsWith('V'));
   return first?.trim();
 }

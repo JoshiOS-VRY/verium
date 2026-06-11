@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BookUser, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { BookUser, Search, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import {
   listAddressBookEntries,
   type AddressBookCategory,
   type AddressBookEntry,
-} from "@/lib/address-book";
-import { cn } from "@/lib/utils";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
+} from '@/lib/address-book';
+import { cn } from '@/lib/utils';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
 
 interface AddressBookPickerProps {
   open: boolean;
@@ -22,28 +22,28 @@ export function AddressBookPicker({
   open,
   onClose,
   onPick,
-  category = "send",
+  category = 'send',
 }: AddressBookPickerProps) {
   const coin = useActiveCoin();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
 
   const entries = useQuery({
-    queryKey: coinQueryKey(coin, "address-book"),
+    queryKey: coinQueryKey(coin, 'address-book'),
     queryFn: () => listAddressBookEntries(coin),
     enabled: open,
   });
 
   useEffect(() => {
-    if (!open) setQuery("");
+    if (!open) setQuery('');
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   const filtered = useMemo(() => {
@@ -54,7 +54,7 @@ export function AddressBookPicker({
       (e) =>
         e.label.toLowerCase().includes(q) ||
         e.address.toLowerCase().includes(q) ||
-        e.notes.toLowerCase().includes(q),
+        e.notes.toLowerCase().includes(q)
     );
   }, [entries.data, query, category]);
 
@@ -99,13 +99,10 @@ export function AddressBookPicker({
 
         <div className="max-h-[55vh] overflow-y-auto">
           {entries.isLoading ? (
-            <div className="px-4 py-6 text-center text-xs text-fg-muted">
-              Loading…
-            </div>
+            <div className="px-4 py-6 text-center text-xs text-fg-muted">Loading…</div>
           ) : filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-xs text-fg-muted">
-              No saved {category} addresses yet. Manage entries on the Address
-              book page.
+              No saved {category} addresses yet. Manage entries on the Address book page.
             </div>
           ) : (
             <ul>
@@ -118,19 +115,15 @@ export function AddressBookPicker({
                       onClose();
                     }}
                     className={cn(
-                      "block w-full border-b border-border px-4 py-3 text-left hover:bg-bg-subtle",
+                      'block w-full border-b border-border px-4 py-3 text-left hover:bg-bg-subtle'
                     )}
                   >
-                    <div className="text-sm font-medium text-fg">
-                      {entry.label || "(no label)"}
-                    </div>
+                    <div className="text-sm font-medium text-fg">{entry.label || '(no label)'}</div>
                     <div className="mt-0.5 break-all text-[11px] text-fg-muted">
                       {entry.address}
                     </div>
                     {entry.notes && (
-                      <div className="mt-1 text-xs text-fg-subtle">
-                        {entry.notes}
-                      </div>
+                      <div className="mt-1 text-xs text-fg-subtle">{entry.notes}</div>
                     )}
                   </button>
                 </li>

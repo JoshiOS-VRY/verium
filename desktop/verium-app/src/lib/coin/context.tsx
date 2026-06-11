@@ -1,17 +1,6 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from "react";
-import {
-  ALL_COINS,
-  getCoinProfile,
-  type CoinId,
-  type CoinProfile,
-} from "@/lib/coin/profile";
-import { useUserPreferences } from "@/lib/user-preferences";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
+import { ALL_COINS, getCoinProfile, type CoinId, type CoinProfile } from '@/lib/coin/profile';
+import { useUserPreferences } from '@/lib/user-preferences';
 
 interface CoinContextValue {
   activeCoin: CoinId;
@@ -32,23 +21,22 @@ export function CoinProvider({ children }: { children: ReactNode }) {
   const vericoinEnabled = useUserPreferences((s) => s.prefs.vericoin_enabled);
   const update = useUserPreferences((s) => s.update);
 
-  const activeCoin: CoinId =
-    activeCoinPref === "vericoin" ? "vericoin" : "verium";
+  const activeCoin: CoinId = activeCoinPref === 'vericoin' ? 'vericoin' : 'verium';
 
   const enabledCoins = useMemo(
     () =>
       ALL_COINS.filter((coin) => {
-        if (coin === "verium") return veriumEnabled !== false;
+        if (coin === 'verium') return veriumEnabled !== false;
         return vericoinEnabled !== false;
       }),
-    [veriumEnabled, vericoinEnabled],
+    [veriumEnabled, vericoinEnabled]
   );
 
   const setActiveCoin = useCallback(
     (coin: CoinId) => {
       void update({ active_coin: coin });
     },
-    [update],
+    [update]
   );
 
   const value = useMemo(
@@ -59,7 +47,7 @@ export function CoinProvider({ children }: { children: ReactNode }) {
       enabledCoins,
       isCoinEnabled: (coin: CoinId) => enabledCoins.includes(coin),
     }),
-    [activeCoin, enabledCoins, setActiveCoin],
+    [activeCoin, enabledCoins, setActiveCoin]
   );
 
   return <CoinContext.Provider value={value}>{children}</CoinContext.Provider>;
@@ -84,7 +72,7 @@ export function useEnabledCoins(): CoinId[] {
 export function useCoinContext(): CoinContextValue {
   const ctx = useContext(CoinContext);
   if (!ctx) {
-    throw new Error("useCoinContext must be used within CoinProvider");
+    throw new Error('useCoinContext must be used within CoinProvider');
   }
   return ctx;
 }

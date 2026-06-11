@@ -1,16 +1,15 @@
-Verium
-=============
+# Verium
 
-Setup
----------------------
+## Setup
+
 Verium is the original Verium client and it builds the backbone of the network. It downloads and, by default, stores the entire history of Verium transactions; depending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.
 
 In order to help you to be able to sync as fast as possible we have implemented a bootstrap system explain in the documentation below
 
 To download Verium, visit [vericonomy.com](https://vericonomy.com).
 
-Running
----------------------
+## Running
+
 The following are some helpful notes on how to run Verium on your native platform.
 
 ### Unix
@@ -28,26 +27,26 @@ Download and execute "Verium_0.16_64bit.exe"
 
 Drag Verium_0.16_64bit.pkg to your applications folder, and then run Verium Wallet.
 
-Bootstrap
----------------------
+## Bootstrap
+
 In order to speed up the download of the blockchain and to let you discover the full potential of the Verium Wallet, a bootstrap process is implemented in the Verium.
 
-* You can launch it by different methods base on how you are using you wallet:
+- You can launch it by different methods base on how you are using you wallet:
   - Command line: src/verium-cli bootstrap
   - UI: file > reload blockchain
 
-
 ### Need Help?
 
-* See the documentation at the [Vericoin & Verium Wiki](https://docs.vericonomy.com)
-for help and more information.
-* Ask for help on 
- - [Slack](https://vericonomy.com)
- - [Telegram](https://t.me/vericoinandverium)
- - [Vericoin & Verium Reddit](https://www.reddit.com/r/vericoin)
+- See the documentation at the [Vericoin & Verium Wiki](https://docs.vericonomy.com)
+  for help and more information.
+- Ask for help on
 
-Building
----------------------
+* [Slack](https://vericonomy.com)
+* [Telegram](https://t.me/vericoinandverium)
+* [Vericoin & Verium Reddit](https://www.reddit.com/r/vericoin)
+
+## Building
+
 The following are developer notes on how to build Verium on your native platform. They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
 
 - [Dependencies](dependencies.md)
@@ -56,8 +55,8 @@ The following are developer notes on how to build Verium on your native platform
 - [Windows Build Notes](build-windows.md)
 - [OpenBSD Build Notes](build-openbsd.md)
 
-Development
----------------------
+## Development
+
 The Verium repo's [root README](/README.md) contains relevant information on the development process and automated testing.
 
 - [Release Notes](release-notes.md)
@@ -68,10 +67,12 @@ The Verium repo's [root README](/README.md) contains relevant information on the
 - [Benchmarking](benchmarking.md)
 
 ### Resources
-* Discuss on the [Slack](https://vericonomy.com), in the development channel.
-* Follow the [Development Kanban](https://trello.com/b/Fna9ydfw/vericonomy).
+
+- Discuss on the [Slack](https://vericonomy.com), in the development channel.
+- Follow the [Development Kanban](https://trello.com/b/Fna9ydfw/vericonomy).
 
 ### Miscellaneous
+
 - [Assets Attribution](assets-attribution.md)
 - [Files](files.md)
 - [Fuzz-testing](fuzzing.md)
@@ -80,8 +81,8 @@ The Verium repo's [root README](/README.md) contains relevant information on the
 - [Init Scripts (systemd/upstart/openrc)](init.md)
 - [ZMQ](zmq.md)
 
-License
----------------------
+## License
+
 Distributed under the [MIT software license](/COPYING).
 This product includes software developed by the OpenSSL Project for use in the [OpenSSL Toolkit](https://www.openssl.org/). This product includes
 cryptographic software written by Eric Young ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.

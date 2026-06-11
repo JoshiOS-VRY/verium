@@ -1,35 +1,23 @@
-import { useEffect, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Coins, Loader2, TrendingUp } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { ExplorerMarketCard } from "@/components/ExplorerMarketCard";
-import { WalletUnlockGate } from "@/components/WalletUnlockGate";
-import { useActiveCoin } from "@/lib/coin/context";
-import { coinQueryKey, getCoinProfile } from "@/lib/coin/profile";
-import { fetchExplorerStats } from "@/lib/explorer-api";
-import { useExplorerQueriesEnabled } from "@/lib/network-mode";
-import { useDaemonStatus } from "@/hooks/useDaemonStatus";
-import { useWalletTransactions } from "@/hooks/useWalletTransactions";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
-import { useUserPreferences } from "@/lib/user-preferences";
-import {
-  playStakeRewardSound,
-  unlockBlockMinedAudio,
-} from "@/lib/block-mined-sound";
-import {
-  clearStakingStoppedByUser,
-  markStakingStoppedByUser,
-} from "@/hooks/useAutoStake";
+import { useEffect, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Coins, Loader2, TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { ExplorerMarketCard } from '@/components/ExplorerMarketCard';
+import { WalletUnlockGate } from '@/components/WalletUnlockGate';
+import { useActiveCoin } from '@/lib/coin/context';
+import { coinQueryKey, getCoinProfile } from '@/lib/coin/profile';
+import { fetchExplorerStats } from '@/lib/explorer-api';
+import { useExplorerQueriesEnabled } from '@/lib/network-mode';
+import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { useWalletTransactions } from '@/hooks/useWalletTransactions';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { playStakeRewardSound, unlockBlockMinedAudio } from '@/lib/block-mined-sound';
+import { clearStakingStoppedByUser, markStakingStoppedByUser } from '@/hooks/useAutoStake';
 import {
   rpcGetBlockchainInfo,
   rpcGetStakingState,
@@ -37,8 +25,8 @@ import {
   rpcGetWalletInfo,
   rpcStakingStart,
   rpcStakingStop,
-} from "@/lib/rpc/client";
-import { formatCoinAmount } from "@/lib/units";
+} from '@/lib/rpc/client';
+import { formatCoinAmount } from '@/lib/units';
 import {
   buildPostReadinessSummary,
   estimateExpectedStakeReward,
@@ -47,27 +35,17 @@ import {
   mergeStakingNetworkKpis,
   networkCoinsStakingPercent,
   walletStakeSharePercent,
-} from "@/lib/staking-stats";
-import { cn, formatNumber } from "@/lib/utils";
+} from '@/lib/staking-stats';
+import { cn, formatNumber } from '@/lib/utils';
 
-const VERICOIN = "vericoin" as const;
+const VERICOIN = 'vericoin' as const;
 const profile = getCoinProfile(VERICOIN);
 
-function BalanceCard({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-}) {
+function BalanceCard({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
-    <Card className={cn(muted && "opacity-90")}>
+    <Card className={cn(muted && 'opacity-90')}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium normal-case text-fg-muted">
-          {label}
-        </CardTitle>
+        <CardTitle className="text-sm font-medium normal-case text-fg-muted">{label}</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="text-xl font-semibold tabular-nums">{value}</div>
@@ -86,22 +64,22 @@ export function Staking() {
 
   const visible = useWindowVisible();
   const stakingState = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "get_staking_state"),
+    queryKey: coinQueryKey(VERICOIN, 'get_staking_state'),
     queryFn: () => rpcGetStakingState(VERICOIN),
     refetchInterval: false,
   });
   const miningInfo = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "getmininginfo"),
+    queryKey: coinQueryKey(VERICOIN, 'getmininginfo'),
     queryFn: () => rpcGetVericoinMiningInfo(),
     refetchInterval: false,
   });
   const blockchain = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "getblockchaininfo"),
+    queryKey: coinQueryKey(VERICOIN, 'getblockchaininfo'),
     queryFn: () => rpcGetBlockchainInfo(VERICOIN),
     refetchInterval: false,
   });
   const wallet = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "getwalletinfo"),
+    queryKey: coinQueryKey(VERICOIN, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(VERICOIN),
     refetchInterval: false,
   });
@@ -109,7 +87,7 @@ export function Staking() {
   const daemonStatus = useDaemonStatus(VERICOIN);
   const explorerEnabled = useExplorerQueriesEnabled();
   const explorerStats = useQuery({
-    queryKey: coinQueryKey(VERICOIN, "explorer-stats"),
+    queryKey: coinQueryKey(VERICOIN, 'explorer-stats'),
     queryFn: () => fetchExplorerStats(VERICOIN),
     enabled: explorerEnabled,
     refetchInterval: false,
@@ -129,20 +107,14 @@ export function Staking() {
     mutationFn: () => rpcStakingStart(VERICOIN),
     onSuccess: (state) => {
       clearStakingStoppedByUser();
-      queryClient.setQueryData(
-        coinQueryKey(VERICOIN, "get_staking_state"),
-        state,
-      );
+      queryClient.setQueryData(coinQueryKey(VERICOIN, 'get_staking_state'), state);
     },
   });
   const stop = useMutation({
     mutationFn: () => rpcStakingStop(VERICOIN),
     onSuccess: (state) => {
       markStakingStoppedByUser();
-      queryClient.setQueryData(
-        coinQueryKey(VERICOIN, "get_staking_state"),
-        state,
-      );
+      queryClient.setQueryData(coinQueryKey(VERICOIN, 'get_staking_state'), state);
     },
   });
 
@@ -162,10 +134,7 @@ export function Staking() {
   const networkStakePct = networkCoinsStakingPercent(network.netStakeWeight);
   const walletStakeWeight =
     miningInfo.data?.stakeweight?.combined ?? (stake > 0 ? stake : undefined);
-  const stakeShare = walletStakeSharePercent(
-    walletStakeWeight,
-    network.netStakeWeight,
-  );
+  const stakeShare = walletStakeSharePercent(walletStakeWeight, network.netStakeWeight);
   const youngestReceive = findYoungestStakeReceive(walletTxs.data ?? []);
   const postReadiness = buildPostReadinessSummary({
     receive: youngestReceive,
@@ -197,27 +166,15 @@ export function Staking() {
         {ibd && !syncStalled && (
           <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
             Staking is disabled while the node is syncing (
-            {blockchain.data?.blocks?.toLocaleString() ?? "…"} blocks).
+            {blockchain.data?.blocks?.toLocaleString() ?? '…'} blocks).
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <BalanceCard
-            label="Available"
-            value={formatCoinAmount(available, VERICOIN, 4)}
-          />
-          <BalanceCard
-            label="Unconfirmed"
-            value={formatCoinAmount(unconfirmed, VERICOIN, 4)}
-          />
-          <BalanceCard
-            label="Immature rewards"
-            value={formatCoinAmount(stake, VERICOIN, 4)}
-          />
-          <BalanceCard
-            label="Total"
-            value={formatCoinAmount(total, VERICOIN, 4)}
-          />
+          <BalanceCard label="Available" value={formatCoinAmount(available, VERICOIN, 4)} />
+          <BalanceCard label="Unconfirmed" value={formatCoinAmount(unconfirmed, VERICOIN, 4)} />
+          <BalanceCard label="Immature rewards" value={formatCoinAmount(stake, VERICOIN, 4)} />
+          <BalanceCard label="Total" value={formatCoinAmount(total, VERICOIN, 4)} />
         </div>
 
         <Card className="relative">
@@ -228,15 +185,11 @@ export function Staking() {
                 Staking process
               </CardTitle>
               <CardDescription>
-                Proof-of-stake minting for {profile.displayName}. Requires mature
-                coins and an unlocked wallet.
+                Proof-of-stake minting for {profile.displayName}. Requires mature coins and an
+                unlocked wallet.
               </CardDescription>
             </div>
-            {active ? (
-              <Badge tone="success">Staking</Badge>
-            ) : (
-              <Badge tone="neutral">Stopped</Badge>
-            )}
+            {active ? <Badge tone="success">Staking</Badge> : <Badge tone="neutral">Stopped</Badge>}
           </CardHeader>
           <CardContent className="flex flex-col gap-4 pb-[4.75rem]">
             <label className="flex cursor-pointer items-center gap-2 text-xs text-fg-muted">
@@ -287,7 +240,7 @@ export function Staking() {
                     Stopping…
                   </>
                 ) : (
-                  "Stop staking"
+                  'Stop staking'
                 )}
               </Button>
             ) : (
@@ -303,7 +256,7 @@ export function Staking() {
                     Starting…
                   </>
                 ) : (
-                  "Start staking"
+                  'Start staking'
                 )}
               </Button>
             )}
@@ -317,11 +270,11 @@ export function Staking() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold tabular-nums">
-                {interestRate != null ? `${formatNumber(interestRate, 2)}%` : "—"}
+                {interestRate != null ? `${formatNumber(interestRate, 2)}%` : '—'}
               </div>
               <div className="mt-1 text-xs text-fg-subtle">
                 Current PoS reward rate
-                {network.source === "explorer" && " · explorer"}
+                {network.source === 'explorer' && ' · explorer'}
               </div>
             </CardContent>
           </Card>
@@ -331,13 +284,9 @@ export function Staking() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold tabular-nums">
-                {inflationRate != null
-                  ? `${formatNumber(inflationRate, 2)}%`
-                  : "—"}
+                {inflationRate != null ? `${formatNumber(inflationRate, 2)}%` : '—'}
               </div>
-              <div className="mt-1 text-xs text-fg-subtle">
-                Network staking inflation
-              </div>
+              <div className="mt-1 text-xs text-fg-subtle">Network staking inflation</div>
             </CardContent>
           </Card>
           <Card>
@@ -346,13 +295,9 @@ export function Staking() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold tabular-nums">
-                {networkStakePct != null
-                  ? `${formatNumber(networkStakePct, 2)}%`
-                  : "—"}
+                {networkStakePct != null ? `${formatNumber(networkStakePct, 2)}%` : '—'}
               </div>
-              <div className="mt-1 text-xs text-fg-subtle">
-                Of supply actively staking
-              </div>
+              <div className="mt-1 text-xs text-fg-subtle">Of supply actively staking</div>
             </CardContent>
           </Card>
           <Card>
@@ -363,14 +308,11 @@ export function Staking() {
               <div className="text-2xl font-semibold tabular-nums">
                 {walletStakeWeight != null && walletStakeWeight > 0
                   ? formatNumber(walletStakeWeight, 0)
-                  : "—"}
+                  : '—'}
               </div>
               <div className="mt-1 text-xs text-fg-subtle">
-                PoST coin-age units from{" "}
-                {miningInfo.data ? "getmininginfo" : "your node"}
-                {stake > 0
-                  ? ` · immature rewards ${formatCoinAmount(stake, VERICOIN, 2)}`
-                  : ""}
+                PoST coin-age units from {miningInfo.data ? 'getmininginfo' : 'your node'}
+                {stake > 0 ? ` · immature rewards ${formatCoinAmount(stake, VERICOIN, 2)}` : ''}
               </div>
               {newmint > 0 && (
                 <div className="mt-1 text-xs text-fg-subtle">
@@ -391,30 +333,18 @@ export function Staking() {
           <CardContent className="grid gap-4 text-sm md:grid-cols-3">
             <div>
               <div className="text-xs text-fg-subtle">Minimum coin age (8h)</div>
-              <div className="font-semibold tabular-nums">
-                {postReadiness.minAgeLabel}
-              </div>
-              <p className="mt-1 text-xs text-fg-subtle">
-                {postReadiness.minAgeDetail}
-              </p>
+              <div className="font-semibold tabular-nums">{postReadiness.minAgeLabel}</div>
+              <p className="mt-1 text-xs text-fg-subtle">{postReadiness.minAgeDetail}</p>
             </div>
             <div>
               <div className="text-xs text-fg-subtle">Wallet maturity</div>
-              <div className="font-semibold tabular-nums">
-                {postReadiness.maturityLabel}
-              </div>
-              <p className="mt-1 text-xs text-fg-subtle">
-                {postReadiness.maturityDetail}
-              </p>
+              <div className="font-semibold tabular-nums">{postReadiness.maturityLabel}</div>
+              <p className="mt-1 text-xs text-fg-subtle">{postReadiness.maturityDetail}</p>
             </div>
             <div>
               <div className="text-xs text-fg-subtle">Weight ramp</div>
-              <div className="font-semibold tabular-nums">
-                {postReadiness.weightRampLabel}
-              </div>
-              <p className="mt-1 text-xs text-fg-subtle">
-                {postReadiness.weightRampDetail}
-              </p>
+              <div className="font-semibold tabular-nums">{postReadiness.weightRampLabel}</div>
+              <p className="mt-1 text-xs text-fg-subtle">{postReadiness.weightRampDetail}</p>
             </div>
           </CardContent>
         </Card>
@@ -423,9 +353,7 @@ export function Staking() {
           <div className="rounded-lg border border-border bg-bg-subtle/50 px-4 py-3">
             <div className="mb-1 flex justify-between text-sm">
               <span className="text-fg-muted">Your network stake share</span>
-              <span className="font-semibold tabular-nums">
-                {formatNumber(stakeShare, 4)}%
-              </span>
+              <span className="font-semibold tabular-nums">{formatNumber(stakeShare, 4)}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-bg-panel">
               <div
@@ -453,16 +381,10 @@ export function Staking() {
                 <div className="font-semibold text-success">Staking active</div>
               </div>
               <div>
-                <div className="text-xs text-fg-subtle">
-                  Est. time to stake reward
-                </div>
-                <div className="font-semibold tabular-nums">
-                  {rewardEstimate?.label ?? "—"}
-                </div>
+                <div className="text-xs text-fg-subtle">Est. time to stake reward</div>
+                <div className="font-semibold tabular-nums">{rewardEstimate?.label ?? '—'}</div>
                 {rewardEstimate ? (
-                  <p className="mt-1 text-xs text-fg-subtle">
-                    {rewardEstimate.disclaimer}
-                  </p>
+                  <p className="mt-1 text-xs text-fg-subtle">{rewardEstimate.disclaimer}</p>
                 ) : null}
               </div>
             </CardContent>
@@ -472,15 +394,15 @@ export function Staking() {
         {!active && rewardEstimate && (
           <div className="rounded-lg border border-border bg-bg-subtle/50 px-4 py-3 text-sm text-fg-muted">
             <span className="font-medium text-fg">If you start staking: </span>
-            {rewardEstimate.label} to expected reward ({rewardEstimate.source}{" "}
-            estimate). {rewardEstimate.disclaimer}
+            {rewardEstimate.label} to expected reward ({rewardEstimate.source} estimate).{' '}
+            {rewardEstimate.disclaimer}
           </div>
         )}
 
         {immature > 0 && (
           <div className="rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm">
-            Pending from recent stakes:{" "}
-            <strong>{formatCoinAmount(immature, VERICOIN, 4)}</strong> (immature)
+            Pending from recent stakes: <strong>{formatCoinAmount(immature, VERICOIN, 4)}</strong>{' '}
+            (immature)
           </div>
         )}
 
@@ -497,27 +419,19 @@ export function Staking() {
                 Live staking stats from your node and the official VRC explorer.
               </CardDescription>
             </div>
-            <ExplorerLink
-              coin={VERICOIN}
-              target={{ kind: "home" }}
-              label="Open VRC explorer"
-            />
+            <ExplorerLink coin={VERICOIN} target={{ kind: 'home' }} label="Open VRC explorer" />
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
             <div>
               <div className="text-xs text-fg-subtle">PoS difficulty</div>
               <div className="font-semibold tabular-nums">
-                {network.posDifficulty != null
-                  ? formatNumber(network.posDifficulty, 4)
-                  : "—"}
+                {network.posDifficulty != null ? formatNumber(network.posDifficulty, 4) : '—'}
               </div>
             </div>
             <div>
               <div className="text-xs text-fg-subtle">Blocks per hour</div>
               <div className="font-semibold tabular-nums">
-                {network.blocksPerHour != null
-                  ? formatNumber(network.blocksPerHour, 2)
-                  : "—"}
+                {network.blocksPerHour != null ? formatNumber(network.blocksPerHour, 2) : '—'}
               </div>
             </div>
             <div>
@@ -525,7 +439,7 @@ export function Staking() {
               <div className="font-semibold tabular-nums">
                 {networkCoinsStakingPercent(network.netStakeWeight) != null
                   ? `${formatNumber(networkCoinsStakingPercent(network.netStakeWeight)!, 2)}%`
-                  : "—"}
+                  : '—'}
               </div>
             </div>
             {network.supply != null && (

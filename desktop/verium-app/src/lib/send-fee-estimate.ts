@@ -6,12 +6,9 @@ export const MIN_TX_FEE_VRM = 0.001;
 
 export function estimateSendFee(
   feeRatePerKb: number,
-  transactionCount = 1,
+  transactionCount = 1
 ): { sizeKb: number; feePerTx: number; totalFee: number } {
-  const feePerTx = Math.max(
-    MIN_TX_FEE_VRM,
-    feeRatePerKb * ESTIMATED_TX_SIZE_KB,
-  );
+  const feePerTx = Math.max(MIN_TX_FEE_VRM, feeRatePerKb * ESTIMATED_TX_SIZE_KB);
   return {
     sizeKb: ESTIMATED_TX_SIZE_KB,
     feePerTx,
