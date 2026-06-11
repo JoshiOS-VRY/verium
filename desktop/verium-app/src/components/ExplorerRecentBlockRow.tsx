@@ -184,6 +184,7 @@ function BlockMinerLabel({
         coin={coin}
         target={{ kind: "address", address: minerLinkAddress }}
         label={block.miner_address}
+        className="block max-w-full truncate"
       />
     );
   }

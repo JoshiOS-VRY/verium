@@ -74,32 +74,163 @@
   }
 }
 
-/* iOS / mobile shell — safe areas and touch-first spacing */
+/* iOS / mobile shell — safe areas, vertical-only scroll, no horizontal bleed */
 @layer components {
   .mobile-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
     padding-top: env(safe-area-inset-top, 0px);
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* iOS auto-zooms focused fields below 16px — keep native inputs readable. */
+  .mobile-shell input,
+  .mobile-shell select,
+  .mobile-shell textarea {
+    font-size: 16px;
   }
 
   .mobile-header {
+    min-width: 0;
+    max-width: 100%;
     padding-top: env(safe-area-inset-top, 0px);
   }
 
   .mobile-main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
     padding: 1rem 1rem 0;
     padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
   }
 
+  .mobile-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .mobile-tab-bar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .mobile-setup {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .mobile-setup-card {
+    min-width: 0;
+    max-width: 100%;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-page {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .mobile-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mobile-input {
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-subtle);
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .mobile-input:focus {
+    border-color: var(--accent);
+  }
+
+  .mobile-textarea {
+    min-height: 5.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-subtle);
+    padding: 0.75rem 0.875rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    outline: none;
+    resize: vertical;
+  }
+
+  .mobile-textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .mobile-select {
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-subtle);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 1rem;
+    outline: none;
+  }
+
+  .mobile-checkbox-row {
+    display: flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.875rem;
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: background-color 0.15s;
+  }
+
+  .mobile-checkbox-row:active {
+    background-color: var(--bg-subtle);
+  }
+
+  .mobile-checkbox-row input[type="checkbox"] {
+    height: 1.25rem;
+    width: 1.25rem;
+    flex-shrink: 0;
+    border-radius: 0.25rem;
+    accent-color: var(--accent);
+  }
+
+  .mobile-banner {
+    border-radius: 1rem;
+    padding: 0.875rem 1rem;
+    font-size: 0.8125rem;
+    line-height: 1.375rem;
+  }
+
+  .mobile-list-card {
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--bg-subtle) 40%, transparent);
+    padding: 0.875rem 1rem;
   }
 }
 

@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +65,21 @@ pub fn default_datadir(coin: CoinId) -> PathBuf {
     coin.default_datadir()
 }
 
+static APP_CONFIG_BASE_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+
+/// Mobile apps must store data under the sandboxed app data directory (set at startup).
+pub fn init_app_storage_base(base: PathBuf) -> AppResult<()> {
+    fs::create_dir_all(&base)?;
+    APP_CONFIG_BASE_OVERRIDE
+        .set(base)
+        .map_err(|_| AppError::other("app storage base already initialized"))?;
+    Ok(())
+}
+
 pub fn app_config_base() -> PathBuf {
+    if let Some(base) = APP_CONFIG_BASE_OVERRIDE.get() {
+        return base.clone();
+    }
     let base = dirs::config_dir()
         .or_else(dirs::data_dir)
         .unwrap_or_else(|| PathBuf::from("."));
@@ -72,6 +87,10 @@ pub fn app_config_base() -> PathBuf {
 }
 
 pub fn migrate_legacy_configs() -> AppResult<()> {
+    #[cfg(mobile)]
+    {
+        return Ok(());
+    }
     let legacy_daemon = app_config_base()
         .parent()
         .map(|p| p.join("Verium").join("desktop-app").join("daemon.json"));
@@ -175,6 +194,13 @@ pub fn load_or_default_config(coin: CoinId) -> AppResult<DaemonConfig> {
 /// saved daemon-*.json when its chain matches the requested mode; otherwise
 /// returns fresh defaults for that network (binarytest ports/datadirs).
 pub fn load_config_for_network(coin: CoinId, mode: NetworkMode) -> AppResult<DaemonConfig> {
+    // iOS/Android light wallet: no local node datadir or .conf I/O at startup.
+    #[cfg(mobile)]
+    {
+        let _ = migrate_legacy_configs();
+        return Ok(default_config_for_target(CoinTarget::new(coin, mode)));
+    }
+
     let _ = migrate_legacy_configs();
     let want_binarytest = mode.is_test();
     let mut cfg = if let Some(saved) = load_saved_daemon_config(coin)? {

@@ -22,66 +22,66 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		00FD63D635A372EF6117B5BC /* backup_scheduler.rs */ = {isa = PBXFileReference; path = backup_scheduler.rs; sourceTree = "<group>"; };
+		00FD63D635A372EF6117B5BC /* backup_scheduler.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = backup_scheduler.rs; sourceTree = "<group>"; };
 		0127F559653341D3FEC3BE79 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		0A8B6A8AB82CF7F93A0DEBB2 /* mining_opt.rs */ = {isa = PBXFileReference; path = mining_opt.rs; sourceTree = "<group>"; };
-		0C5137348C6AA1DA46D6E422 /* snapshot.rs */ = {isa = PBXFileReference; path = snapshot.rs; sourceTree = "<group>"; };
+		0A8B6A8AB82CF7F93A0DEBB2 /* mining_opt.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mining_opt.rs; sourceTree = "<group>"; };
+		0C5137348C6AA1DA46D6E422 /* snapshot.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = snapshot.rs; sourceTree = "<group>"; };
 		0E54B91A3C8FD6E283D3E5A0 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
-		118F757588A50300AE00250A /* prefs.rs */ = {isa = PBXFileReference; path = prefs.rs; sourceTree = "<group>"; };
-		26C202FEAC4E222C23091349 /* auto_lock.rs */ = {isa = PBXFileReference; path = auto_lock.rs; sourceTree = "<group>"; };
-		28BED724B47236F84F611091 /* orchestrator.rs */ = {isa = PBXFileReference; path = orchestrator.rs; sourceTree = "<group>"; };
-		2ADCA82D20578C6E4496EC6F /* status.rs */ = {isa = PBXFileReference; path = status.rs; sourceTree = "<group>"; };
-		30A981E367D8B2B4CB0F0A3B /* gpu_miner.rs */ = {isa = PBXFileReference; path = gpu_miner.rs; sourceTree = "<group>"; };
-		32BD6A537BFE885F80984E85 /* bootstrap.rs */ = {isa = PBXFileReference; path = bootstrap.rs; sourceTree = "<group>"; };
+		118F757588A50300AE00250A /* prefs.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = prefs.rs; sourceTree = "<group>"; };
+		26C202FEAC4E222C23091349 /* auto_lock.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = auto_lock.rs; sourceTree = "<group>"; };
+		28BED724B47236F84F611091 /* orchestrator.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = orchestrator.rs; sourceTree = "<group>"; };
+		2ADCA82D20578C6E4496EC6F /* status.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = status.rs; sourceTree = "<group>"; };
+		30A981E367D8B2B4CB0F0A3B /* gpu_miner.rs */ = {isa = PBXFileReference; lastKnownFileType = file; path = gpu_miner.rs; sourceTree = "<group>"; };
+		32BD6A537BFE885F80984E85 /* bootstrap.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = bootstrap.rs; sourceTree = "<group>"; };
 		3567463BDA2043F2D58FC720 /* vericonomy-wallet_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "vericonomy-wallet_iOS.entitlements"; sourceTree = "<group>"; };
-		396B1E120FCF96664B15D588 /* dace_commands.rs */ = {isa = PBXFileReference; path = dace_commands.rs; sourceTree = "<group>"; };
-		3AD18D9FF3052F89DDECE42E /* error.rs */ = {isa = PBXFileReference; path = error.rs; sourceTree = "<group>"; };
-		3B7AE4990FCF7ECC65116C7C /* audit_log.rs */ = {isa = PBXFileReference; path = audit_log.rs; sourceTree = "<group>"; };
+		396B1E120FCF96664B15D588 /* dace_commands.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = dace_commands.rs; sourceTree = "<group>"; };
+		3AD18D9FF3052F89DDECE42E /* error.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = error.rs; sourceTree = "<group>"; };
+		3B7AE4990FCF7ECC65116C7C /* audit_log.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = audit_log.rs; sourceTree = "<group>"; };
 		3CFA00D58B9ACC18FDEE07D2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3D1EA8CC92C805D64519C1CE /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
-		443A7927FAF3DA25D0A2FAE5 /* vericonomy-wallet_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "vericonomy-wallet_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		445B7D24A38BD01F82BD3299 /* chain_tip_watcher.rs */ = {isa = PBXFileReference; path = chain_tip_watcher.rs; sourceTree = "<group>"; };
-		47EADD799BF15E7BCFB407DD /* updates.rs */ = {isa = PBXFileReference; path = updates.rs; sourceTree = "<group>"; };
+		443A7927FAF3DA25D0A2FAE5 /* Vericonomy Wallet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vericonomy Wallet.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		445B7D24A38BD01F82BD3299 /* chain_tip_watcher.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = chain_tip_watcher.rs; sourceTree = "<group>"; };
+		47EADD799BF15E7BCFB407DD /* updates.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = updates.rs; sourceTree = "<group>"; };
 		48761B72C7A28A9996ED43A1 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		4BA79B37CB7E1D1CC8A3E045 /* secret_store.rs */ = {isa = PBXFileReference; path = secret_store.rs; sourceTree = "<group>"; };
-		4CA9E4B8BA0D98EA8768511E /* installer_verify.rs */ = {isa = PBXFileReference; path = installer_verify.rs; sourceTree = "<group>"; };
-		500F51789807CA9E6655FBB4 /* wallet_secrets.rs */ = {isa = PBXFileReference; path = wallet_secrets.rs; sourceTree = "<group>"; };
-		522951FCC48E47484CA73111 /* features.rs */ = {isa = PBXFileReference; path = features.rs; sourceTree = "<group>"; };
+		4BA79B37CB7E1D1CC8A3E045 /* secret_store.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = secret_store.rs; sourceTree = "<group>"; };
+		4CA9E4B8BA0D98EA8768511E /* installer_verify.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = installer_verify.rs; sourceTree = "<group>"; };
+		500F51789807CA9E6655FBB4 /* wallet_secrets.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = wallet_secrets.rs; sourceTree = "<group>"; };
+		522951FCC48E47484CA73111 /* features.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = features.rs; sourceTree = "<group>"; };
 		5535A156568BF48DA53C05C2 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
-		56F0B3FAC39DEBAC778242AF /* coin_profile.rs */ = {isa = PBXFileReference; path = coin_profile.rs; sourceTree = "<group>"; };
-		5FC11D60579E4F940AC6B5EC /* security_commands.rs */ = {isa = PBXFileReference; path = security_commands.rs; sourceTree = "<group>"; };
-		606F5DD72641A29FB55D1C12 /* diagnostics.rs */ = {isa = PBXFileReference; path = diagnostics.rs; sourceTree = "<group>"; };
-		61F1C23C8EE1EDF750F52E9F /* logs.rs */ = {isa = PBXFileReference; path = logs.rs; sourceTree = "<group>"; };
-		64EF868E285792B063FF71E1 /* constants.rs */ = {isa = PBXFileReference; path = constants.rs; sourceTree = "<group>"; };
-		687FE0D68DCD2A8948CFA7DC /* config.rs */ = {isa = PBXFileReference; path = config.rs; sourceTree = "<group>"; };
+		56F0B3FAC39DEBAC778242AF /* coin_profile.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = coin_profile.rs; sourceTree = "<group>"; };
+		5FC11D60579E4F940AC6B5EC /* security_commands.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = security_commands.rs; sourceTree = "<group>"; };
+		606F5DD72641A29FB55D1C12 /* diagnostics.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = diagnostics.rs; sourceTree = "<group>"; };
+		61F1C23C8EE1EDF750F52E9F /* logs.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = logs.rs; sourceTree = "<group>"; };
+		64EF868E285792B063FF71E1 /* constants.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = constants.rs; sourceTree = "<group>"; };
+		687FE0D68DCD2A8948CFA7DC /* config.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = config.rs; sourceTree = "<group>"; };
 		6D48AD96390D0ED92AC6E5D9 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
-		6E054C4DB98DE5021D07BE95 /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
-		70907CA23E025E175CF37E60 /* rpc.rs */ = {isa = PBXFileReference; path = rpc.rs; sourceTree = "<group>"; };
+		6E054C4DB98DE5021D07BE95 /* state.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = state.rs; sourceTree = "<group>"; };
+		70907CA23E025E175CF37E60 /* rpc.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = rpc.rs; sourceTree = "<group>"; };
 		78A572671AA30585BD3101EA /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
-		7AA2B25C83D669DAFE29C542 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
-		80C6D3A07F1449CCB9A6AB1E /* passkey.rs */ = {isa = PBXFileReference; path = passkey.rs; sourceTree = "<group>"; };
-		81558521101F6541D9FDC65D /* slip39_recovery.rs */ = {isa = PBXFileReference; path = slip39_recovery.rs; sourceTree = "<group>"; };
-		81F9079C9F72C7358847BADC /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		7AA2B25C83D669DAFE29C542 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
+		80C6D3A07F1449CCB9A6AB1E /* passkey.rs */ = {isa = PBXFileReference; lastKnownFileType = file; path = passkey.rs; sourceTree = "<group>"; };
+		81558521101F6541D9FDC65D /* slip39_recovery.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = slip39_recovery.rs; sourceTree = "<group>"; };
+		81F9079C9F72C7358847BADC /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
 		85636DE5F44D34B9B898EDC6 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		890413F90367E0B575CC6DAC /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		8ECC9331B0B65513E5D087DB /* network_mode_commands.rs */ = {isa = PBXFileReference; path = network_mode_commands.rs; sourceTree = "<group>"; };
-		9AF6EFCFB8BF5DD7E45FB3EB /* daemon.rs */ = {isa = PBXFileReference; path = daemon.rs; sourceTree = "<group>"; };
-		A43C32F37A45B05CA3F95861 /* receive_requests.rs */ = {isa = PBXFileReference; path = receive_requests.rs; sourceTree = "<group>"; };
-		B72C5BEC4A7F1FA2FC9E8DE2 /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
+		8ECC9331B0B65513E5D087DB /* network_mode_commands.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = network_mode_commands.rs; sourceTree = "<group>"; };
+		9AF6EFCFB8BF5DD7E45FB3EB /* daemon.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = daemon.rs; sourceTree = "<group>"; };
+		A43C32F37A45B05CA3F95861 /* receive_requests.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = receive_requests.rs; sourceTree = "<group>"; };
+		B72C5BEC4A7F1FA2FC9E8DE2 /* state.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = state.rs; sourceTree = "<group>"; };
 		BF3295CC79E1CF74754B83D2 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		C3CC824513F7E80C66212276 /* addressbook.rs */ = {isa = PBXFileReference; path = addressbook.rs; sourceTree = "<group>"; };
-		CAC0DD1634A6A8775B57036F /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		C3CC824513F7E80C66212276 /* addressbook.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = addressbook.rs; sourceTree = "<group>"; };
+		CAC0DD1634A6A8775B57036F /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
 		D5F8622C09A802BF289E66A1 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		D8743DA1F7FB8C6988FB8DFD /* multisig.rs */ = {isa = PBXFileReference; path = multisig.rs; sourceTree = "<group>"; };
-		DDF6A29C17E14DC89EF73E45 /* two_factor.rs */ = {isa = PBXFileReference; path = two_factor.rs; sourceTree = "<group>"; };
-		DE5CCB60908E0620BCA101F7 /* recovery.rs */ = {isa = PBXFileReference; path = recovery.rs; sourceTree = "<group>"; };
-		DEE1C751B42D8E00FDECD977 /* psbt.rs */ = {isa = PBXFileReference; path = psbt.rs; sourceTree = "<group>"; };
+		D8743DA1F7FB8C6988FB8DFD /* multisig.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = multisig.rs; sourceTree = "<group>"; };
+		DDF6A29C17E14DC89EF73E45 /* two_factor.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = two_factor.rs; sourceTree = "<group>"; };
+		DE5CCB60908E0620BCA101F7 /* recovery.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = recovery.rs; sourceTree = "<group>"; };
+		DEE1C751B42D8E00FDECD977 /* psbt.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = psbt.rs; sourceTree = "<group>"; };
 		EC4E32C6EC0C325309F76FE6 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		EE0D64BFF272355A13F1674B /* commands.rs */ = {isa = PBXFileReference; path = commands.rs; sourceTree = "<group>"; };
-		EFADC76D17CBAB13DAA14300 /* rpc_auth.rs */ = {isa = PBXFileReference; path = rpc_auth.rs; sourceTree = "<group>"; };
-		F3692FD2349A8097994E1045 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
-		F6D81BCAE9BA437BA784B4D2 /* explorer_api.rs */ = {isa = PBXFileReference; path = explorer_api.rs; sourceTree = "<group>"; };
-		F74DB805EC510A31B8B5649E /* spending_controls.rs */ = {isa = PBXFileReference; path = spending_controls.rs; sourceTree = "<group>"; };
+		EE0D64BFF272355A13F1674B /* commands.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = commands.rs; sourceTree = "<group>"; };
+		EFADC76D17CBAB13DAA14300 /* rpc_auth.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = rpc_auth.rs; sourceTree = "<group>"; };
+		F3692FD2349A8097994E1045 /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
+		F6D81BCAE9BA437BA784B4D2 /* explorer_api.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = explorer_api.rs; sourceTree = "<group>"; };
+		F74DB805EC510A31B8B5649E /* spending_controls.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = spending_controls.rs; sourceTree = "<group>"; };
 		FD42BE52025C83A87611A328 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -222,7 +222,7 @@
 		8792BB3F55CEA183B43761E0 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				443A7927FAF3DA25D0A2FAE5 /* vericonomy-wallet_iOS.app */,
+				443A7927FAF3DA25D0A2FAE5 /* Vericonomy Wallet.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -272,7 +272,7 @@
 			packageProductDependencies = (
 			);
 			productName = "vericonomy-wallet_iOS";
-			productReference = 443A7927FAF3DA25D0A2FAE5 /* vericonomy-wallet_iOS.app */;
+			productReference = 443A7927FAF3DA25D0A2FAE5 /* Vericonomy Wallet.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -283,8 +283,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = 3F15AE8723559432A9B47876 /* Build configuration list for PBXProject "vericonomy-wallet" */;
 			developmentRegion = en;
@@ -338,7 +336,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} 0 ${ARCHS:?}";
+			shellScript = "export PATH=\"${PATH}:/opt/homebrew/bin:/usr/local/bin:${HOME}/.cargo/bin\"; npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${ARCHS:?}";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -358,12 +356,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = (
-					arm64,
-				);
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "396ZMFA3PP";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -375,8 +372,20 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vericonomy.wallet.ios;
 				PRODUCT_NAME = "Vericonomy Wallet";
 				SDKROOT = iphoneos;
@@ -508,12 +517,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = (
-					arm64,
-				);
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "396ZMFA3PP";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -525,8 +533,20 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vericonomy.wallet.ios;
 				PRODUCT_NAME = "Vericonomy Wallet";
 				SDKROOT = iphoneos;

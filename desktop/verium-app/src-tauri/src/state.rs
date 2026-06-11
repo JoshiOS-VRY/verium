@@ -4,11 +4,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tokio::sync::RwLock;
 
 use crate::coin_profile::CoinId;
-use crate::config::{load_config_for_network, refresh_config_paths, DaemonConfig};
+use crate::config::{
+    init_app_storage_base, load_config_for_network, refresh_config_paths, DaemonConfig,
+};
 use crate::daemon::DaemonManager;
 use crate::error::{AppError, AppResult};
 use crate::features::effective_network_mode;
@@ -82,6 +84,17 @@ pub type MinerLocalState = EarnLocalState;
 
 impl AppState {
     pub fn initialize(app: AppHandle) -> AppResult<Self> {
+        #[cfg(mobile)]
+        {
+            let storage = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| AppError::other(format!("app data dir: {e}")))?
+                .join("wallet");
+            init_app_storage_base(storage)?;
+            let _ = crate::wallet::keystore::cleanup_stale_mobile_wallet_artifacts();
+        }
+
         let prefs = prefs::load_sync().unwrap_or_default();
         let network_mode = effective_network_mode(prefs.network_mode);
         let mut coins = HashMap::new();

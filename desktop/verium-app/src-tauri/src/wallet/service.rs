@@ -308,7 +308,7 @@ pub async fn send_to_address(
     if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
-    let phrase = keystore::decrypt_mnemonic_for_send(coin, passphrase)?;
+    let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
     let utxos = fetch_utxos_with_addresses(state, coin, &phrase).await?;
     let backend = resolve_backend(state, coin).await?;
     let amount_sats = coins_to_sats(amount);
@@ -388,7 +388,7 @@ pub async fn send_with_inputs(
     if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
     }
-    let phrase = keystore::decrypt_mnemonic_for_send(coin, passphrase)?;
+    let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
     let all_utxos = fetch_utxos_with_addresses(state, coin, &phrase).await?;
     let mut selected = Vec::new();
     for input in inputs {

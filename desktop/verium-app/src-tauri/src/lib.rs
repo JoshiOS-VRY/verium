@@ -113,6 +113,7 @@ pub fn run() {
             });
             // Reap any pool-miner sidecar orphaned by a previous (crashed) session
             // so it does not hold the API port or double-mine.
+            #[cfg(not(mobile))]
             tauri::async_runtime::spawn(async move {
                 mining_supervisor::kill_stray_miners().await;
             });
