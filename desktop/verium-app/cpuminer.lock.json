@@ -1,5 +1,5 @@
 {
   "repo": "JoshiOS-VRY/veriumMiner",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "_comment": "Single pin for the pool-mining sidecar. Bump version when veriumMiner tags a release, then npm run fetch:cpuminer. Monorepo dev: npm run fetch:cpuminer:local (uses ../../../veriumMiner build)."
 }
