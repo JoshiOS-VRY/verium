@@ -172,7 +172,7 @@ mod live_tests {
         use crate::chain::ChainBackend;
         let client = ElectrumLightClient::new(
             CoinId::Verium,
-            &["tls://electrumx-vrm1.vericonomy.com:51002".to_string()],
+            &["tls://electrumx-vrm3.vericonomy.com:53002".to_string()],
         )
         .expect("client");
         let scripts: Vec<String> = (0..42)

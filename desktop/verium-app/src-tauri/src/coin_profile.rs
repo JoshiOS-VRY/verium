@@ -208,7 +208,7 @@ impl CoinId {
         if network.is_test() {
             return match self {
                 CoinId::Verium => vec![
-                    "tls://electrumx-vrm1.vericonomy.com:51002".into(),
+                    "tls://electrumx-vrm3.vericonomy.com:53002".into(),
                 ],
                 CoinId::Vericoin => vec![
                     "tls://electrumx-vrc1.vericonomy.com:51012".into(),
@@ -231,6 +231,7 @@ impl CoinId {
         }
         match self {
             CoinId::Verium => vec![
+                "tls://electrumx-vrm3.vericonomy.com:53002".into(),
                 "tls://electrumx-vrm1.vericonomy.com:51002".into(),
                 "tls://electrumx-vrm2.vericonomy.com:52002".into(),
             ],
