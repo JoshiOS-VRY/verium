@@ -42,7 +42,9 @@ Settings → Notifications:
 - **Notify when VRM is received** → `notify_vrm` on the server
 - **Notify when VRC is received** → `notify_vrc` on the server (only if VeriCoin is enabled)
 
-Registration runs when the wallet is unlocked; unregister on lock.
+Registration runs when the wallet is unlocked (scripthashes are read from the
+keystore). Subscriptions stay active after lock or when the app is closed so
+remote push can still alert you.
 
 ## Privacy
 

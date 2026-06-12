@@ -79,16 +79,9 @@ export function useRemotePushRegistration(): void {
     const sync = async (heartbeat = false) => {
       if (cancelled) return;
 
+      // Keep server subscriptions after lock/background — remote push is for when
+      // the app is closed. Only sync scripthashes while the wallet is unlocked.
       if (!anyUnlocked) {
-        const token = tokenRef.current;
-        if (token && lastRegisteredRef.current) {
-          try {
-            await pushUnregisterDevice(token);
-          } catch {
-            // best effort
-          }
-          lastRegisteredRef.current = false;
-        }
         return;
       }
 
@@ -137,4 +130,18 @@ export function useRemotePushRegistration(): void {
     vrmUnlocked,
     vrcUnlocked,
   ]);
+
+  // Drop server registration when user disables remote push entirely.
+  useEffect(() => {
+    if (wantsPush || configured.data !== true) return;
+
+    const token = tokenRef.current;
+    if (!token || !lastRegisteredRef.current) return;
+
+    void pushUnregisterDevice(token)
+      .catch(() => {})
+      .finally(() => {
+        lastRegisteredRef.current = false;
+      });
+  }, [wantsPush, configured.data]);
 }
