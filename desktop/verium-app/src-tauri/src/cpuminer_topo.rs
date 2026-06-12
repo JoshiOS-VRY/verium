@@ -142,7 +142,7 @@ pub fn recommended_threads(scratchpad_bytes: u64, topo: &TopoSnapshot) -> u32 {
     }
 
     let mut by_l3 = phys;
-    if scratchpad_bytes > 0 && topo.l3_bytes > 0 {
+    if scratchpad_bytes > 0 && topo.l3_bytes > 0 && topo.l3_bytes >= scratchpad_bytes {
         by_l3 = (topo.l3_bytes / scratchpad_bytes).max(1) as u32;
     }
 
