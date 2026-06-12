@@ -5,6 +5,7 @@ import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { useCoinWalletMode } from '@/hooks/useWalletMode';
 import { lightWalletExists } from '@/lib/light-wallet/client';
+import { LIGHT_WALLET_INFO_POLL_MS } from '@/lib/light-wallet/poll';
 import { rpcGetWalletInfo, type WalletInfo } from '@/lib/rpc/client';
 
 function walletScanProgress(
@@ -14,7 +15,8 @@ function walletScanProgress(
 }
 
 const WALLET_INFO_POLL_MS = 30_000;
-const WALLET_SCAN_POLL_MS = 5_000;
+/** Faster wallet polls while light wallet gap scan is in progress. */
+const WALLET_SCAN_POLL_MS = 2_000;
 
 function inactiveCoinNeedsBackgroundPoll(
   coin: CoinId,
@@ -74,18 +76,19 @@ export function useWalletInfoPollCoordinator(): void {
     prefs.vericoin_enabled !== false &&
     (activeCoin === 'vericoin' || inactiveCoinNeedsBackgroundPoll('vericoin', prefs));
 
-  const interval = (data: WalletInfo | undefined) => {
+  const interval = (data: WalletInfo | undefined, isLight: boolean) => {
     if (!visible) return false;
     if (data?.light_syncing) return WALLET_SCAN_POLL_MS;
-    return walletScanProgress(data?.scanning) ? WALLET_SCAN_POLL_MS : WALLET_INFO_POLL_MS;
+    if (walletScanProgress(data?.scanning)) return WALLET_SCAN_POLL_MS;
+    return isLight ? LIGHT_WALLET_INFO_POLL_MS : WALLET_INFO_POLL_MS;
   };
 
   useQuery({
     queryKey: coinQueryKey('verium', 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo('verium'),
     enabled: pollVerium && (!veriumMode.isLight || veriumLight.data !== false),
-    refetchInterval: (q) => interval(q.state.data ?? undefined),
-    staleTime: 10_000,
+    refetchInterval: (q) => interval(q.state.data ?? undefined, veriumMode.isLight),
+    staleTime: veriumMode.isLight ? 0 : 10_000,
     gcTime: 30_000,
   });
 
@@ -93,8 +96,8 @@ export function useWalletInfoPollCoordinator(): void {
     queryKey: coinQueryKey('vericoin', 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo('vericoin'),
     enabled: pollVericoin && (!vericoinMode.isLight || vericoinLight.data !== false),
-    refetchInterval: (q) => interval(q.state.data ?? undefined),
-    staleTime: 10_000,
+    refetchInterval: (q) => interval(q.state.data ?? undefined, vericoinMode.isLight),
+    staleTime: vericoinMode.isLight ? 0 : 10_000,
     gcTime: 30_000,
   });
 }

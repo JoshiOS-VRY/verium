@@ -11,10 +11,7 @@ import {
 } from 'recharts';
 import type { MouseHandlerDataParam } from 'recharts/types/synchronisation/types';
 import type { CoinId } from '@/lib/coin/profile';
-import {
-  pointFromChartState,
-  scrubPointFromClientX,
-} from '@/lib/chart-scrub';
+import { pointFromChartState, scrubPointFromClientX } from '@/lib/chart-scrub';
 import {
   computeChartBalanceDomain,
   formatChartAxisBalance,
@@ -33,11 +30,7 @@ function estimateYAxisWidth(domain: [number, number]): number {
   return Math.min(56, Math.max(36, chars * 6 + 10));
 }
 
-function formatPinnedBalance(
-  balance: number,
-  coin: CoinId | undefined,
-  ticker: string
-): string {
+function formatPinnedBalance(balance: number, coin: CoinId | undefined, ticker: string): string {
   if (coin != null) return formatCoinAmount(balance, coin, 4);
   return `${formatChartAxisBalance(balance)} ${ticker}`;
 }
@@ -189,10 +182,7 @@ export function CumulativeBalanceChart({
 
   return (
     <section
-      className={cn(
-        'mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4',
-        className
-      )}
+      className={cn('mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4', className)}
     >
       <div className="flex items-center gap-2">
         <LineChartIcon className="h-4 w-4 text-accent" aria-hidden />
@@ -201,12 +191,7 @@ export function CumulativeBalanceChart({
       {caption && <p className="mt-1 text-[11px] text-fg-muted">{caption}</p>}
 
       <div className={cn('mt-3', blurClass)}>
-        <PinnedChartValue
-          point={displayPoint}
-          scrubbing={scrubbing}
-          coin={coin}
-          ticker={ticker}
-        />
+        <PinnedChartValue point={displayPoint} scrubbing={scrubbing} coin={coin} ticker={ticker} />
 
         <div
           ref={chartAreaRef}
@@ -287,7 +272,9 @@ export function CumulativeBalanceChart({
           </ResponsiveContainer>
         </div>
 
-        <p className="mt-1.5 text-[10px] text-fg-subtle">Drag across the chart to inspect history.</p>
+        <p className="mt-1.5 text-[10px] text-fg-subtle">
+          Drag across the chart to inspect history.
+        </p>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Coins, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { estimateSendFee } from '@/lib/send-fee-estimate';
 import { cn } from '@/lib/utils';
 
 interface FeeRateDialogProps {
@@ -38,6 +39,7 @@ export function FeeRateDialog({ open, current, symbol, onClose, onApply }: FeeRa
 
   const parsed = Number(draft);
   const valid = Number.isFinite(parsed) && parsed > 0;
+  const previewFee = valid ? estimateSendFee(parsed) : null;
 
   return (
     <div
@@ -106,8 +108,19 @@ export function FeeRateDialog({ open, current, symbol, onClose, onApply }: FeeRa
             />
           </div>
 
-          <div className="text-[11px] text-fg-subtle">
-            Fees are paid per kilobyte of transaction size. Typical sends are around 0.2 kB.
+          <div className="rounded-md border border-border bg-bg-subtle px-3 py-2 text-[11px] text-fg-muted">
+            <span className="text-fg-subtle">Rate is per kB, not total. </span>
+            {previewFee ? (
+              <span className="tabular-nums">
+                Typical send (~{previewFee.sizeKb.toFixed(2)} kB) ≈{' '}
+                <span className="font-medium text-fg">
+                  {previewFee.feePerTx.toFixed(8)} {symbol}
+                </span>{' '}
+                total fee.
+              </span>
+            ) : (
+              <span>Typical sends are about 0.23 kB.</span>
+            )}
           </div>
         </div>
 

@@ -2,6 +2,7 @@
 
 pub mod electrum;
 pub mod full_node;
+pub mod tx_hex;
 pub mod types;
 
 use async_trait::async_trait;

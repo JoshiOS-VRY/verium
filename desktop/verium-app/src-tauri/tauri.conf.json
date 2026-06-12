@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Vericonomy Wallet Alpha",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0",
   "identifier": "com.vericonomy.wallet.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -23,7 +23,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: asset: http://ipc.localhost https://explorer.vericonomy.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' blob:"
+      "csp": "default-src 'self'; img-src 'self' data: blob: asset: http://ipc.localhost https://explorer.vericonomy.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' blob:",
+      "capabilities": ["default", "desktop"]
     }
   },
   "plugins": {

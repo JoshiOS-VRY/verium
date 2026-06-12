@@ -119,6 +119,38 @@ function transactionTimestamp(tx: TransactionItem): number {
   return tx.blocktime ?? tx.time ?? tx.timereceived ?? 0;
 }
 
+/** Signed balance effect when walking history backward from the current anchor. */
+function walletTxBalanceEffect(tx: TransactionItem): number {
+  const amount = tx.amount;
+  if (!Number.isFinite(amount)) return 0;
+  if (tx.category === 'send') {
+    return amount < 0 ? amount : -Math.abs(amount);
+  }
+  if (
+    tx.category === 'receive' ||
+    tx.category === 'immature' ||
+    tx.category === 'generate'
+  ) {
+    return amount > 0 ? amount : Math.abs(amount);
+  }
+  return amount;
+}
+
+/** Historical points should not exceed the live wallet anchor when tx amounts are partial. */
+function clampWalletCumulativePoints(
+  points: ChartCumulativePoint[],
+  anchorBalanceCoins: number
+): ChartCumulativePoint[] {
+  if (!Number.isFinite(anchorBalanceCoins) || anchorBalanceCoins < 0) {
+    return points;
+  }
+  const cap = anchorBalanceCoins;
+  return points.map((p) => ({
+    ...p,
+    balance: Math.min(Math.max(p.balance, 0), cap),
+  }));
+}
+
 function appendAnchorPoint(
   points: ChartCumulativePoint[],
   anchorBalanceCoins: number
@@ -189,7 +221,7 @@ export function buildWalletCumulativeSeries(
         label: formatChartPointDate(time),
       });
     }
-    balance -= tx.amount;
+    balance -= walletTxBalanceEffect(tx);
   }
 
   const withAnchor = appendAnchorPoint(
@@ -197,7 +229,10 @@ export function buildWalletCumulativeSeries(
     anchorBalanceCoins
   );
 
-  const points = downsampleCumulativePoints(withAnchor, maxPoints);
+  const points = clampWalletCumulativePoints(
+    downsampleCumulativePoints(withAnchor, maxPoints),
+    anchorBalanceCoins
+  );
 
   return { points, complete, txCountUsed: txs.length };
 }

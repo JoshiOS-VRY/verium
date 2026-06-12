@@ -166,9 +166,7 @@ export function MobileSendForm({
         </div>
       </div>
 
-      {lastSend && (
-        <MobileSendSuccess result={lastSend} coin={coin} onDismiss={onDismissSuccess} />
-      )}
+      {lastSend && <MobileSendSuccess result={lastSend} coin={coin} onDismiss={onDismissSuccess} />}
 
       {recipients.map((row, index) => {
         const addressError = row.address.trim() ? validateSendAddress(row.address.trim()) : null;

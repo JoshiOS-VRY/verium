@@ -2346,6 +2346,13 @@ pub async fn wallet_set_tx_fee(
     fee_rate_vrm_per_kb: f64,
 ) -> AppResult<bool> {
     let coin = parse_coin_id(&coin)?;
+    let prefs = crate::prefs::load().await?;
+    if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
+        let mut next = prefs;
+        next.tx_fee_rate_vrm_per_kb = Some(fee_rate_vrm_per_kb);
+        crate::prefs::save(&next).await?;
+        return Ok(true);
+    }
     state
         .rpc_client(coin)
         .await?
@@ -2518,6 +2525,7 @@ pub async fn send_to_address(
     totp_code: Option<String>,
     wallet_passphrase: Option<String>,
     extra_confirmed: Option<bool>,
+    fee_rate_vrm_per_kb: Option<f64>,
 ) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
     crate::wallet::address::validate_send_address(coin, &address)?;
@@ -2538,12 +2546,15 @@ pub async fn send_to_address(
     let pass = wallet_passphrase.unwrap_or_default();
     let txid = if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
         let _ = comment;
+        let fee_rate = fee_rate_vrm_per_kb
+            .filter(|rate| rate.is_finite() && *rate > 0.0)
+            .or(prefs.tx_fee_rate_vrm_per_kb);
         crate::wallet::service::send_to_address(
             &state,
             coin,
             &address,
             amount,
-            prefs.tx_fee_rate_vrm_per_kb,
+            fee_rate,
             &pass,
         )
         .await?

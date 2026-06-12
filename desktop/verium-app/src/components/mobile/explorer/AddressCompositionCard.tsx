@@ -69,16 +69,8 @@ export function AddressCompositionCard({ composition }: { composition: AddressCo
       </div>
 
       <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-bg-subtle">
-        <div
-          className="bg-emerald-500/80"
-          style={{ width: `${balancePct}%` }}
-          title="Balance"
-        />
-        <div
-          className="bg-amber-500/80"
-          style={{ width: `${sentPct}%` }}
-          title="Sent"
-        />
+        <div className="bg-emerald-500/80" style={{ width: `${balancePct}%` }} title="Balance" />
+        <div className="bg-amber-500/80" style={{ width: `${sentPct}%` }} title="Sent" />
         {outflowPct < 100 && (
           <div className="flex-1 bg-transparent" title="Unallocated indexing gap" />
         )}

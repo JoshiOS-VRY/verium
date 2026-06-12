@@ -9,9 +9,8 @@ import {
   indexerTicker,
   sumIndexerAmountCoins,
 } from '@/lib/indexer-amount';
-import { explorerAddressPath, explorerTxPath } from '@/lib/explorer-nav';
 import { cn } from '@/lib/utils';
-import { ExplorerInternalLink } from './ExplorerInternalLink';
+import { ExplorerCardLink } from '@/components/ExplorerLink';
 import { shortExplorerAddress, shortTxid } from './tx-detail-utils';
 
 const DEFAULT_VISIBLE = 8;
@@ -56,7 +55,9 @@ function IoSectionShell({
         <div
           className={cn(
             'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-            tone === 'input' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+            tone === 'input'
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
           )}
         >
           {tone === 'input' ? (
@@ -140,9 +141,14 @@ function ExpandableList<T>({
 function VinRow({ vin }: { vin: IndexerVin }) {
   const isCoinbase = !vin.prevTxid && !vin.address;
   const label = isCoinbase ? 'Coinbase' : vin.address ? 'From address' : 'Previous output';
+  const target = vin.address
+    ? { kind: 'address' as const, address: vin.address }
+    : vin.prevTxid
+      ? { kind: 'tx' as const, txid: vin.prevTxid }
+      : null;
 
-  return (
-    <article className="rounded-xl border border-border/70 bg-bg-subtle/30 px-3 py-2.5">
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -156,7 +162,9 @@ function VinRow({ vin }: { vin: IndexerVin }) {
               </Badge>
             )}
             {!vin.resolved && !isCoinbase && (
-              <Badge tone="neutral" className="text-[10px]">Unresolved</Badge>
+              <Badge tone="neutral" className="text-[10px]">
+                Unresolved
+              </Badge>
             )}
           </div>
           <p className="mt-0.5 text-[11px] text-fg-subtle">{label}</p>
@@ -167,27 +175,46 @@ function VinRow({ vin }: { vin: IndexerVin }) {
       </div>
       <div className="mt-2 border-t border-border/50 pt-2">
         {vin.address ? (
-          <ExplorerInternalLink to={explorerAddressPath(vin.address)} mono className="block">
+          <p className="font-mono text-[11px] text-accent break-all">
             {shortExplorerAddress(vin.address)}
-          </ExplorerInternalLink>
+          </p>
         ) : vin.prevTxid ? (
           <div className="space-y-0.5">
-            <ExplorerInternalLink to={explorerTxPath(vin.prevTxid)} mono className="block">
-              {shortTxid(vin.prevTxid)}
-            </ExplorerInternalLink>
+            <p className="font-mono text-[11px] text-accent break-all">{shortTxid(vin.prevTxid)}</p>
             <p className="text-[10px] text-fg-muted">Spends output #{vin.prevVout ?? '?'}</p>
           </div>
         ) : (
           <p className="text-[11px] text-fg-muted">No source address (newly minted coins)</p>
         )}
       </div>
-    </article>
+    </>
+  );
+
+  if (!target) {
+    return (
+      <article className="rounded-xl border border-border/70 bg-bg-subtle/30 px-3 py-2.5">
+        {body}
+      </article>
+    );
+  }
+
+  const ariaLabel =
+    target.kind === 'address' ? `View address ${vin.address}` : `View transaction ${vin.prevTxid}`;
+
+  return (
+    <ExplorerCardLink
+      target={target}
+      ariaLabel={ariaLabel}
+      className="rounded-xl border border-border/70 bg-bg-subtle/30 px-3 py-2.5"
+    >
+      {body}
+    </ExplorerCardLink>
   );
 }
 
 function VoutRow({ vout }: { vout: IndexerVout }) {
-  return (
-    <article className="rounded-xl border border-border/70 bg-bg-subtle/30 px-3 py-2.5">
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -195,7 +222,9 @@ function VoutRow({ vout }: { vout: IndexerVout }) {
               Output {vout.n}
             </span>
             {vout.isSpent && (
-              <Badge tone="neutral" className="text-[10px]">Spent later</Badge>
+              <Badge tone="neutral" className="text-[10px]">
+                Spent later
+              </Badge>
             )}
           </div>
           <p className="mt-0.5 text-[11px] text-fg-subtle">To address</p>
@@ -206,14 +235,32 @@ function VoutRow({ vout }: { vout: IndexerVout }) {
       </div>
       <div className="mt-2 border-t border-border/50 pt-2">
         {vout.address ? (
-          <ExplorerInternalLink to={explorerAddressPath(vout.address)} mono className="block">
+          <p className="font-mono text-[11px] text-accent break-all">
             {shortExplorerAddress(vout.address)}
-          </ExplorerInternalLink>
+          </p>
         ) : (
           <p className="text-[11px] text-fg-muted">No decoded address</p>
         )}
       </div>
-    </article>
+    </>
+  );
+
+  if (!vout.address) {
+    return (
+      <article className="rounded-xl border border-border/70 bg-bg-subtle/30 px-3 py-2.5">
+        {body}
+      </article>
+    );
+  }
+
+  return (
+    <ExplorerCardLink
+      target={{ kind: 'address', address: vout.address }}
+      ariaLabel={`View address ${vout.address}`}
+      className="rounded-xl border border-border/70 bg-bg-subtle/30 px-3 py-2.5"
+    >
+      {body}
+    </ExplorerCardLink>
   );
 }
 

@@ -1,9 +1,20 @@
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { isExplorerDetailPath } from '@/lib/explorer-nav';
 import { useToastStore, type ToastItem } from '@/lib/toast-store';
 import { cn } from '@/lib/utils';
 
-function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
+function ToastCard({
+  toast,
+  onDismiss,
+  mobileBottom,
+}: {
+  toast: ToastItem;
+  onDismiss: () => void;
+  mobileBottom: boolean;
+}) {
   useEffect(() => {
     const ms = toast.durationMs ?? 6_000;
     const timer = window.setTimeout(onDismiss, ms);
@@ -15,7 +26,8 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       role="status"
       aria-live="polite"
       className={cn(
-        'toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-sm',
+        'pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-sm',
+        mobileBottom ? 'toast-enter-mobile' : 'toast-enter',
         toast.tone === 'success'
           ? 'border-success/40 bg-bg-panel/95'
           : 'border-border bg-bg-panel/95'
@@ -49,16 +61,27 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
+  const { mobileOnly } = useWalletMode();
+  const { pathname } = useLocation();
+  const hideTabBar = mobileOnly && isExplorerDetailPath(pathname);
 
   if (toasts.length === 0) return null;
 
   return (
     <div
-      className="pointer-events-none fixed left-4 right-4 top-4 z-[100] mx-auto flex w-full max-w-sm flex-col gap-2"
+      className={cn(
+        'pointer-events-none fixed left-4 right-4 z-[100] mx-auto flex w-full max-w-sm flex-col gap-2',
+        mobileOnly ? (hideTabBar ? 'toast-host-mobile-no-tab' : 'toast-host-mobile') : 'top-4'
+      )}
       aria-label="Notifications"
     >
       {toasts.map((toast) => (
-        <ToastCard key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
+        <ToastCard
+          key={toast.id}
+          toast={toast}
+          mobileBottom={mobileOnly}
+          onDismiss={() => dismiss(toast.id)}
+        />
       ))}
     </div>
   );

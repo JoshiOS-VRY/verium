@@ -9,6 +9,7 @@ use bitcoin::script::Builder;
 use bitcoin::secp256k1::{Message, Secp256k1, SecretKey};
 use bitcoin::sighash::EcdsaSighashType;
 use bitcoin::script::PushBytes;
+use bitcoin::hashes::{sha256d, Hash};
 use bitcoin::{PrivateKey, PublicKey, ScriptBuf, Sequence, TxIn, TxOut, Txid};
 use sha2::{Digest, Sha256};
 
@@ -36,6 +37,24 @@ pub fn parse_display_txid(txid_hex: &str) -> AppResult<Txid> {
     txid_hex
         .parse()
         .map_err(|e| AppError::other(format!("invalid txid {txid_hex}: {e}")))
+}
+
+/// Wire-order txid (internal byte array) for an already-serialized parent transaction.
+pub fn wire_txid_from_raw(raw: &[u8]) -> Txid {
+    let hash = sha256d::Hash::from_byte_array(double_sha256(raw));
+    Txid::from_raw_hash(hash)
+}
+
+/// Alternate txid hex encoding (byte-reversed display form).
+pub fn reverse_display_txid_hex(txid_hex: &str) -> AppResult<String> {
+    let bytes = hex::decode(txid_hex.trim())
+        .map_err(|e| AppError::other(format!("txid hex decode: {e}")))?;
+    if bytes.len() != 32 {
+        return Err(AppError::other("txid must be 32 bytes"));
+    }
+    let mut rev = bytes;
+    rev.reverse();
+    Ok(hex::encode(rev))
 }
 
 fn consensus_err(context: &str, e: impl std::fmt::Display) -> AppError {
@@ -78,13 +97,65 @@ pub fn decode_verium_tx(bytes: &[u8]) -> AppResult<VeriumMutableTx> {
     })
 }
 
-fn strip_code_separators(script: &[u8]) -> Vec<u8> {
-    const OP_CODESEPARATOR: u8 = 0xab;
-    script
-        .iter()
-        .copied()
-        .filter(|b| *b != OP_CODESEPARATOR)
-        .collect()
+/// Opcode-aware `FindAndDelete(scriptCode, OP_CODESEPARATOR)` from Verium Core.
+/// Must not strip `0xab` bytes inside push data (e.g. inside a P2PKH pubkey hash).
+fn find_and_delete_code_separators(script: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(script.len());
+    let mut pc = 0;
+    while pc < script.len() {
+        match next_script_instruction(script, pc) {
+            Some((end, is_separator)) => {
+                if !is_separator {
+                    out.extend_from_slice(&script[pc..end]);
+                }
+                pc = end;
+            }
+            None => break,
+        }
+    }
+    out
+}
+
+/// Returns the end offset of the instruction at `start` and whether it is `OP_CODESEPARATOR`.
+fn next_script_instruction(script: &[u8], start: usize) -> Option<(usize, bool)> {
+    if start >= script.len() {
+        return None;
+    }
+    let opcode = script[start];
+    let is_separator = opcode == 0xab;
+    let mut end = start + 1;
+    match opcode {
+        0x01..=0x4b => {
+            let len = opcode as usize;
+            end += len;
+        }
+        0x4c => {
+            if end >= script.len() {
+                return None;
+            }
+            let len = script[end] as usize;
+            end += 1 + len;
+        }
+        0x4d => {
+            if end + 2 > script.len() {
+                return None;
+            }
+            let len = u16::from_le_bytes([script[end], script[end + 1]]) as usize;
+            end += 2 + len;
+        }
+        0x4e => {
+            if end + 4 > script.len() {
+                return None;
+            }
+            let len = u32::from_le_bytes(script[end..end + 4].try_into().unwrap()) as usize;
+            end += 4 + len;
+        }
+        _ => {}
+    }
+    if end > script.len() {
+        return None;
+    }
+    Some((end, is_separator))
 }
 
 /// Verium/Vericoin legacy P2PKH sighash (`SignatureHash` in `interpreter.cpp`).
@@ -99,7 +170,7 @@ pub fn verium_signature_hash(
     }
 
     let mut tmp = tx.clone();
-    let script_code = strip_code_separators(script_code);
+    let script_code = find_and_delete_code_separators(script_code);
     let script_buf = ScriptBuf::from_bytes(script_code);
 
     for input in &mut tmp.inputs {
@@ -165,14 +236,15 @@ pub fn sign_script_sig(
         .map_err(|e| AppError::other(format!("message: {e}")))?;
     let sk = SecretKey::from_slice(secret_bytes)
         .map_err(|e| AppError::other(format!("secret key: {e}")))?;
-    let sig = secp.sign_ecdsa(&msg, &sk);
-    let mut sig_bytes = sig.serialize_der().to_vec();
-    sig_bytes.push(EcdsaSighashType::All as u8);
-
     let pk = PublicKey::from_private_key(
         &secp,
         &PrivateKey::new(sk, bitcoin::NetworkKind::Main),
     );
+    let sig = secp.sign_ecdsa(&msg, &sk);
+    secp.verify_ecdsa(&msg, &sig, &pk.inner)
+        .map_err(|e| AppError::other(format!("local signature verify failed: {e}")))?;
+    let mut sig_bytes = sig.serialize_der().to_vec();
+    sig_bytes.push(EcdsaSighashType::All as u8);
     let sig_push = <&PushBytes>::try_from(sig_bytes.as_slice())
         .map_err(|_| AppError::other("signature too long for script push"))?;
     let pk_bytes = pk.to_bytes();
@@ -193,7 +265,7 @@ pub fn build_signed_tx_hex(
         return Err(AppError::other("signing input count mismatch"));
     }
     for (i, secret) in secrets.iter().enumerate() {
-        let script = hex::decode(&utxos[i].script_hex)
+        let script = hex::decode(utxos[i].script_hex.trim())
             .map_err(|e| AppError::other(format!("script: {e}")))?;
         let sighash = verium_signature_hash(tx, i, &script, EcdsaSighashType::All as i32)?;
         tx.inputs[i].script_sig = sign_script_sig(secret, sighash)?;
@@ -226,6 +298,37 @@ mod tests {
         assert_eq!(&raw[0..4], &[1, 0, 0, 0]);
         assert_eq!(u32::from_le_bytes(raw[4..8].try_into().unwrap()), 1_700_000_000);
         assert_eq!(raw[8], 1); // one input
+    }
+
+    #[test]
+    fn display_and_wire_txid_are_consistent() {
+        let tx = VeriumMutableTx {
+            version: Version::ONE.0,
+            n_time: 42,
+            inputs: vec![],
+            outputs: vec![],
+            lock_time: LockTime::ZERO.to_consensus_u32(),
+        };
+        let raw = serialize_verium_tx(&tx).unwrap();
+        let display = display_txid_from_raw(&raw);
+        let wire = wire_txid_from_raw(&raw);
+        let parsed = display.parse::<Txid>().unwrap();
+        assert_eq!(parsed, wire);
+        let reversed = reverse_display_txid_hex(&display).unwrap();
+        assert_eq!(reversed, hex::encode(wire.to_byte_array()));
+    }
+
+    #[test]
+    fn find_and_delete_removes_opcode_separator_only() {
+        let with_separator = vec![0x76, 0xab, 0xa9];
+        assert_eq!(find_and_delete_code_separators(&with_separator), vec![0x76, 0xa9]);
+
+        // PUSH4 containing 0xab bytes must survive (old byte-filter would corrupt sighash).
+        let push_with_ab = vec![0x76, 0xa9, 0x04, 0xab, 0x00, 0xab, 0xff, 0x88, 0xac];
+        assert_eq!(
+            find_and_delete_code_separators(&push_with_ab),
+            push_with_ab
+        );
     }
 
     #[test]

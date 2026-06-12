@@ -105,30 +105,33 @@ impl CoinId {
     pub fn default_datadir(self) -> PathBuf {
         #[cfg(mobile)]
         {
-            return crate::config::app_config_base().join(match self {
+            crate::config::app_config_base().join(match self {
                 CoinId::Verium => "verium-chain",
                 CoinId::Vericoin => "vericoin-chain",
-            });
+            })
         }
-        #[cfg(any(target_os = "windows", target_os = "macos"))]
+        #[cfg(not(mobile))]
         {
-            if let Some(d) = dirs::data_dir() {
-                return match self {
-                    CoinId::Verium => d.join("Verium"),
-                    CoinId::Vericoin => d.join("Vericonomy"),
-                };
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            {
+                if let Some(d) = dirs::data_dir() {
+                    return match self {
+                        CoinId::Verium => d.join("Verium"),
+                        CoinId::Vericoin => d.join("Vericonomy"),
+                    };
+                }
             }
-        }
-        #[cfg(not(any(target_os = "windows", target_os = "macos", mobile)))]
-        {
-            if let Some(h) = dirs::home_dir() {
-                return match self {
-                    CoinId::Verium => h.join(".verium"),
-                    CoinId::Vericoin => h.join(".vericonomy"),
-                };
+            #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+            {
+                if let Some(h) = dirs::home_dir() {
+                    return match self {
+                        CoinId::Verium => h.join(".verium"),
+                        CoinId::Vericoin => h.join(".vericonomy"),
+                    };
+                }
             }
+            PathBuf::from(".")
         }
-        PathBuf::from(".")
     }
 
     pub fn bootstrap_cdn_base(self) -> &'static str {
@@ -211,7 +214,7 @@ impl CoinId {
                     "tls://electrumx-vrm3.vericonomy.com:53002".into(),
                 ],
                 CoinId::Vericoin => vec![
-                    "tls://electrumx-vrc1.vericonomy.com:51012".into(),
+                    "tls://electrumx-vrc3.vericonomy.com:53012".into(),
                 ],
             };
         }
@@ -236,6 +239,7 @@ impl CoinId {
                 "tls://electrumx-vrm2.vericonomy.com:52002".into(),
             ],
             CoinId::Vericoin => vec![
+                "tls://electrumx-vrc3.vericonomy.com:53012".into(),
                 "tls://electrumx-vrc1.vericonomy.com:50012".into(),
                 "tls://electrumx-vrc2.vericonomy.com:50012".into(),
             ],

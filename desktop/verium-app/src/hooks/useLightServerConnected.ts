@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useActiveCoin } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
 import { lightServerStatus } from '@/lib/light-wallet/client';
+import { LIGHT_SERVER_STATUS_POLL_MS } from '@/lib/light-wallet/poll';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 
@@ -15,7 +16,7 @@ export function useLightServerConnected() {
     queryKey: coinQueryKey(coin, 'light-server-status'),
     queryFn: () => lightServerStatus(coin),
     enabled: isLight,
-    refetchInterval: isLight && visible ? 45_000 : false,
+    refetchInterval: isLight && visible ? LIGHT_SERVER_STATUS_POLL_MS : false,
     staleTime: 10_000,
   });
 

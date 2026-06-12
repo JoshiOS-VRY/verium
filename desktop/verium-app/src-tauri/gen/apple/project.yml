@@ -36,6 +36,8 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
     info:
       path: vericonomy-wallet_iOS/Info.plist
       properties:
@@ -52,8 +54,18 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 1.0.0
-        CFBundleVersion: "1.0.0.1"
+        CFBundleVersion: "3"
+        LSApplicationCategoryType: public.app-category.finance
+        ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: Vericonomy Wallet uses the camera to scan payment QR codes when you send Verium or Vericoin.
+        NSFaceIDUsageDescription: Vericonomy uses Face ID to unlock your wallet without typing your passphrase each time.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.vericonomy.wallet.verium
+            CFBundleURLSchemes:
+              - verium
+          - CFBundleURLName: com.vericonomy.wallet.vericoin
+            CFBundleURLSchemes:
+              - vericoin
     entitlements:
       path: vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements
     scheme:
@@ -69,6 +81,7 @@ targets:
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        CODE_SIGN_STYLE: Automatic
       groups: [app]
     dependencies:
       - framework: libapp.a

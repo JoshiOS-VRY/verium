@@ -15,6 +15,9 @@ import {
 } from '@/lib/wallet-unlock';
 import { BiometricUnlockButton } from '@/components/BiometricUnlockCard';
 import { usePromptBiometricUnlock } from '@/hooks/useBiometricUnlock';
+import { biometricUnlockStatus } from '@/lib/biometric/client';
+import { requestBiometricSetupOffer, shouldOfferBiometricSetup } from '@/lib/biometric/setup-offer';
+import { useUserPreferences } from '@/lib/user-preferences';
 import { cn } from '@/lib/utils';
 
 interface WalletUnlockFormProps {
@@ -51,6 +54,8 @@ export function WalletUnlockForm({
   const { isLight, mobileOnly } = useWalletMode();
   const invalidateWalletMode = useInvalidateWalletMode();
   const queryClient = useQueryClient();
+  const prefs = useUserPreferences((s) => s.prefs);
+  const prefsLoaded = useUserPreferences((s) => s.loaded);
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'verifying' | 'applied'>('idle');
@@ -135,7 +140,18 @@ export function WalletUnlockForm({
     },
     onSuccess: async () => {
       if (useLightUnlock) {
+        const passphraseForBiometric = passphrase;
         applyLightUnlockSuccess();
+        if (mobileOnly) {
+          try {
+            const bioStatus = await biometricUnlockStatus(coin);
+            if (shouldOfferBiometricSetup(bioStatus, prefs, prefsLoaded)) {
+              requestBiometricSetupOffer(coin, passphraseForBiometric);
+            }
+          } catch {
+            // Non-fatal — user can enable Face ID in Settings.
+          }
+        }
       } else {
         setPassphrase('');
         setError(null);

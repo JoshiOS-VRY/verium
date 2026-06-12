@@ -462,13 +462,21 @@ impl ChainBackend for ElectrumLightClient {
     }
 
     async fn get_raw_tx_hex(&self, txid: &str) -> AppResult<String> {
+        let txid = txid.trim();
+        // Electrum spec: verbose=false returns raw tx as hex; verbose=true returns JSON.
         let raw = self
-            .call_with_failover("blockchain.transaction.get", json!([txid, true]))
+            .call_with_failover("blockchain.transaction.get", json!([txid, false]))
             .await?;
-        Ok(raw
-            .as_str()
-            .map(str::to_string)
-            .unwrap_or_else(|| raw.to_string()))
+        match crate::chain::tx_hex::parse_electrum_transaction_get(&raw) {
+            Ok(hex) => Ok(hex),
+            Err(first) => {
+                let verbose = self
+                    .call_with_failover("blockchain.transaction.get", json!([txid, true]))
+                    .await?;
+                crate::chain::tx_hex::parse_electrum_transaction_get(&verbose)
+                    .map_err(|_| first)
+            }
+        }
     }
 
     async fn estimate_fee(&self, target_blocks: u32) -> AppResult<FeeRate> {

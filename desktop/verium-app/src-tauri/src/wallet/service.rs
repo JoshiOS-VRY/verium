@@ -25,7 +25,99 @@ use crate::wallet::explorer_history::fetch_wallet_history_from_explorer;
 use crate::wallet::sync::{
     addresses_for_history, balance_from_utxo_cache, sync_light_wallet,
 };
-use crate::wallet::utxo_selector::{plan_send_utxos, DEFAULT_TX_FEE_COINS_PER_KB, fee_for_rate};
+use crate::wallet::utxo_selector::{
+    plan_send_utxos, replan_fee_for_selected, DEFAULT_TX_FEE_COINS_PER_KB,
+};
+
+fn parent_txid_variants(txid: &str) -> Vec<String> {
+    let trimmed = txid.trim();
+    let mut variants = vec![trimmed.to_string()];
+    if let Ok(alt) = crate::wallet::vericonomy_tx::reverse_display_txid_hex(trimmed) {
+        if !variants.iter().any(|v| v.eq_ignore_ascii_case(&alt)) {
+            variants.push(alt);
+        }
+    }
+    variants
+}
+
+async fn fetch_parent_tx_bytes(
+    backend: &dyn crate::chain::ChainBackend,
+    txid: &str,
+) -> AppResult<Vec<u8>> {
+    let mut last_err: Option<AppError> = None;
+    for variant in parent_txid_variants(txid) {
+        match backend.get_raw_tx_hex(&variant).await {
+            Ok(hex) => {
+                let bytes = hex::decode(&hex)
+                    .map_err(|e| AppError::other(format!("parent tx hex decode: {e}")))?;
+                return Ok(bytes);
+            }
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| AppError::other("failed to fetch parent transaction")))
+}
+
+/// Fetch each parent tx from Electrum, normalize txid/script/value, and verify the spend.
+async fn prepare_utxos_for_signing(
+    backend: &dyn crate::chain::ChainBackend,
+    utxos: &mut [Utxo],
+) -> AppResult<()> {
+    for utxo in utxos.iter_mut() {
+        let bytes = fetch_parent_tx_bytes(backend, &utxo.txid).await?;
+        let display_txid = crate::wallet::vericonomy_tx::display_txid_from_raw(&bytes);
+        let wire_txid = crate::wallet::vericonomy_tx::wire_txid_from_raw(&bytes);
+        let parsed = crate::wallet::vericonomy_tx::parse_display_txid(&display_txid)?;
+        if parsed != wire_txid {
+            return Err(AppError::other(format!(
+                "parent txid endian mismatch for {}",
+                utxo.txid
+            )));
+        }
+
+        let parent = crate::wallet::vericonomy_tx::decode_verium_tx(&bytes)
+            .map_err(|e| AppError::other(format!("parent tx decode: {e}")))?;
+        let out = parent
+            .outputs
+            .get(utxo.vout as usize)
+            .ok_or_else(|| AppError::other(format!("parent tx missing vout {}", utxo.vout)))?;
+        let on_chain_script = hex::encode(out.script_pubkey.as_bytes());
+        let on_chain_value = out.value.to_sat() as i64;
+
+        if on_chain_value != utxo.value_sats {
+            tracing::warn!(
+                "UTXO {}:{} value stale (cache {} vs chain {}); using chain value",
+                utxo.txid,
+                utxo.vout,
+                utxo.value_sats,
+                on_chain_value
+            );
+            utxo.value_sats = on_chain_value;
+        }
+
+        if !display_txid.eq_ignore_ascii_case(&utxo.txid) {
+            tracing::info!(
+                "UTXO {}:{} txid normalized {} -> {}",
+                utxo.txid,
+                utxo.vout,
+                utxo.txid,
+                display_txid
+            );
+        }
+
+        if !crate::wallet::verify::script_pays_to(&on_chain_script, &utxo.script_hex) {
+            return Err(AppError::other(format!(
+                "UTXO {}:{} on-chain script does not match wallet script",
+                utxo.txid,
+                utxo.vout
+            )));
+        }
+
+        utxo.txid = display_txid;
+        utxo.script_hex = on_chain_script;
+    }
+    Ok(())
+}
 
 pub async fn fetch_utxos_with_addresses(
     state: &AppState,
@@ -63,13 +155,33 @@ pub async fn fetch_utxos_with_addresses(
     Ok(utxos)
 }
 
+/// UTXO set used for signing: always sync from Electrum first so txid/script/value match chain.
+async fn fetch_utxos_for_send(
+    state: &AppState,
+    coin: CoinId,
+    phrase: &str,
+) -> AppResult<Vec<Utxo>> {
+    sync_light_wallet(state, coin).await?;
+    let mut utxos = LightWalletCache::open(coin)?
+        .list_utxos()
+        .map_err(|e| AppError::other(format!("utxo cache read: {e}")))?;
+    enrich_utxo_addresses(coin, phrase, None, &mut utxos)?;
+    if let Some(missing) = utxos.iter().find(|u| u.address.is_empty() && !u.script_hex.is_empty()) {
+        return Err(AppError::other(format!(
+            "could not resolve signing address for utxo {}:{} (wait for address scan to finish)",
+            missing.txid, missing.vout
+        )));
+    }
+    Ok(utxos)
+}
+
 /// Minimum gap between steady-state (scan-complete) light-wallet UTXO refetches.
 /// `get_wallet_info` is polled every ~30s; without this throttle each poll would
 /// trigger a full Electrum UTXO refetch + SQLite table rewrite. Initial-scan
 /// syncs (`light_syncing`) are NOT throttled so they keep making progress.
-const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(120);
-/// Gap-scan syncs are expensive; don't run a new indexing slice every wallet poll.
-const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(45);
+const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
+/// Minimum gap between gap-scan indexing slices (Electrum RPC budget per slice).
+const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
 
 static LAST_STEADY_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -117,6 +229,7 @@ pub fn reset_steady_sync_throttle(coin: CoinId) {
         map.remove(&coin);
     }
     crate::wallet::sync::reset_pending_refresh_throttle(coin);
+    crate::wallet::sync::reset_balance_refresh_throttle(coin);
 }
 
 /// Last Electrum tip height we reacted to per coin (for event-driven sync).
@@ -146,7 +259,15 @@ fn maybe_sync_on_tip_advance(state: &AppState, coin: CoinId, tip: u32) {
     if !advanced {
         return;
     }
-    // Rate-limit (and unify with the get_wallet_info fallback throttle).
+    // Merge Electrum 0-conf / new-block txs immediately (incoming notify latency).
+    let pending_state = state.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::wallet::sync::refresh_light_wallet_pending(&pending_state, coin).await
+        {
+            tracing::debug!("tip-advance pending refresh failed for {}: {e}", coin.as_str());
+        }
+    });
+    // Rate-limit full UTXO + explorer history refresh.
     if !steady_sync_due(coin) {
         return;
     }
@@ -185,13 +306,14 @@ pub async fn get_wallet_info_json(
     let session_unlocked = unlock_timer_active && signing_ready;
     let scan_complete = !keystore::needs_full_address_scan(coin).unwrap_or(true);
     let light_syncing = session_unlocked && !scan_complete;
-    let funded_scripts = keystore::funded_script_hexes(coin).unwrap_or_default();
-    let steady_state = scan_complete && !funded_scripts.is_empty();
-    // Initial-scan syncs always run (and coalesce via SYNC_IN_FLIGHT). Steady-state
-    // UTXO refetches are throttled so polling getwalletinfo every ~30s does not
-    // refetch the full UTXO set + rewrite SQLite on every poll.
-    let should_background_sync =
-        (light_syncing && indexing_sync_due(coin)) || (steady_state && steady_sync_due(coin));
+    let sync_in_flight = crate::wallet::sync::is_light_wallet_sync_in_flight(coin).await;
+    let probe_complete = crate::wallet::sync::is_precache_probe_complete(coin);
+    let light_balance_syncing = session_unlocked && (light_syncing || sync_in_flight);
+    let light_balance_ready =
+        session_unlocked && scan_complete && probe_complete && !sync_in_flight;
+    // Gap-scan syncs run from getwalletinfo while addresses are still being discovered.
+    // Steady-state balance refresh is driven by the foreground balance poll (`light_wallet_refresh_balance`).
+    let should_background_sync = light_syncing && indexing_sync_due(coin);
 
     if should_background_sync {
         let sync_state = state.clone();
@@ -217,13 +339,17 @@ pub async fn get_wallet_info_json(
     };
 
     let bal = balance_from_utxo_cache(coin);
+    // Spendable includes 0-conf change outputs so a 1 VRM send does not drop
+    // displayed balance by the full input amount (Core splits confirmed vs pending).
+    let available_sats = bal.confirmed_sats + bal.unconfirmed_sats;
     let txcount = LightWalletCache::open(coin)
         .and_then(|c| c.tx_history_count())
         .unwrap_or(0);
 
     Ok(Some(json!({
         "walletname": format!("{}-light", coin.as_str()),
-        "balance": sats_to_coins(bal.confirmed_sats),
+        "balance": sats_to_coins(available_sats),
+        "confirmed_balance": sats_to_coins(bal.confirmed_sats),
         "unconfirmed_balance": sats_to_coins(bal.unconfirmed_sats),
         "immature_balance": sats_to_coins(bal.immature_sats),
         "txcount": txcount,
@@ -235,6 +361,8 @@ pub async fn get_wallet_info_json(
         "private_keys_enabled": signing_ready,
         "light_wallet": true,
         "light_syncing": light_syncing,
+        "light_balance_syncing": light_balance_syncing,
+        "light_balance_ready": light_balance_ready,
     })))
 }
 
@@ -363,7 +491,7 @@ pub async fn send_to_address(
         return Err(AppError::other("not in light wallet mode"));
     }
     let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
-    let utxos = fetch_utxos_with_addresses(state, coin, &phrase).await?;
+    let utxos = fetch_utxos_for_send(state, coin, &phrase).await?;
     let backend = resolve_backend(state, coin).await?;
     let amount_sats = coins_to_sats(amount);
     let rate = fee_rate
@@ -372,7 +500,9 @@ pub async fn send_to_address(
                 .tx_fee_rate_vrm_per_kb
                 .unwrap_or(DEFAULT_TX_FEE_COINS_PER_KB),
         );
-    let (selected, fee_sats) = plan_send_utxos(&utxos, amount_sats, rate, 2)?;
+    let (mut selected, _initial_fee) = plan_send_utxos(&utxos, amount_sats, rate, 1)?;
+    prepare_utxos_for_signing(backend.as_ref(), &mut selected).await?;
+    let fee_sats = replan_fee_for_selected(&selected, amount_sats, rate, 1)?;
     let change_idx = keystore::peek_receive_index(coin)?.saturating_sub(1);
     let change_addr = if uses_core_hd_paths(coin, &phrase) {
         derive_change_address_at(coin, &phrase, None, change_idx)?
@@ -393,9 +523,36 @@ pub async fn send_to_address(
         &signed.hex,
         &[(address.to_string(), amount_sats)],
     )?;
+    crate::wallet::verify::verify_signed_p2pkh_inputs(&signed.hex, &selected)?;
     let txid = backend.broadcast_tx(&signed.hex).await?;
-    // Spent UTXOs are now stale; let the next poll resync without waiting out the throttle.
+    for utxo in &selected {
+        if let Err(e) = keystore::register_funded_address(coin, &utxo.address) {
+            tracing::warn!(
+                "register input address after send failed for {}: {e}",
+                coin.as_str()
+            );
+        }
+    }
+    if let Err(e) = keystore::register_funded_address(coin, &change_addr) {
+        tracing::warn!(
+            "register change address after send failed for {}: {e}",
+            coin.as_str()
+        );
+    }
+    let input_sum: i64 = selected.iter().map(|u| u.value_sats).sum();
+    let change_sats = input_sum - amount_sats - fee_sats;
+    if let Err(e) = crate::wallet::sync::apply_local_send_cache_update(
+        coin,
+        &selected,
+        &txid,
+        &signed.hex,
+        change_sats,
+        &change_addr,
+    ) {
+        tracing::warn!("post-send local cache update failed for {}: {e}", coin.as_str());
+    }
     reset_steady_sync_throttle(coin);
+    crate::wallet::sync::reset_balance_refresh_throttle(coin);
     Ok(txid)
 }
 
@@ -443,7 +600,7 @@ pub async fn send_with_inputs(
         return Err(AppError::other("not in light wallet mode"));
     }
     let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
-    let all_utxos = fetch_utxos_with_addresses(state, coin, &phrase).await?;
+    let all_utxos = fetch_utxos_for_send(state, coin, &phrase).await?;
     let mut selected = Vec::new();
     for input in inputs {
         let txid = input
@@ -473,7 +630,6 @@ pub async fn send_with_inputs(
             .tx_fee_rate_vrm_per_kb
             .unwrap_or(DEFAULT_TX_FEE_COINS_PER_KB),
     );
-    let fee_sats = fee_for_rate(rate, selected.len(), output_pairs.len() + 1);
     let change_addr = match change_address.filter(|s| !s.is_empty()) {
         Some(a) => a.to_string(),
         None => {
@@ -485,6 +641,10 @@ pub async fn send_with_inputs(
             }
         }
     };
+    let backend = resolve_backend(state, coin).await?;
+    prepare_utxos_for_signing(backend.as_ref(), &mut selected).await?;
+    let total_out: i64 = output_pairs.iter().map(|(_, v)| *v).sum();
+    let fee_sats = replan_fee_for_selected(&selected, total_out, rate, output_pairs.len())?;
     let signed = signer::sign_transaction(
         coin,
         &phrase,
@@ -495,9 +655,36 @@ pub async fn send_with_inputs(
         fee_sats,
     )?;
     crate::wallet::verify::verify_send_outputs(coin, &signed.hex, &output_pairs)?;
-    let backend = resolve_backend(state, coin).await?;
+    crate::wallet::verify::verify_signed_p2pkh_inputs(&signed.hex, &selected)?;
     let txid = backend.broadcast_tx(&signed.hex).await?;
+    for utxo in &selected {
+        if let Err(e) = keystore::register_funded_address(coin, &utxo.address) {
+            tracing::warn!(
+                "register input address after send failed for {}: {e}",
+                coin.as_str()
+            );
+        }
+    }
+    if let Err(e) = keystore::register_funded_address(coin, &change_addr) {
+        tracing::warn!(
+            "register change address after send failed for {}: {e}",
+            coin.as_str()
+        );
+    }
+    let input_sum: i64 = selected.iter().map(|u| u.value_sats).sum();
+    let change_sats = input_sum - total_out - fee_sats;
+    if let Err(e) = crate::wallet::sync::apply_local_send_cache_update(
+        coin,
+        &selected,
+        &txid,
+        &signed.hex,
+        change_sats,
+        &change_addr,
+    ) {
+        tracing::warn!("post-send local cache update failed for {}: {e}", coin.as_str());
+    }
     reset_steady_sync_throttle(coin);
+    crate::wallet::sync::reset_balance_refresh_throttle(coin);
     Ok(txid)
 }
 

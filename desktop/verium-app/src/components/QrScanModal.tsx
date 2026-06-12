@@ -131,7 +131,9 @@ export function QrScanModal({ open, onClose, onScan }: QrScanModalProps) {
         className="w-full max-w-md rounded-xl border border-border bg-bg-panel p-4 shadow-2xl"
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 id="qr-scan-title" className="text-base font-semibold">Scan QR code</h2>
+          <h2 id="qr-scan-title" className="text-base font-semibold">
+            Scan QR code
+          </h2>
           <button
             type="button"
             onClick={onClose}

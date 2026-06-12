@@ -125,6 +125,12 @@ pub struct UserPreferences {
     /// Mobile: unlock light wallet with Face ID / Touch ID after storing passphrase in keychain.
     #[serde(default)]
     pub biometric_unlock_enabled: bool,
+    /// User dismissed the one-time biometric setup prompt or completed setup.
+    #[serde(default)]
+    pub biometric_unlock_prompt_dismissed: bool,
+    /// User dismissed the one-time notification permission prompt.
+    #[serde(default)]
+    pub notifications_prompt_dismissed: bool,
 }
 
 fn default_active_coin() -> String {
@@ -212,6 +218,8 @@ impl Default for UserPreferences {
             electrum_servers_by_coin: None,
             onboarding_by_coin: None,
             biometric_unlock_enabled: false,
+            biometric_unlock_prompt_dismissed: false,
+            notifications_prompt_dismissed: false,
         }
     }
 }
@@ -256,6 +264,8 @@ pub struct PartialUserPreferences {
     pub electrum_servers_by_coin: Option<HashMap<String, Vec<String>>>,
     pub onboarding_by_coin: Option<HashMap<String, OnboardingCheckpoint>>,
     pub biometric_unlock_enabled: Option<bool>,
+    pub biometric_unlock_prompt_dismissed: Option<bool>,
+    pub notifications_prompt_dismissed: Option<bool>,
 }
 
 pub fn prefs_path() -> PathBuf {
@@ -313,6 +323,24 @@ pub fn electrum_servers_for(prefs: &UserPreferences, coin: CoinId) -> Vec<String
         .unwrap_or_else(|| coin.default_electrum_servers(network))
 }
 
+fn is_legacy_vrm_electrum_defaults(servers: &[String]) -> bool {
+    let normalized: Vec<String> = servers.iter().map(|s| s.to_lowercase()).collect();
+    let first = normalized.first().map(String::as_str).unwrap_or("");
+    first.contains("vrm1")
+        && !normalized
+            .iter()
+            .any(|s| s.contains("vrm3") || s.contains("vrm-3"))
+}
+
+fn is_legacy_vrc_electrum_defaults(servers: &[String]) -> bool {
+    let normalized: Vec<String> = servers.iter().map(|s| s.to_lowercase()).collect();
+    let first = normalized.first().map(String::as_str).unwrap_or("");
+    (first.contains("vrc1") || first.contains("vrc2"))
+        && !normalized
+            .iter()
+            .any(|s| s.contains("vrc3") || s.contains("vrc-3"))
+}
+
 /// Seed default Electrum endpoints for every enabled chain when prefs omit them.
 pub fn reconcile_electrum_servers(prefs: &mut UserPreferences) -> bool {
     let network = crate::features::effective_network_mode(prefs.network_mode);
@@ -324,8 +352,13 @@ pub fn reconcile_electrum_servers(prefs: &mut UserPreferences) -> bool {
             continue;
         }
         let key = coin.as_str().to_string();
-        let needs_defaults = map.get(&key).map(|servers| servers.is_empty()).unwrap_or(true);
-        if needs_defaults {
+        let stored = map.get(&key);
+        let needs_defaults = stored.map(|servers| servers.is_empty()).unwrap_or(true);
+        let needs_vrm3_migration = *coin == CoinId::Verium
+            && stored.is_some_and(|servers| is_legacy_vrm_electrum_defaults(servers));
+        let needs_vrc3_migration = *coin == CoinId::Vericoin
+            && stored.is_some_and(|servers| is_legacy_vrc_electrum_defaults(servers));
+        if needs_defaults || needs_vrm3_migration || needs_vrc3_migration {
             map.insert(key, coin.default_electrum_servers(network));
             changed = true;
         }
@@ -645,8 +678,62 @@ mod mode_tests {
         let map = prefs.electrum_servers_by_coin.expect("map");
         let vrm = map.get(CoinId::Verium.as_str()).expect("vrm");
         let vrc = map.get(CoinId::Vericoin.as_str()).expect("vrc");
-        assert!(vrm.iter().any(|s| s.contains("vrm")));
-        assert!(vrc.iter().any(|s| s.contains("vrc")));
+        assert!(
+            vrm.first().is_some_and(|s| s.contains("vrm3")),
+            "expected vrm3 primary: {vrm:?}"
+        );
+        assert!(
+            vrc.first().is_some_and(|s| s.contains("vrc3")),
+            "expected vrc3 primary: {vrc:?}"
+        );
+    }
+
+    #[test]
+    fn reconcile_electrum_servers_migrates_legacy_vrm_primary() {
+        let mut prefs = UserPreferences::default();
+        prefs.electrum_servers_by_coin = Some(HashMap::from([
+            (
+                CoinId::Verium.as_str().to_string(),
+                vec![
+                    "tls://electrumx-vrm1.vericonomy.com:51002".into(),
+                    "tls://electrumx-vrm2.vericonomy.com:52002".into(),
+                ],
+            ),
+        ]));
+        assert!(reconcile_electrum_servers(&mut prefs));
+        let vrm = prefs
+            .electrum_servers_by_coin
+            .as_ref()
+            .and_then(|m| m.get(CoinId::Verium.as_str()))
+            .expect("vrm");
+        assert!(
+            vrm.first().is_some_and(|s| s.contains("vrm3")),
+            "expected migration to vrm3 primary: {vrm:?}"
+        );
+    }
+
+    #[test]
+    fn reconcile_electrum_servers_migrates_legacy_vrc_primary() {
+        let mut prefs = UserPreferences::default();
+        prefs.electrum_servers_by_coin = Some(HashMap::from([
+            (
+                CoinId::Vericoin.as_str().to_string(),
+                vec![
+                    "tls://electrumx-vrc1.vericonomy.com:50012".into(),
+                    "tls://electrumx-vrc2.vericonomy.com:50012".into(),
+                ],
+            ),
+        ]));
+        assert!(reconcile_electrum_servers(&mut prefs));
+        let vrc = prefs
+            .electrum_servers_by_coin
+            .as_ref()
+            .and_then(|m| m.get(CoinId::Vericoin.as_str()))
+            .expect("vrc");
+        assert!(
+            vrc.first().is_some_and(|s| s.contains("vrc3")),
+            "expected migration to vrc3 primary: {vrc:?}"
+        );
     }
 
     #[test]
@@ -791,5 +878,11 @@ pub fn merge(current: UserPreferences, partial: PartialUserPreferences) -> UserP
         biometric_unlock_enabled: partial
             .biometric_unlock_enabled
             .unwrap_or(current.biometric_unlock_enabled),
+        biometric_unlock_prompt_dismissed: partial
+            .biometric_unlock_prompt_dismissed
+            .unwrap_or(current.biometric_unlock_prompt_dismissed),
+        notifications_prompt_dismissed: partial
+            .notifications_prompt_dismissed
+            .unwrap_or(current.notifications_prompt_dismissed),
     }
 }

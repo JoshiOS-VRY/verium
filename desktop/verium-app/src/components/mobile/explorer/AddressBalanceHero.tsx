@@ -18,9 +18,7 @@ export function AddressBalanceHero({
   const { copied, copy } = useCopyToClipboard();
 
   return (
-    <section
-      className="mobile-panel overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-bg-panel via-bg-panel to-accent/5 p-4 shadow-sm"
-    >
+    <section className="mobile-panel overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-bg-panel via-bg-panel to-accent/5 p-4 shadow-sm">
       <div className="flex items-start gap-4">
         <div className="shrink-0 rounded-xl border border-border bg-white p-2 shadow-sm">
           <QRCodeSVG value={address} size={88} level="M" includeMargin={false} />

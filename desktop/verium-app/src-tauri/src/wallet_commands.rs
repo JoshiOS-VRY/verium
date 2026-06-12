@@ -7,7 +7,7 @@ use crate::chain::electrum::conformance::{run_all_default_servers, run_conforman
 use crate::chain::electrum::multi_server::{verify_tip_consistency, TipVerifyResult};
 use crate::coin_profile::CoinId;
 use crate::coin_profile::parse_coin_id;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::prefs::{self, UserPreferences};
 use crate::recovery;
 use crate::state::AppState;
@@ -164,6 +164,7 @@ pub async fn light_wallet_create(
     prefs::save(&prefs).await?;
     prefs::invalidate_prefs_cache();
     keystore::mark_address_scan_incomplete(coin)?;
+    crate::wallet::sync::reset_balance_probe_state(coin)?;
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {
@@ -213,6 +214,7 @@ pub async fn light_wallet_import(
     prefs::save(&prefs).await?;
     prefs::invalidate_prefs_cache();
     keystore::mark_address_scan_incomplete(coin)?;
+    crate::wallet::sync::reset_balance_probe_state(coin)?;
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {
@@ -253,7 +255,17 @@ pub async fn light_wallet_rescan(
         ));
     }
     keystore::mark_address_scan_incomplete(coin)?;
+    crate::wallet::sync::reset_balance_probe_state(coin)?;
     crate::wallet::sync::sync_light_wallet(&state, coin).await
+}
+
+#[tauri::command]
+pub async fn light_wallet_refresh_balance(
+    state: State<'_, AppState>,
+    coin: String,
+) -> AppResult<()> {
+    let coin = parse_coin_id(&coin)?;
+    crate::wallet::sync::refresh_light_wallet_balance(&state, coin).await
 }
 
 #[tauri::command]
@@ -394,7 +406,9 @@ pub async fn biometric_unlock_wallet(
             ));
         }
         let pass = crate::biometric_unlock::load_passphrase(coin)?
-            .ok_or_else(|| AppError::other("Biometric unlock is not set up on this device"))?;
+            .ok_or_else(|| {
+                crate::error::AppError::other("Biometric unlock is not set up on this device")
+            })?;
         let seconds = seconds.unwrap_or(4 * 60 * 60);
         keystore::unlock_wallet(coin, &pass, seconds)?;
         ensure_light_wallet_mode_active(coin).await?;

@@ -10,10 +10,28 @@ pub const VIP1_MIN_TX_FEE_PER_K: i64 = 100_000;
 /// Default wallet fee rate matching the legacy Qt UI and relay policy.
 pub const DEFAULT_TX_FEE_COINS_PER_KB: f64 = 0.001;
 
+/// P2PKH dust threshold at Verium's default dust relay rate (3000 sat/kB).
+pub const DUST_CHANGE_SATS: i64 = 546;
+
 pub fn select_utxos(utxos: &[Utxo], target_sats: i64, fee_sats: i64) -> AppResult<Vec<Utxo>> {
     let needed = target_sats + fee_sats;
+    if needed <= 0 {
+        return Err(AppError::other("invalid send amount"));
+    }
+
+    // Prefer one input: smallest UTXO that covers amount + fee (minimizes change).
+    let mut sufficient: Vec<&Utxo> = utxos
+        .iter()
+        .filter(|u| u.value_sats >= needed)
+        .collect();
+    sufficient.sort_by_key(|u| u.value_sats);
+    if let Some(best) = sufficient.first() {
+        return Ok(vec![(*best).clone()]);
+    }
+
+    // Otherwise combine smallest inputs until the target is met.
     let mut sorted: Vec<&Utxo> = utxos.iter().collect();
-    sorted.sort_by(|a, b| b.value_sats.cmp(&a.value_sats));
+    sorted.sort_by_key(|u| u.value_sats);
 
     let mut selected = Vec::new();
     let mut sum = 0i64;
@@ -57,27 +75,82 @@ pub fn coins_per_kb_to_sats_per_k(rate_coins_per_kb: f64) -> i64 {
     (rate_coins_per_kb * 100_000_000.0).round() as i64
 }
 
-/// Select inputs and compute fee using the final input count (Verium start-fee model).
+fn change_will_be_included(input_sum: i64, amount_sats: i64, fee_sats: i64) -> bool {
+    input_sum - amount_sats - fee_sats > DUST_CHANGE_SATS
+}
+
+/// Select inputs and compute fee using the final input/output counts (Verium start-fee model).
+///
+/// `recipient_outputs` is the number of payment outputs (excludes change). Fee sizing
+/// includes a change output only when the leftover would exceed the dust threshold.
 pub fn plan_send_utxos(
     utxos: &[Utxo],
     amount_sats: i64,
     rate_coins_per_kb: f64,
-    output_count: usize,
+    recipient_outputs: usize,
 ) -> AppResult<(Vec<Utxo>, i64)> {
-    let mut fee_sats = fee_for_rate(rate_coins_per_kb, 1, output_count);
+    let recipient_outputs = recipient_outputs.max(1);
+    let mut fee_sats = fee_for_rate(rate_coins_per_kb, 1, recipient_outputs + 1);
     let mut selected = select_utxos(utxos, amount_sats, fee_sats)?;
-    fee_sats = fee_for_rate(rate_coins_per_kb, selected.len(), output_count);
-    let needed = amount_sats + fee_sats;
-    let selected_sum: i64 = selected.iter().map(|u| u.value_sats).sum();
-    if selected_sum < needed {
-        selected = select_utxos(utxos, amount_sats, fee_sats)?;
+
+    for _ in 0..8 {
+        let selected_sum: i64 = selected.iter().map(|u| u.value_sats).sum();
+        let output_count = if change_will_be_included(selected_sum, amount_sats, fee_sats) {
+            recipient_outputs + 1
+        } else {
+            recipient_outputs
+        };
+        let new_fee = fee_for_rate(rate_coins_per_kb, selected.len(), output_count);
+        let needed = amount_sats + new_fee;
+        if new_fee != fee_sats || selected_sum < needed {
+            fee_sats = new_fee;
+            selected = select_utxos(utxos, amount_sats, fee_sats)?;
+            continue;
+        }
+        return Ok((selected, fee_sats));
     }
-    Ok((selected, fee_sats))
+    Err(AppError::other("could not converge send fee plan"))
+}
+
+/// Recompute fee after UTXO values/scripts were refreshed from chain (post-`prepare_utxos_for_signing`).
+pub fn replan_fee_for_selected(
+    selected: &[Utxo],
+    amount_sats: i64,
+    rate_coins_per_kb: f64,
+    recipient_outputs: usize,
+) -> AppResult<i64> {
+    if selected.is_empty() {
+        return Err(AppError::other("no inputs selected for send"));
+    }
+    let recipient_outputs = recipient_outputs.max(1);
+    let input_sum: i64 = selected.iter().map(|u| u.value_sats).sum();
+    let mut fee_sats = fee_for_rate(rate_coins_per_kb, selected.len(), recipient_outputs + 1);
+    for _ in 0..8 {
+        let output_count = if change_will_be_included(input_sum, amount_sats, fee_sats) {
+            recipient_outputs + 1
+        } else {
+            recipient_outputs
+        };
+        let new_fee = fee_for_rate(rate_coins_per_kb, selected.len(), output_count);
+        if new_fee == fee_sats {
+            if input_sum < amount_sats + new_fee {
+                return Err(AppError::other(format!(
+                    "insufficient funds: need {} sats (amount + fee) but inputs total {} sats",
+                    amount_sats + new_fee,
+                    input_sum
+                )));
+            }
+            return Ok(new_fee);
+        }
+        fee_sats = new_fee;
+    }
+    Err(AppError::other("could not converge send fee after refreshing inputs"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chain::types::Utxo;
 
     #[test]
     fn verium_start_fee_is_at_least_one_per_k_rate() {
@@ -96,5 +169,76 @@ mod tests {
     fn default_rate_matches_network_minimum_for_typical_send() {
         let fee = fee_for_rate(DEFAULT_TX_FEE_COINS_PER_KB, 1, 2);
         assert_eq!(fee, VIP1_MIN_TX_FEE_PER_K);
+    }
+
+    #[test]
+    fn select_utxos_prefers_smallest_sufficient_input() {
+        let small = Utxo {
+            txid: "small".repeat(64),
+            vout: 0,
+            value_sats: 7_000_000_000, // 70 VRM
+            height: 1,
+            address: String::new(),
+            script_hex: String::new(),
+            confirmations: 10,
+        };
+        let large = Utxo {
+            txid: "large".repeat(64),
+            vout: 0,
+            value_sats: 28_000_000_000, // 280 VRM
+            height: 1,
+            address: String::new(),
+            script_hex: String::new(),
+            confirmations: 10,
+        };
+        let amount_sats = 100_000_000; // 1 VRM
+        let fee_sats = VIP1_MIN_TX_FEE_PER_K;
+        let selected = select_utxos(&[large, small], amount_sats, fee_sats).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].value_sats, 7_000_000_000);
+    }
+
+    #[test]
+    fn select_utxos_accumulates_smallest_when_no_single_input_covers() {
+        let a = Utxo {
+            txid: "a".repeat(64),
+            vout: 0,
+            value_sats: 40_000_000,
+            height: 1,
+            address: String::new(),
+            script_hex: String::new(),
+            confirmations: 1,
+        };
+        let b = Utxo {
+            txid: "b".repeat(64),
+            vout: 0,
+            value_sats: 50_000_000,
+            height: 1,
+            address: String::new(),
+            script_hex: String::new(),
+            confirmations: 1,
+        };
+        let amount_sats = 80_000_000;
+        let fee_sats = VIP1_MIN_TX_FEE_PER_K;
+        let selected = select_utxos(&[b, a], amount_sats, fee_sats).unwrap();
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].value_sats, 40_000_000);
+        assert_eq!(selected[1].value_sats, 50_000_000);
+    }
+
+    #[test]
+    fn plan_send_converges_for_high_custom_rate() {
+        let utxos = vec![Utxo {
+            txid: "a".repeat(64),
+            vout: 0,
+            value_sats: 100_000_000,
+            height: 1,
+            address: String::new(),
+            script_hex: String::new(),
+            confirmations: 1,
+        }];
+        let (selected, fee) = plan_send_utxos(&utxos, 50_000_000, 0.5, 1).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(fee, 50_000_000);
     }
 }

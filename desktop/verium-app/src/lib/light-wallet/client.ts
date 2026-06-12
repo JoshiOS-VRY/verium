@@ -116,7 +116,12 @@ export async function lightWalletRescan(coin: CoinId): Promise<void> {
   return invoke('light_wallet_rescan', { coin });
 }
 
-/** Fast foreground refresh for pending (0-conf) UTXOs and tx history. */
+/** Fast UTXO-only refresh — updates cached balance without history RPC. */
+export async function lightWalletRefreshBalance(coin: CoinId): Promise<void> {
+  return invoke('light_wallet_refresh_balance', { coin });
+}
+
+/** Foreground refresh for pending (0-conf) history merge. */
 export async function lightWalletRefreshPending(coin: CoinId): Promise<void> {
   return invoke('light_wallet_refresh_pending', { coin });
 }

@@ -3,7 +3,8 @@ import { Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { useActiveCoin } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
 import { lightServerStatus } from '@/lib/light-wallet/client';
-import { electrumServerShortLabel, electrumStatusTitle } from '@/lib/light-wallet/labels';
+import { LIGHT_SERVER_STATUS_POLL_MS } from '@/lib/light-wallet/poll';
+import { electrumStatusTitle } from '@/lib/light-wallet/labels';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 
 export function LightServerBadge() {
@@ -12,7 +13,7 @@ export function LightServerBadge() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: coinQueryKey(activeCoin, 'light-server-status'),
     queryFn: () => lightServerStatus(activeCoin),
-    refetchInterval: visible ? 45_000 : false,
+    refetchInterval: visible ? LIGHT_SERVER_STATUS_POLL_MS : false,
     retry: 1,
   });
 
@@ -45,15 +46,16 @@ export function LightServerBadge() {
     );
   }
 
-  const serverLabel = electrumServerShortLabel(activeCoin, data);
-
   return (
     <span
       className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
       title={electrumStatusTitle(activeCoin, data)}
     >
-      <Cloud className="h-3.5 w-3.5 shrink-0" />
-      <span className="min-w-0 truncate">{serverLabel.toUpperCase()}</span>
+      <span className="relative flex h-3.5 w-3.5 shrink-0" aria-hidden>
+        <span className="absolute inline-flex h-full w-full rounded-full" />
+        <Cloud className="relative h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 truncate">Connected</span>
     </span>
   );
 }

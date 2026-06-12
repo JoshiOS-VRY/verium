@@ -1,7 +1,7 @@
 {
   "name": "vericonomy-app",
   "private": true,
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "Modern Tauri + React desktop wallet for Verium (VRM) and Vericoin (VRC).",
   "scripts": {
@@ -31,6 +31,8 @@
     "ios:install": "bash scripts/install-ios-device.sh",
     "ios:deploy": "bash scripts/build-ios.sh",
     "ios:ship": "bash scripts/build-ios.sh",
+    "ios:archive": "bash scripts/archive-ios-appstore.sh",
+    "ios:export": "EXPORT_ONLY=1 bash scripts/archive-ios-appstore.sh",
     "icons:ios": "bash scripts/sync-ios-icons.sh",
     "fetch:veriumd": "node scripts/fetch-veriumd.cjs",
     "fetch:veriumd:if-missing": "node scripts/fetch-veriumd.cjs --skip-if-present",
@@ -67,6 +69,7 @@
     "@tauri-apps/plugin-deep-link": "^2.4.9",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

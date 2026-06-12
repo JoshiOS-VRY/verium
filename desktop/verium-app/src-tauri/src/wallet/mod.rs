@@ -9,6 +9,7 @@ pub mod full_node_unlock;
 pub mod gap_scan_hook;
 pub mod hd;
 pub mod keystore;
+pub mod listtransactions_rows;
 pub mod mode;
 pub mod psbt_light;
 pub mod service;

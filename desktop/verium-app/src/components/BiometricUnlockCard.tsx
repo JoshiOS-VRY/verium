@@ -61,7 +61,10 @@ export function BiometricUnlockCard() {
         })
       );
 
-      await updatePrefs({ biometric_unlock_enabled: true });
+      await updatePrefs({
+        biometric_unlock_enabled: true,
+        biometric_unlock_prompt_dismissed: true,
+      });
       await queryClient.invalidateQueries({ queryKey: biometricUnlockQueryKey(coin) });
     },
     onError: (error) => {
@@ -82,7 +85,10 @@ export function BiometricUnlockCard() {
           configured: false,
         })
       );
-      await updatePrefs({ biometric_unlock_enabled: false });
+      await updatePrefs({
+        biometric_unlock_enabled: false,
+        biometric_unlock_prompt_dismissed: true,
+      });
       await queryClient.invalidateQueries({ queryKey: biometricUnlockQueryKey(coin) });
     },
   });

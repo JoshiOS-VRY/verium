@@ -11,20 +11,11 @@ import { ExplorerDetailShell } from '@/components/mobile/explorer/ExplorerDetail
 import { shortExplorerAddress } from '@/components/mobile/explorer/tx-detail-utils';
 import { useActiveCoin } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
-import {
-  buildActivityBars,
-  buildAddressComposition,
-} from '@/lib/address-activity';
-import {
-  cumulativeSeriesCaption,
-  indexerPointsToChart,
-} from '@/lib/cumulative-balance';
+import { buildActivityBars, buildAddressComposition } from '@/lib/address-activity';
+import { cumulativeSeriesCaption, indexerPointsToChart } from '@/lib/cumulative-balance';
 import { buildAddressExplorerUrl, effectiveAddressExplorerTemplate } from '@/lib/explorer-links';
 import { fetchIndexerAddress, fetchIndexerAddressCumulativeSeries } from '@/lib/indexer-api';
-import {
-  indexerTicker,
-  parseIndexerAmountCoins,
-} from '@/lib/indexer-amount';
+import { indexerTicker, parseIndexerAmountCoins } from '@/lib/indexer-amount';
 import { useUserPreferences } from '@/lib/user-preferences';
 
 const PAGE_SIZE = 20;
@@ -103,10 +94,7 @@ export function ExplorerAddressPage() {
   const txs = data.transactions ?? [];
   const paging = data.paging;
   const chartTxs = chartSample.data?.transactions ?? txs;
-  const ticker =
-    indexerTicker(balance?.balance) ||
-    indexerTicker(balance?.totalReceived) ||
-    'VRM';
+  const ticker = indexerTicker(balance?.balance) || indexerTicker(balance?.totalReceived) || 'VRM';
 
   if (!data.found) {
     return (

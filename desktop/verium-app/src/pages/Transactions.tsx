@@ -3,7 +3,9 @@ import { coinQueryKey } from '@/lib/coin/profile';
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useMinerPayoutsQuery } from '@/hooks/usePoolQueries';
+import { useLightWalletInstantReceiveSync } from '@/hooks/useLightWalletInstantReceiveSync';
 import { useWalletMode } from '@/hooks/useWalletMode';
+import { LIGHT_HISTORY_POLL_MS } from '@/lib/light-wallet/poll';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { resolvePoolDashboardAddress } from '@/lib/pool-dashboard-address';
 import { useUserPreferences } from '@/lib/user-preferences';
@@ -109,6 +111,8 @@ export function Transactions() {
     label?: string;
   }>({});
 
+  useLightWalletInstantReceiveSync(coin, isLight && visible);
+
   useEffect(() => {
     const pending = consumePendingPaymentUri();
     if (!pending) return;
@@ -180,7 +184,13 @@ export function Transactions() {
     enabled: wallet.isSuccess,
     // Light wallets: poll SQLite-backed history while the screen is open.
     refetchInterval:
-      isLight && visible ? (lightSyncing ? 10_000 : 15_000) : lightSyncing ? 20_000 : false,
+      isLight && visible
+        ? lightSyncing
+          ? 5_000
+          : LIGHT_HISTORY_POLL_MS
+        : lightSyncing
+          ? 20_000
+          : false,
     retry: 1,
   });
 

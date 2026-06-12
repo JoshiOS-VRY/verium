@@ -15,6 +15,10 @@ import {
 } from '@/lib/light-wallet/client';
 import { onboardingMarkComplete } from '@/lib/wallet-profile';
 import { scorePassphrase } from '@/lib/passphrase-strength';
+import { biometricUnlockStatus } from '@/lib/biometric/client';
+import { requestBiometricSetupOffer, shouldOfferBiometricSetup } from '@/lib/biometric/setup-offer';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { useWalletMode } from '@/hooks/useWalletMode';
 import { cn } from '@/lib/utils';
 
 interface LightWalletSetupFormProps {
@@ -38,6 +42,9 @@ export function LightWalletSetupForm({
 }: LightWalletSetupFormProps) {
   const coin = useActiveCoin();
   const queryClient = useQueryClient();
+  const { mobileOnly } = useWalletMode();
+  const prefs = useUserPreferences((s) => s.prefs);
+  const prefsLoaded = useUserPreferences((s) => s.loaded);
   const twoFa = useTwoFactorGate(coin);
   const [passphrase, setPassphrase] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -74,6 +81,16 @@ export function LightWalletSetupForm({
       if (mode !== 'unlock') {
         await walletModeSetForCoin(coin, 'light').catch(() => undefined);
         await onboardingMarkComplete(coin).catch(() => undefined);
+      }
+      if (mobileOnly) {
+        try {
+          const bioStatus = await biometricUnlockStatus(coin);
+          if (shouldOfferBiometricSetup(bioStatus, prefs, prefsLoaded)) {
+            requestBiometricSetupOffer(coin, passphrase);
+          }
+        } catch {
+          // Non-fatal — user can enable Face ID in Settings.
+        }
       }
       onDone();
     },

@@ -35,7 +35,9 @@ function FlowPill({
       <p
         className={cn(
           'text-[11px] font-medium uppercase tracking-wide',
-          tone === 'input' ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'
+          tone === 'input'
+            ? 'text-amber-700 dark:text-amber-300'
+            : 'text-emerald-700 dark:text-emerald-300'
         )}
       >
         {label}
@@ -43,9 +45,7 @@ function FlowPill({
       <p className="mt-1 text-base font-semibold tabular-nums text-fg">
         {formatIndexerCoinsTotal(total, ticker)}
       </p>
-      <p className="mt-0.5 text-[11px] text-fg-muted">
-        {count === 1 ? '1 leg' : `${count} legs`}
-      </p>
+      <p className="mt-0.5 text-[11px] text-fg-muted">{count === 1 ? '1 leg' : `${count} legs`}</p>
     </div>
   );
 }
@@ -174,7 +174,9 @@ export function TransactionFlowCard({
                   </li>
                 ))}
                 {hiddenOutputs > 0 && (
-                  <li className="text-[11px] text-fg-subtle">+{hiddenOutputs} more outputs below</li>
+                  <li className="text-[11px] text-fg-subtle">
+                    +{hiddenOutputs} more outputs below
+                  </li>
                 )}
               </ul>
             </div>

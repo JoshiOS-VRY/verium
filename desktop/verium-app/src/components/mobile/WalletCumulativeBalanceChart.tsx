@@ -2,10 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CumulativeBalanceChart } from '@/components/mobile/explorer/CumulativeBalanceChart';
 import { useActiveCoin } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
-import {
-  buildWalletCumulativeSeries,
-  cumulativeSeriesCaption,
-} from '@/lib/cumulative-balance';
+import { buildWalletCumulativeSeries, cumulativeSeriesCaption } from '@/lib/cumulative-balance';
 import { rpcGetWalletInfo, rpcListTransactions } from '@/lib/rpc/client';
 import { TRANSACTIONS_LIST_CAP } from '@/lib/transactions-list';
 import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';

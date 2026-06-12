@@ -40,10 +40,7 @@ export function MobileTransactionHistory({
   const [search, setSearch] = useState('');
   const [visibleCount, setVisibleCount] = useState(MOBILE_HISTORY_INITIAL);
 
-  const filtered = useMemo(
-    () => filterTransactions(txs, filter, search),
-    [txs, filter, search]
-  );
+  const filtered = useMemo(() => filterTransactions(txs, filter, search), [txs, filter, search]);
 
   const visibleRows = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
@@ -208,7 +205,6 @@ export function MobileTransactionHistory({
           </>
         )}
       </div>
-
     </section>
   );
 }

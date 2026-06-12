@@ -1,14 +1,5 @@
 import { useState } from 'react';
-import {
-  ChevronDown,
-  Copy,
-  Check,
-  Loader2,
-  QrCode,
-  Radio,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ChevronDown, Copy, Check, Loader2, QrCode, Radio, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ExplorerLink } from '@/components/ExplorerLink';
 import { QrCodeDisplay } from '@/components/QrCodeDisplay';
@@ -87,7 +78,10 @@ export function MobileReceiveForm({
           >
             <span>Network notices ({warnings.length})</span>
             <ChevronDown
-              className={cn('h-4 w-4 text-fg-muted transition-transform', showWarnings && 'rotate-180')}
+              className={cn(
+                'h-4 w-4 text-fg-muted transition-transform',
+                showWarnings && 'rotate-180'
+              )}
             />
           </button>
           {showWarnings && (
@@ -136,9 +130,7 @@ export function MobileReceiveForm({
               </button>
             </div>
 
-            {active.message && (
-              <p className="mt-2 text-sm text-fg-muted">{active.message}</p>
-            )}
+            {active.message && <p className="mt-2 text-sm text-fg-muted">{active.message}</p>}
 
             <div className="mt-4 flex justify-center">
               <QrCodeDisplay
@@ -198,7 +190,9 @@ export function MobileReceiveForm({
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-accent">
               <QrCode className="h-8 w-8" />
             </div>
-            <p className="mt-4 text-sm font-medium text-fg">Show a QR code to receive {profile.symbol}</p>
+            <p className="mt-4 text-sm font-medium text-fg">
+              Show a QR code to receive {profile.symbol}
+            </p>
             <p className="mt-1 text-xs text-fg-muted">
               Generate an address below or pick a recent request.
             </p>
@@ -224,7 +218,9 @@ export function MobileReceiveForm({
       {showDetails && (
         <section className="mobile-panel space-y-4 rounded-2xl border border-border bg-bg-panel/60 p-4">
           <div>
-            <label htmlFor="mobile-receive-label" className="mobile-field-label">Label</label>
+            <label htmlFor="mobile-receive-label" className="mobile-field-label">
+              Label
+            </label>
             <input
               id="mobile-receive-label"
               type="text"
@@ -249,7 +245,9 @@ export function MobileReceiveForm({
             />
           </div>
           <div>
-            <label htmlFor="mobile-receive-message" className="mobile-field-label">Message</label>
+            <label htmlFor="mobile-receive-message" className="mobile-field-label">
+              Message
+            </label>
             <textarea
               id="mobile-receive-message"
               rows={2}
@@ -259,7 +257,13 @@ export function MobileReceiveForm({
               className="mobile-textarea mt-1.5 w-full"
             />
           </div>
-          <Button type="button" variant="ghost" size="sm" className="text-fg-muted" onClick={onClearForm}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-fg-muted"
+            onClick={onClearForm}
+          >
             Clear fields
           </Button>
         </section>
@@ -279,13 +283,13 @@ export function MobileReceiveForm({
                     onClick={() => onSelectRequest(row.id)}
                     className={cn(
                       'flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors active:opacity-90',
-                      isActive
-                        ? 'border-accent/40 bg-accent/10'
-                        : 'border-border bg-bg-subtle/50'
+                      isActive ? 'border-accent/40 bg-accent/10' : 'border-border bg-bg-subtle/50'
                     )}
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{row.label || 'Payment request'}</p>
+                      <p className="truncate text-sm font-medium">
+                        {row.label || 'Payment request'}
+                      </p>
                       <p className="mt-0.5 truncate font-mono text-[11px] text-fg-muted">
                         {row.address}
                       </p>

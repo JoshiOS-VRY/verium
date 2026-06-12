@@ -142,9 +142,9 @@ impl ChainBackend for FullNodeRpcClient {
     async fn get_raw_tx_hex(&self, txid: &str) -> AppResult<String> {
         let hex: String = self
             .client
-            .call("getrawtransaction", json!([txid, false]))
+            .call("getrawtransaction", json!([txid.trim(), false]))
             .await?;
-        Ok(hex)
+        crate::chain::tx_hex::normalize_transaction_hex(&hex, "getrawtransaction")
     }
 
     async fn estimate_fee(&self, target_blocks: u32) -> AppResult<FeeRate> {

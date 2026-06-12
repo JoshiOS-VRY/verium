@@ -11,7 +11,7 @@ use crate::coin_profile::CoinId;
 /// Pause Electrum RPC after the server reports excessive usage (-101).
 const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(300);
 /// Minimum gap between `blockchain.headers.subscribe` status probes.
-pub const STATUS_PROBE_INTERVAL: Duration = Duration::from_secs(45);
+pub const STATUS_PROBE_INTERVAL: Duration = Duration::from_secs(10);
 
 static COOLDOWN_UNTIL: Lazy<Mutex<HashMap<CoinId, Instant>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));

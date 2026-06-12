@@ -32,6 +32,7 @@ import { coinSymbol, formatCoinAmount } from '@/lib/units';
 import { MobileSendForm } from '@/components/mobile/MobileSendForm';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { cn } from '@/lib/utils';
+import { estimateSendFee } from '@/lib/send-fee-estimate';
 import { listAddressBookEntries, upsertAddressBookEntry } from '@/lib/address-book';
 import { validateSendAddress } from '@/lib/address-validation';
 import {
@@ -41,6 +42,12 @@ import {
   spendingControlsGet,
   twoFactorIsGated,
 } from '@/lib/security/client';
+import {
+  sendFormHasUserInput,
+  useSendFormSession,
+  type SendFormRecipient,
+  type SendFormSessionSnapshot,
+} from '@/lib/send-form-session';
 
 const EXAMPLE_ADDRESSES: Partial<Record<CoinId, string>> = {
   verium: 'VRq98Nm2P6anLHPgnHdb6NnibJ6GoG3Jm9',
@@ -49,12 +56,7 @@ const DEFAULT_FEE_RATE = 0.001;
 /** ~2 recipient cards visible; additional rows scroll inside the panel. */
 const RECIPIENTS_SCROLL_MAX_CLASS = 'max-h-[min(22rem,42vh)]';
 
-interface SendRecipient {
-  id: string;
-  address: string;
-  label: string;
-  amount: string;
-}
+type SendRecipient = SendFormRecipient;
 
 function newRecipient(): SendRecipient {
   return {
@@ -169,6 +171,38 @@ interface SendPanelProps {
   initialLabel?: string;
 }
 
+function hasSendPrefill(
+  initialAddress?: string,
+  initialAmount?: string,
+  initialLabel?: string
+): boolean {
+  return Boolean(initialAddress || initialAmount || initialLabel);
+}
+
+function recipientsFromPrefill(
+  initialAddress?: string,
+  initialAmount?: string,
+  initialLabel?: string
+): SendRecipient[] {
+  return [
+    {
+      ...newRecipient(),
+      address: initialAddress ?? '',
+      amount: initialAmount ?? '',
+      label: initialLabel ?? '',
+    },
+  ];
+}
+
+function readSessionSnapshot(
+  coin: CoinId,
+  baselineFeeRate: number
+): SendFormSessionSnapshot | undefined {
+  const saved = useSendFormSession.getState().get(coin);
+  if (!saved || !sendFormHasUserInput(saved, baselineFeeRate)) return undefined;
+  return saved;
+}
+
 export function SendPanel({
   className,
   initialAddress,
@@ -183,20 +217,41 @@ export function SendPanel({
   const queryClient = useQueryClient();
   const prefs = useUserPreferences((s) => s.prefs);
   const updatePrefs = useUserPreferences((s) => s.update);
+  const saveSendFormSession = useSendFormSession((s) => s.save);
+  const clearSendFormSession = useSendFormSession((s) => s.clear);
+  const baselineFeeRate = prefs.tx_fee_rate_vrm_per_kb ?? DEFAULT_FEE_RATE;
   const wallet = useQuery({
     queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
 
-  const [recipients, setRecipients] = useState<SendRecipient[]>([newRecipient()]);
-  const [subtractFee, setSubtractFee] = useState(false);
-  const [feeRate, setFeeRate] = useState<number>(prefs.tx_fee_rate_vrm_per_kb ?? DEFAULT_FEE_RATE);
+  const [recipients, setRecipients] = useState<SendRecipient[]>(() => {
+    if (hasSendPrefill(initialAddress, initialAmount, initialLabel)) {
+      return recipientsFromPrefill(initialAddress, initialAmount, initialLabel);
+    }
+    const saved = readSessionSnapshot(coin, baselineFeeRate);
+    return saved?.recipients ?? [newRecipient()];
+  });
+  const [subtractFee, setSubtractFee] = useState(() => {
+    if (hasSendPrefill(initialAddress, initialAmount, initialLabel)) return false;
+    return readSessionSnapshot(coin, baselineFeeRate)?.subtractFee ?? false;
+  });
+  const [feeRate, setFeeRate] = useState<number>(() => {
+    if (hasSendPrefill(initialAddress, initialAmount, initialLabel)) {
+      return baselineFeeRate;
+    }
+    const saved = readSessionSnapshot(coin, baselineFeeRate);
+    return saved?.feeRate ?? baselineFeeRate;
+  });
   const [feeDialogOpen, setFeeDialogOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [addressBookFor, setAddressBookFor] = useState<string | null>(null);
   const [coinControlOpen, setCoinControlOpen] = useState(false);
-  const [coinControl, setCoinControl] = useState<SelectedUtxoSet>([]);
+  const [coinControl, setCoinControl] = useState<SelectedUtxoSet>(() => {
+    if (hasSendPrefill(initialAddress, initialAmount, initialLabel)) return [];
+    return readSessionSnapshot(coin, baselineFeeRate)?.coinControl ?? [];
+  });
   const [qrOpen, setQrOpen] = useState(false);
   const [qrTargetId, setQrTargetId] = useState<string | null>(null);
   const [twoFaOpen, setTwoFaOpen] = useState(false);
@@ -218,16 +273,51 @@ export function SendPanel({
   });
 
   useEffect(() => {
-    if (!initialAddress && !initialAmount && !initialLabel) return;
-    setRecipients([
-      {
-        ...newRecipient(),
-        address: initialAddress ?? '',
-        amount: initialAmount ?? '',
-        label: initialLabel ?? '',
-      },
-    ]);
-  }, [initialAddress, initialAmount, initialLabel]);
+    if (!hasSendPrefill(initialAddress, initialAmount, initialLabel)) return;
+    setRecipients(recipientsFromPrefill(initialAddress, initialAmount, initialLabel));
+    setSubtractFee(false);
+    setFeeRate(baselineFeeRate);
+    setCoinControl([]);
+    clearSendFormSession(coin);
+  }, [coin, initialAddress, initialAmount, initialLabel, baselineFeeRate, clearSendFormSession]);
+
+  // Restore when switching coins while the panel stays mounted.
+  useEffect(() => {
+    if (hasSendPrefill(initialAddress, initialAmount, initialLabel)) return;
+    const saved = readSessionSnapshot(coin, baselineFeeRate);
+    if (saved) {
+      setRecipients(saved.recipients);
+      setSubtractFee(saved.subtractFee);
+      setFeeRate(saved.feeRate);
+      setCoinControl(saved.coinControl);
+      return;
+    }
+    setRecipients([newRecipient()]);
+    setSubtractFee(false);
+    setFeeRate(baselineFeeRate);
+    setCoinControl([]);
+  }, [coin, baselineFeeRate, initialAddress, initialAmount, initialLabel]);
+
+  // Persist draft while navigating away from the send view (same browser session).
+  useEffect(() => {
+    return () => {
+      const snapshot = { recipients, subtractFee, feeRate, coinControl };
+      if (sendFormHasUserInput(snapshot, baselineFeeRate)) {
+        saveSendFormSession(coin, snapshot);
+      } else {
+        clearSendFormSession(coin);
+      }
+    };
+  }, [
+    coin,
+    recipients,
+    subtractFee,
+    feeRate,
+    coinControl,
+    baselineFeeRate,
+    saveSendFormSession,
+    clearSendFormSession,
+  ]);
 
   useEffect(() => {
     if (recipients.length <= prevRecipientCountRef.current) {
@@ -268,7 +358,8 @@ export function SendPanel({
   const clearAll = useCallback(() => {
     setRecipients([newRecipient()]);
     setSubtractFee(false);
-  }, []);
+    clearSendFormSession(coin);
+  }, [coin, clearSendFormSession]);
 
   const addRecipient = useCallback(() => {
     setRecipients((rows) => [...rows, newRecipient()]);
@@ -289,16 +380,6 @@ export function SendPanel({
     [updateRecipient]
   );
 
-  const useAvailableBalance = useCallback(
-    (id: string) => {
-      if (balance <= 0) return;
-      const feeBuffer = subtractFee ? 0 : feeRate;
-      const spendable = Math.max(0, balance - feeBuffer);
-      updateRecipient(id, { amount: spendable.toFixed(8) });
-    },
-    [balance, feeRate, subtractFee, updateRecipient]
-  );
-
   const validRows = recipients.filter((row) => {
     const address = row.address.trim();
     return (
@@ -311,6 +392,17 @@ export function SendPanel({
     label: row.label.trim() || undefined,
     amount: parseAmount(row.amount)!,
   }));
+
+  const useAvailableBalance = useCallback(
+    (id: string) => {
+      if (balance <= 0) return;
+      const feeEstimate = estimateSendFee(feeRate, validRows.length || 1);
+      const feeBuffer = subtractFee ? 0 : feeEstimate.totalFee;
+      const spendable = Math.max(0, balance - feeBuffer);
+      updateRecipient(id, { amount: spendable.toFixed(8) });
+    },
+    [balance, feeRate, subtractFee, updateRecipient, validRows.length]
+  );
 
   const send = useMutation({
     mutationFn: async () => {
@@ -351,7 +443,9 @@ export function SendPanel({
             amount,
             row.label.trim() || undefined,
             totpCode,
-            walletPassphrase
+            walletPassphrase,
+            true,
+            feeRate
           );
           txids.push(txid);
         }
@@ -370,6 +464,7 @@ export function SendPanel({
       setLastSend(result);
       clearAll();
       setCoinControl([]);
+      clearSendFormSession(coin);
       sendTotpCodeRef.current = '';
       sendPassphraseRef.current = '';
       for (const row of result.recipients) {
@@ -388,8 +483,10 @@ export function SendPanel({
           coin
         );
       }
+      // Light wallet: balance is updated locally in Rust after broadcast; an immediate
+      // Electrum refresh can wipe the optimistic change UTXO before it is indexed.
+      await queryClient.refetchQueries({ queryKey: coinQueryKey(coin, 'getwalletinfo') });
       queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'listtransactions') });
-      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'getwalletinfo') });
       queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'listunspent') });
       queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'address-book') });
       queryClient.invalidateQueries({ queryKey: ['spending-controls'] });
@@ -617,271 +714,276 @@ export function SendPanel({
         />
       ) : (
         <>
-      <div className="flex min-h-0 flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-fg-muted">
-            {recipients.length === 1 ? '1 recipient' : `${recipients.length} recipients`}
-          </p>
-          <Button type="button" variant="secondary" size="sm" onClick={addRecipient}>
-            <Plus className="h-4 w-4" />
-            Add Recipient
-          </Button>
-        </div>
+          <div className="flex min-h-0 flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-fg-muted">
+                {recipients.length === 1 ? '1 recipient' : `${recipients.length} recipients`}
+              </p>
+              <Button type="button" variant="secondary" size="sm" onClick={addRecipient}>
+                <Plus className="h-4 w-4" />
+                Add Recipient
+              </Button>
+            </div>
 
-        <div
-          ref={recipientsScrollRef}
-          className={cn(
-            'flex flex-col gap-3 overflow-y-auto overscroll-y-contain rounded-lg border border-border bg-bg-subtle/40 p-2 pr-1',
-            RECIPIENTS_SCROLL_MAX_CLASS
-          )}
-        >
-          {recipients.map((row, index) => {
-            const addressError = row.address.trim()
-              ? validateSendAddress(row.address.trim())
-              : null;
-            return (
-              <div key={row.id} className="rounded-lg border border-border bg-bg-subtle/80 p-4">
-                {recipients.length > 1 && (
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
-                    Recipient {index + 1}
-                  </p>
-                )}
-                <div className="grid gap-3">
-                  <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-start">
-                    <label
-                      htmlFor={`pay-to-${row.id}`}
-                      className="text-sm font-medium text-fg-muted sm:text-right sm:pt-2"
-                    >
-                      Pay To
-                    </label>
-                    <div className="flex min-w-0 flex-col gap-1.5">
-                      <div className="flex min-w-0 gap-1">
-                        <input
-                          id={`pay-to-${row.id}`}
-                          type="text"
-                          spellCheck={false}
-                          value={row.address}
-                          onChange={(e) => updateRecipient(row.id, { address: e.target.value })}
-                          placeholder={
-                            exampleAddress
-                              ? `Enter a ${profile.displayName} address (e.g. ${exampleAddress})`
-                              : `Enter a ${profile.displayName} address`
-                          }
-                          className={cn(
-                            'h-10 min-w-0 flex-1 rounded-md border bg-bg-panel px-3 text-xs outline-none focus:border-accent',
-                            addressError ? 'border-danger' : 'border-border'
-                          )}
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="h-10 w-10 shrink-0 px-0"
-                          title="Pick from address book"
-                          onClick={() => setAddressBookFor(row.id)}
-                        >
-                          <BookUser className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="h-10 w-10 shrink-0 px-0"
-                          title="Paste from clipboard"
-                          onClick={() => void pasteAddress(row.id)}
-                        >
-                          <ClipboardPaste className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="h-10 w-10 shrink-0 px-0"
-                          title="Scan QR code"
-                          onClick={() => {
-                            setQrTargetId(row.id);
-                            setQrOpen(true);
-                          }}
-                        >
-                          <QrCode className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="h-10 w-10 shrink-0 px-0"
-                          title={recipients.length > 1 ? 'Remove recipient' : 'Clear'}
-                          onClick={() => removeRecipient(row.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {addressError && <p className="text-xs text-danger">{addressError}</p>}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
-                    <label
-                      htmlFor={`label-${row.id}`}
-                      className="text-sm font-medium text-fg-muted sm:text-right"
-                    >
-                      Label
-                    </label>
-                    <input
-                      id={`label-${row.id}`}
-                      type="text"
-                      value={row.label}
-                      onChange={(e) => updateRecipient(row.id, { label: e.target.value })}
-                      placeholder="Enter a label for this address to add it to your address book"
-                      className="h-10 rounded-md border border-border bg-bg-panel px-3 text-sm outline-none focus:border-accent"
-                    />
-                  </div>
-
-                  <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
-                    <label
-                      htmlFor={`amount-${row.id}`}
-                      className="text-sm font-medium text-fg-muted sm:text-right"
-                    >
-                      Amount
-                    </label>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="relative min-w-[8rem] flex-1 sm:max-w-xs">
-                        <input
-                          id={`amount-${row.id}`}
-                          type="number"
-                          min={0}
-                          step="0.00000001"
-                          value={row.amount}
-                          onChange={(e) => updateRecipient(row.id, { amount: e.target.value })}
-                          className="h-10 w-full rounded-md border border-border bg-bg-panel py-2 pl-3 pr-14 text-sm tabular-nums outline-none focus:border-accent"
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-semibold text-accent hover:bg-accent/10 disabled:opacity-40"
-                          onClick={() => useAvailableBalance(row.id)}
-                          disabled={balance <= 0}
-                          aria-label="Use maximum available balance"
-                        >
-                          Max
-                        </button>
-                      </div>
-
-                      {index === 0 && (
-                        <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
-                          <input
-                            type="checkbox"
-                            checked={subtractFee}
-                            onChange={(e) => setSubtractFee(e.target.checked)}
-                            className="h-3.5 w-3.5 rounded accent-accent"
-                          />
-                          Subtract fee from amount
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
-        <span className="text-fg-muted">
-          Transaction Fee:{' '}
-          <span className="font-medium tabular-nums text-fg">
-            {feeRate.toFixed(8)} {symbol}/kB
-          </span>
-        </span>
-        <Button type="button" variant="secondary" size="sm" onClick={() => setFeeDialogOpen(true)}>
-          Choose…
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => setCoinControlOpen(true)}
-        >
-          <Coins className="h-4 w-4" />
-          Coin control
-          {coinControl.length > 0 && (
-            <span className="ml-1 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-              {coinControl.length}
-            </span>
-          )}
-        </Button>
-        {coinControl.length > 0 && (
-          <span className="text-xs text-fg-muted">
-            Selected inputs:{' '}
-            <span className="font-medium tabular-nums text-fg">
-              {formatCoinAmount(coinControlTotal, coin, 8)}
-            </span>{' '}
-            ·{' '}
-            <button
-              type="button"
-              className="text-accent underline"
-              onClick={() => setCoinControl([])}
+            <div
+              ref={recipientsScrollRef}
+              className={cn(
+                'flex flex-col gap-3 overflow-y-auto overscroll-y-contain rounded-lg border border-border bg-bg-subtle/40 p-2 pr-1',
+                RECIPIENTS_SCROLL_MAX_CLASS
+              )}
             >
-              Clear
-            </button>
-          </span>
-        )}
-      </div>
+              {recipients.map((row, index) => {
+                const addressError = row.address.trim()
+                  ? validateSendAddress(row.address.trim())
+                  : null;
+                return (
+                  <div key={row.id} className="rounded-lg border border-border bg-bg-subtle/80 p-4">
+                    {recipients.length > 1 && (
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
+                        Recipient {index + 1}
+                      </p>
+                    )}
+                    <div className="grid gap-3">
+                      <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-start">
+                        <label
+                          htmlFor={`pay-to-${row.id}`}
+                          className="text-sm font-medium text-fg-muted sm:text-right sm:pt-2"
+                        >
+                          Pay To
+                        </label>
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <div className="flex min-w-0 gap-1">
+                            <input
+                              id={`pay-to-${row.id}`}
+                              type="text"
+                              spellCheck={false}
+                              value={row.address}
+                              onChange={(e) => updateRecipient(row.id, { address: e.target.value })}
+                              placeholder={
+                                exampleAddress
+                                  ? `Enter a ${profile.displayName} address (e.g. ${exampleAddress})`
+                                  : `Enter a ${profile.displayName} address`
+                              }
+                              className={cn(
+                                'h-10 min-w-0 flex-1 rounded-md border bg-bg-panel px-3 text-xs outline-none focus:border-accent',
+                                addressError ? 'border-danger' : 'border-border'
+                              )}
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-10 w-10 shrink-0 px-0"
+                              title="Pick from address book"
+                              onClick={() => setAddressBookFor(row.id)}
+                            >
+                              <BookUser className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-10 w-10 shrink-0 px-0"
+                              title="Paste from clipboard"
+                              onClick={() => void pasteAddress(row.id)}
+                            >
+                              <ClipboardPaste className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-10 w-10 shrink-0 px-0"
+                              title="Scan QR code"
+                              onClick={() => {
+                                setQrTargetId(row.id);
+                                setQrOpen(true);
+                              }}
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-10 w-10 shrink-0 px-0"
+                              title={recipients.length > 1 ? 'Remove recipient' : 'Clear'}
+                              onClick={() => removeRecipient(row.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {addressError && <p className="text-xs text-danger">{addressError}</p>}
+                        </div>
+                      </div>
 
-      {clipboardGuardError && (
-        <div className="mt-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-          {clipboardGuardError}
-        </div>
-      )}
-      {spendWarning && (
-        <div className="mt-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          {spendWarning}
-        </div>
-      )}
-      {send.error && <div className="mt-3 text-xs text-danger">{String(send.error)}</div>}
-      {lastSend && (
-        <SendSuccessBanner result={lastSend} coin={coin} onDismiss={() => setLastSend(null)} />
-      )}
+                      <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
+                        <label
+                          htmlFor={`label-${row.id}`}
+                          className="text-sm font-medium text-fg-muted sm:text-right"
+                        >
+                          Label
+                        </label>
+                        <input
+                          id={`label-${row.id}`}
+                          type="text"
+                          value={row.label}
+                          onChange={(e) => updateRecipient(row.id, { label: e.target.value })}
+                          placeholder="Enter a label for this address to add it to your address book"
+                          className="h-10 rounded-md border border-border bg-bg-panel px-3 text-sm outline-none focus:border-accent"
+                        />
+                      </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-accent px-4 py-3 text-accent-fg">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            className="border-0 bg-white text-accent hover:bg-white/90"
-            disabled={!canSend}
-            onClick={() => void openConfirm()}
-          >
-            {preparingConfirm || send.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                {preparingConfirm ? 'Checking…' : 'Sending…'}
-              </>
-            ) : (
-              <>
-                <SendHorizontal className="h-4 w-4" />
-                Send
-              </>
+                      <div className="grid gap-1.5 sm:grid-cols-[5rem_1fr] sm:items-center">
+                        <label
+                          htmlFor={`amount-${row.id}`}
+                          className="text-sm font-medium text-fg-muted sm:text-right"
+                        >
+                          Amount
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="relative min-w-[8rem] flex-1 sm:max-w-xs">
+                            <input
+                              id={`amount-${row.id}`}
+                              type="number"
+                              min={0}
+                              step="0.00000001"
+                              value={row.amount}
+                              onChange={(e) => updateRecipient(row.id, { amount: e.target.value })}
+                              className="h-10 w-full rounded-md border border-border bg-bg-panel py-2 pl-3 pr-14 text-sm tabular-nums outline-none focus:border-accent"
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-semibold text-accent hover:bg-accent/10 disabled:opacity-40"
+                              onClick={() => useAvailableBalance(row.id)}
+                              disabled={balance <= 0}
+                              aria-label="Use maximum available balance"
+                            >
+                              Max
+                            </button>
+                          </div>
+
+                          {index === 0 && (
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+                              <input
+                                type="checkbox"
+                                checked={subtractFee}
+                                onChange={(e) => setSubtractFee(e.target.checked)}
+                                className="h-3.5 w-3.5 rounded accent-accent"
+                              />
+                              Subtract fee from amount
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm">
+            <span className="text-fg-muted">
+              Transaction Fee:{' '}
+              <span className="font-medium tabular-nums text-fg">
+                {feeRate.toFixed(8)} {symbol}/kB
+              </span>
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setFeeDialogOpen(true)}
+            >
+              Choose…
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setCoinControlOpen(true)}
+            >
+              <Coins className="h-4 w-4" />
+              Coin control
+              {coinControl.length > 0 && (
+                <span className="ml-1 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                  {coinControl.length}
+                </span>
+              )}
+            </Button>
+            {coinControl.length > 0 && (
+              <span className="text-xs text-fg-muted">
+                Selected inputs:{' '}
+                <span className="font-medium tabular-nums text-fg">
+                  {formatCoinAmount(coinControlTotal, coin, 8)}
+                </span>{' '}
+                ·{' '}
+                <button
+                  type="button"
+                  className="text-accent underline"
+                  onClick={() => setCoinControl([])}
+                >
+                  Clear
+                </button>
+              </span>
             )}
-          </Button>
-          <Button
-            type="button"
-            variant="danger"
-            size="lg"
-            onClick={() => {
-              clearAll();
-              setLastSend(null);
-            }}
-          >
-            <X className="h-4 w-4" />
-            Clear All
-          </Button>
-        </div>
-        <div className="text-sm font-semibold tabular-nums">
-          Balance: {formatCoinAmount(balance, coin, 8)}
-        </div>
-      </div>
+          </div>
+
+          {clipboardGuardError && (
+            <div className="mt-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+              {clipboardGuardError}
+            </div>
+          )}
+          {spendWarning && (
+            <div className="mt-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              {spendWarning}
+            </div>
+          )}
+          {send.error && <div className="mt-3 text-xs text-danger">{String(send.error)}</div>}
+          {lastSend && (
+            <SendSuccessBanner result={lastSend} coin={coin} onDismiss={() => setLastSend(null)} />
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-accent px-4 py-3 text-accent-fg">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                className="border-0 bg-white text-accent hover:bg-white/90"
+                disabled={!canSend}
+                onClick={() => void openConfirm()}
+              >
+                {preparingConfirm || send.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    {preparingConfirm ? 'Checking…' : 'Sending…'}
+                  </>
+                ) : (
+                  <>
+                    <SendHorizontal className="h-4 w-4" />
+                    Send
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="lg"
+                onClick={() => {
+                  clearAll();
+                  setLastSend(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+                Clear All
+              </Button>
+            </div>
+            <div className="text-sm font-semibold tabular-nums">
+              Balance: {formatCoinAmount(balance, coin, 8)}
+            </div>
+          </div>
         </>
       )}
     </div>

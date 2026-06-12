@@ -8,6 +8,7 @@ use crate::chain::types::Utxo;
 use crate::coin_profile::CoinId;
 use crate::error::{AppError, AppResult};
 use crate::wallet::hd::{derive_keypair_on_chain, uses_core_hd_paths, GAP_SCAN_MAX_INDEX, HdChain};
+use crate::wallet::utxo_selector::DUST_CHANGE_SATS;
 use crate::wallet::vericonomy_tx::{
     build_signed_tx_hex, current_n_time, display_txid_from_raw, parse_display_txid,
     serialize_verium_tx, VeriumMutableTx,
@@ -41,11 +42,14 @@ fn assemble_transaction(
                 vout: utxo.vout,
             },
             script_sig: ScriptBuf::new(),
-            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            sequence: Sequence::MAX,
             witness: Witness::new(),
         });
         input_sum += utxo.value_sats;
-        let (secret, _) = find_signing_key(coin, mnemonic, bip39_passphrase, &utxo.address)?;
+        let script_bytes = hex::decode(utxo.script_hex.trim())
+            .map_err(|e| AppError::other(format!("utxo script hex: {e}")))?;
+        let (secret, _) =
+            find_signing_key(coin, mnemonic, bip39_passphrase, &utxo.address, &script_bytes)?;
         input_keys.push(secret);
     }
     let output_sum: i64 = outputs.iter().map(|(_, v)| *v).sum();
@@ -61,7 +65,7 @@ fn assemble_transaction(
             script_pubkey: ScriptBuf::from_bytes(script),
         });
     }
-    if change_sats > 546 {
+    if change_sats > DUST_CHANGE_SATS {
         let script = crate::wallet::hd::address_to_script_pubkey(coin, change_address)?;
         tx_outputs.push(TxOut {
             value: Amount::from_sat(change_sats as u64),
@@ -132,6 +136,7 @@ fn find_signing_key(
     mnemonic: &str,
     bip39_passphrase: Option<&str>,
     address: &str,
+    expected_script_pubkey: &[u8],
 ) -> AppResult<([u8; 32], Vec<u8>)> {
     if address.is_empty() {
         return Err(AppError::other("utxo missing address for signing"));
@@ -143,7 +148,10 @@ fn find_signing_key(
                     derive_keypair_on_chain(coin, mnemonic, bip39_passphrase, chain, index)?;
                 let addr = crate::wallet::hd::pubkey_to_p2pkh_address(coin, &pubkey)?;
                 if addr == address {
-                    return Ok((secret, pubkey));
+                    let script = crate::wallet::hd::address_to_script_pubkey(coin, &addr)?;
+                    if script == expected_script_pubkey {
+                        return Ok((secret, pubkey));
+                    }
                 }
             }
         }
@@ -153,11 +161,14 @@ fn find_signing_key(
                 derive_keypair_on_chain(coin, mnemonic, bip39_passphrase, HdChain::External, index)?;
             let addr = crate::wallet::hd::pubkey_to_p2pkh_address(coin, &pubkey)?;
             if addr == address {
-                return Ok((secret, pubkey));
+                let script = crate::wallet::hd::address_to_script_pubkey(coin, &addr)?;
+                if script == expected_script_pubkey {
+                    return Ok((secret, pubkey));
+                }
             }
         }
     }
     Err(AppError::other(format!(
-        "no signing key found for address {address}"
+        "no signing key found for address {address} matching output script"
     )))
 }

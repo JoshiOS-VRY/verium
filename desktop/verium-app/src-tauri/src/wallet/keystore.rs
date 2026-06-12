@@ -561,6 +561,26 @@ pub fn set_funded_script_hexes(coin: CoinId, scripts: &[String]) -> AppResult<()
     save_keystore(&store)
 }
 
+/// Ensure Electrum UTXO/history queries include a script we have started using
+/// (e.g. a new change address after the first send).
+pub fn register_funded_script_hex(coin: CoinId, script_hex: &str) -> AppResult<()> {
+    let normalized = script_hex.trim();
+    if normalized.is_empty() {
+        return Ok(());
+    }
+    let mut funded = funded_script_hexes(coin)?;
+    if funded.iter().any(|s| s.eq_ignore_ascii_case(normalized)) {
+        return Ok(());
+    }
+    funded.push(normalized.to_string());
+    set_funded_script_hexes(coin, &funded)
+}
+
+pub fn register_funded_address(coin: CoinId, address: &str) -> AppResult<()> {
+    let script = crate::wallet::hd::address_to_script_pubkey(coin, address)?;
+    register_funded_script_hex(coin, &hex::encode(script))
+}
+
 pub fn set_cached_script_hexes(coin: CoinId, scripts: &[String]) -> AppResult<()> {
     set_cached_script_hexes_with_scan_flag(coin, scripts, false)
 }
