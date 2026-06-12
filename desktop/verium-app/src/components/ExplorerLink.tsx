@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
+import { useWalletMode } from '@/hooks/useWalletMode';
 import { useActiveCoin } from '@/lib/coin/context';
 import type { CoinId } from '@/lib/coin/profile';
 import {
@@ -11,6 +13,7 @@ import {
   effectiveTxExplorerTemplate,
   explorerHome,
 } from '@/lib/explorer-links';
+import { explorerAddressPath, explorerBlockPath, explorerTxPath } from '@/lib/explorer-nav';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { openExternal } from '@/lib/open-external';
 import { cn } from '@/lib/utils';
@@ -31,6 +34,20 @@ interface ExplorerLinkProps {
   title?: string;
 }
 
+function inAppExplorerPath(target: ExplorerTarget): string | null {
+  switch (target.kind) {
+    case 'tx':
+      return explorerTxPath(target.txid);
+    case 'block':
+      return explorerBlockPath(target.hashOrHeight);
+    case 'address':
+      return explorerAddressPath(target.address);
+    case 'home':
+    case 'raw':
+      return null;
+  }
+}
+
 export function ExplorerLink({
   target,
   coin: coinProp,
@@ -39,6 +56,8 @@ export function ExplorerLink({
   showIcon = true,
   title,
 }: ExplorerLinkProps) {
+  const navigate = useNavigate();
+  const { mobileOnly } = useWalletMode();
   const activeCoin = useActiveCoin();
   const coin = coinProp ?? activeCoin;
   const { prefs } = useUserPreferences();
@@ -64,18 +83,27 @@ export function ExplorerLink({
     }
   };
 
+  const inAppPath = mobileOnly ? inAppExplorerPath(target) : null;
+  const useInApp = Boolean(inAppPath);
+
   return (
     <button
       type="button"
       title={title ?? (typeof label === 'string' ? label : 'View on explorer')}
-      onClick={() => void openExternal(resolveUrl())}
+      onClick={() => {
+        if (useInApp && inAppPath) {
+          navigate(inAppPath);
+          return;
+        }
+        void openExternal(resolveUrl());
+      }}
       className={cn(
         'inline-flex items-center gap-1 text-xs text-accent underline-offset-2 hover:underline',
         className
       )}
     >
       {label}
-      {showIcon && <ExternalLink className="h-3 w-3 shrink-0 opacity-70 truncate" />}
+      {showIcon && !useInApp && <ExternalLink className="h-3 w-3 shrink-0 opacity-70 truncate" />}
     </button>
   );
 }

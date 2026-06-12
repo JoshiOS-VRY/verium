@@ -21,7 +21,10 @@ use crate::wallet::hd::{
 use crate::wallet::keystore;
 use crate::wallet::mode::WalletMode;
 use crate::wallet::signer;
-use crate::wallet::sync::{balance_from_utxo_cache, scripts_for_history, sync_light_wallet};
+use crate::wallet::explorer_history::fetch_wallet_history_from_explorer;
+use crate::wallet::sync::{
+    addresses_for_history, balance_from_utxo_cache, sync_light_wallet,
+};
 use crate::wallet::utxo_selector::{plan_send_utxos, DEFAULT_TX_FEE_COINS_PER_KB, fee_for_rate};
 
 pub async fn fetch_utxos_with_addresses(
@@ -64,9 +67,13 @@ pub async fn fetch_utxos_with_addresses(
 /// `get_wallet_info` is polled every ~30s; without this throttle each poll would
 /// trigger a full Electrum UTXO refetch + SQLite table rewrite. Initial-scan
 /// syncs (`light_syncing`) are NOT throttled so they keep making progress.
-const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(90);
+const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(120);
+/// Gap-scan syncs are expensive; don't run a new indexing slice every wallet poll.
+const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(45);
 
 static LAST_STEADY_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static LAST_INDEXING_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Returns true if a steady-state background sync should run now (and records the
@@ -86,12 +93,30 @@ fn steady_sync_due(coin: CoinId) -> bool {
     }
 }
 
-/// Clear the steady-sync throttle so the next poll resyncs immediately (used on
-/// unlock/import/rescan and when funded scripts change).
+fn indexing_sync_due(coin: CoinId) -> bool {
+    let mut map = match LAST_INDEXING_SYNC.lock() {
+        Ok(m) => m,
+        Err(_) => return true,
+    };
+    let now = Instant::now();
+    match map.get(&coin) {
+        Some(last) if now.duration_since(*last) < INDEXING_SYNC_MIN_INTERVAL => false,
+        _ => {
+            map.insert(coin, now);
+            true
+        }
+    }
+}
+
+/// Clear sync throttles so the next poll resyncs immediately (unlock/import/rescan).
 pub fn reset_steady_sync_throttle(coin: CoinId) {
     if let Ok(mut map) = LAST_STEADY_SYNC.lock() {
         map.remove(&coin);
     }
+    if let Ok(mut map) = LAST_INDEXING_SYNC.lock() {
+        map.remove(&coin);
+    }
+    crate::wallet::sync::reset_pending_refresh_throttle(coin);
 }
 
 /// Last Electrum tip height we reacted to per coin (for event-driven sync).
@@ -165,7 +190,8 @@ pub async fn get_wallet_info_json(
     // Initial-scan syncs always run (and coalesce via SYNC_IN_FLIGHT). Steady-state
     // UTXO refetches are throttled so polling getwalletinfo every ~30s does not
     // refetch the full UTXO set + rewrite SQLite on every poll.
-    let should_background_sync = light_syncing || (steady_state && steady_sync_due(coin));
+    let should_background_sync =
+        (light_syncing && indexing_sync_due(coin)) || (steady_state && steady_sync_due(coin));
 
     if should_background_sync {
         let sync_state = state.clone();
@@ -191,13 +217,16 @@ pub async fn get_wallet_info_json(
     };
 
     let bal = balance_from_utxo_cache(coin);
+    let txcount = LightWalletCache::open(coin)
+        .and_then(|c| c.tx_history_count())
+        .unwrap_or(0);
 
     Ok(Some(json!({
         "walletname": format!("{}-light", coin.as_str()),
         "balance": sats_to_coins(bal.confirmed_sats),
         "unconfirmed_balance": sats_to_coins(bal.unconfirmed_sats),
         "immature_balance": sats_to_coins(bal.immature_sats),
-        "txcount": 0,
+        "txcount": txcount,
         "keypoolsize": 0,
         "unlocked_until": unlocked_until,
         "walletversion": 1,
@@ -210,7 +239,7 @@ pub async fn get_wallet_info_json(
 }
 
 pub async fn list_transactions(
-    state: &AppState,
+    _state: &AppState,
     coin: CoinId,
     count: usize,
     passphrase: Option<&str>,
@@ -221,32 +250,55 @@ pub async fn list_transactions(
     }
     let _ = passphrase;
 
-    // Fast path: serve from the local SQLite history cache (refreshed by sync),
-    // recomputing confirmations from the cached chain tip. This avoids issuing N
-    // Electrum get_history calls on every UI poll.
     if let Ok(cache) = LightWalletCache::open(coin) {
-        if cache.tx_history_count().unwrap_or(0) > 0 {
+        let rows = cache.list_tx_history(count).unwrap_or_default();
+        if !rows.is_empty() {
             let tip = cached_tip_height(&cache);
-            let rows = cache.list_tx_history(count).unwrap_or_default();
+            let enriched = rows.iter().any(|t| t.time.is_some() && t.time.unwrap_or(0) > 0);
+            if enriched {
+                return Ok(rows.iter().map(|t| wallet_tx_to_json(t, tip)).collect());
+            }
+
+            // Stale cache (txid-only rows): try explorer once, never Electrum on read.
+            let explorer_tip = tip;
+            if let Ok(addresses) = addresses_for_history(coin) {
+                if let Ok(history) = fetch_wallet_history_from_explorer(
+                    coin,
+                    &addresses,
+                    count,
+                    explorer_tip,
+                )
+                .await
+                {
+                    if !history.is_empty() {
+                        let _ = cache.replace_tx_history(&history);
+                        return Ok(history.iter().map(|t| wallet_tx_to_json(t, explorer_tip)).collect());
+                    }
+                }
+            }
             return Ok(rows.iter().map(|t| wallet_tx_to_json(t, tip)).collect());
         }
     }
 
-    // Cold cache (e.g. immediately after import, before first sync): fetch live
-    // once and populate the cache so subsequent polls hit the fast path.
-    let backend = resolve_backend(state, coin).await?;
-    let scripts = scripts_for_history(coin)?;
-    if scripts.is_empty() {
-        return Ok(vec![]);
+    // Empty cache: explorer only (sync also refreshes history in the background).
+    let tip = LightWalletCache::open(coin)
+        .ok()
+        .and_then(|c| cached_tip_height(&c));
+    if let Ok(addresses) = addresses_for_history(coin) {
+        if let Ok(history) = fetch_wallet_history_from_explorer(coin, &addresses, count, tip).await
+        {
+            if !history.is_empty() {
+                if let Ok(cache) = LightWalletCache::open(coin) {
+                    let _ = cache.replace_tx_history(&history);
+                    if let Some(height) = tip {
+                        let _ = cache.set_meta("tip_height", &height.to_string());
+                    }
+                }
+                return Ok(history.iter().map(|t| wallet_tx_to_json(t, tip)).collect());
+            }
+        }
     }
-    let txs = backend.get_history_for_scripts(&scripts, count).await?;
-    let tip = if let Ok(cache) = LightWalletCache::open(coin) {
-        let _ = cache.replace_tx_history(&txs);
-        cached_tip_height(&cache)
-    } else {
-        None
-    };
-    Ok(txs.iter().map(|t| wallet_tx_to_json(t, tip)).collect())
+    Ok(vec![])
 }
 
 fn cached_tip_height(cache: &LightWalletCache) -> Option<u32> {
@@ -266,6 +318,7 @@ fn wallet_tx_to_json(t: &WalletTx, tip: Option<u32>) -> Value {
         (_, Some(_)) => t.confirmations as i64,
         _ => 0,
     };
+    let time = t.time.unwrap_or(0);
     json!({
         "txid": t.txid,
         "category": t.category,
@@ -274,7 +327,8 @@ fn wallet_tx_to_json(t: &WalletTx, tip: Option<u32>) -> Value {
         "address": t.address,
         "blockheight": t.blockheight,
         "blockhash": t.blockhash,
-        "time": t.time,
+        "time": time,
+        "timereceived": time,
         "fee": t.fee_sats.map(sats_to_coins),
     })
 }

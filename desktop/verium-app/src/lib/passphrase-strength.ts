@@ -8,7 +8,7 @@ export interface PassphraseScore {
   hint: string;
 }
 
-const MIN_LENGTH = 10;
+export const PASSPHRASE_MIN_LENGTH = 10;
 
 export function scorePassphrase(passphrase: string): PassphraseScore {
   if (!passphrase) {
@@ -17,7 +17,7 @@ export function scorePassphrase(passphrase: string): PassphraseScore {
 
   const len = passphrase.length;
   let score = 0;
-  if (len >= MIN_LENGTH) score += 1;
+  if (len >= PASSPHRASE_MIN_LENGTH) score += 1;
   if (len >= 16) score += 1;
   if (/[a-z]/.test(passphrase) && /[A-Z]/.test(passphrase)) score += 1;
   if (/\d/.test(passphrase)) score += 1;
@@ -38,11 +38,11 @@ export function scorePassphrase(passphrase: string): PassphraseScore {
     hint = 'Fair. Mix uppercase, numbers, and symbols, and lengthen it.';
   }
 
-  if (len < MIN_LENGTH) {
+  if (len < PASSPHRASE_MIN_LENGTH) {
     return {
       score: Math.min(score, 1),
       label: 'weak',
-      hint: `Use at least ${MIN_LENGTH} characters.`,
+      hint: `Use at least ${PASSPHRASE_MIN_LENGTH} characters.`,
     };
   }
   return { score, label, hint };

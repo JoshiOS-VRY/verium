@@ -77,6 +77,9 @@ function WalletModeCardInner() {
     mutationFn: (list: string[]) => electrumServersSet(activeCoin, list),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['electrum-servers', activeCoin] });
+      void queryClient.invalidateQueries({
+        queryKey: coinQueryKey(activeCoin, 'light-server-status'),
+      });
     },
   });
 

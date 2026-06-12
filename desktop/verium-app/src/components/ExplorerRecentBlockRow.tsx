@@ -1,41 +1,25 @@
-import { Loader2, Pickaxe, Trophy } from "lucide-react";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { AnimatedBlockNumber } from "@/components/AnimatedBlockNumber";
-import {
-  YouMinedBadge,
-  youMinedRowClassName,
-} from "@/components/YouMinedCelebration";
-import {
-  YouStakedBadge,
-  youStakedRowClassName,
-} from "@/components/YouStakedCelebration";
-import {
-  isBlockMinedByWallet,
-  useWalletMiningContext,
-} from "@/hooks/useWalletMiningContext";
-import {
-  isBlockStakedByWallet,
-  useWalletStakingContext,
-} from "@/hooks/useWalletStakingContext";
-import {
-  isFreshMinedBlock,
-} from "@/components/YouMinedCelebration";
-import {
-  isFreshStakedReward,
-} from "@/components/YouStakedCelebration";
-import type { ExplorerBlock } from "@/lib/explorer-api";
-import { isIndexingBlockRow } from "@/lib/local-recent-block";
+import { Loader2, Pickaxe, Trophy } from 'lucide-react';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { AnimatedBlockNumber } from '@/components/AnimatedBlockNumber';
+import { YouMinedBadge, youMinedRowClassName } from '@/components/YouMinedCelebration';
+import { YouStakedBadge, youStakedRowClassName } from '@/components/YouStakedCelebration';
+import { isBlockMinedByWallet, useWalletMiningContext } from '@/hooks/useWalletMiningContext';
+import { isBlockStakedByWallet, useWalletStakingContext } from '@/hooks/useWalletStakingContext';
+import { isFreshMinedBlock } from '@/components/YouMinedCelebration';
+import { isFreshStakedReward } from '@/components/YouStakedCelebration';
+import type { ExplorerBlock } from '@/lib/explorer-api';
+import { isIndexingBlockRow } from '@/lib/local-recent-block';
 import {
   isVeriumPoolMinerAddress,
   resolveVeriumMinerExplorerAddress,
   VERIUM_POOL_DISPLAY_NAME,
-} from "@/lib/verium-pool-labels";
-import type { CoinId } from "@/lib/coin/profile";
-import { formatCoinAmount } from "@/lib/units";
-import { cn, formatBlockAge, formatNumber } from "@/lib/utils";
+} from '@/lib/verium-pool-labels';
+import type { CoinId } from '@/lib/coin/profile';
+import { formatCoinAmount } from '@/lib/units';
+import { cn, formatBlockAge, formatNumber } from '@/lib/utils';
 
 export function formatBlockDifficulty(value?: string): string {
-  if (!value) return "—";
+  if (!value) return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return value;
   if (n < 0.00001) return n.toExponential(2);
@@ -43,7 +27,7 @@ export function formatBlockDifficulty(value?: string): string {
 }
 
 export function formatBlockOutput(value: string | undefined, coin: CoinId): string {
-  if (!value) return "—";
+  if (!value) return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return value;
   return formatCoinAmount(n, coin, 4);
@@ -79,9 +63,9 @@ export function buildRecentBlockRowModel(
     nudgeOthers: boolean;
     miningCtx: ReturnType<typeof useWalletMiningContext>;
     stakingCtx: ReturnType<typeof useWalletStakingContext>;
-  },
+  }
 ): RecentBlockRowModel {
-  const isVerium = coin === "verium";
+  const isVerium = coin === 'verium';
   const isTip = tipHeight === block.height;
   const indexing = isIndexingBlockRow(block);
   const isYours = isVerium
@@ -97,12 +81,9 @@ export function buildRecentBlockRowModel(
     ? youMinedRowClassName({ isYours, isFresh, isTip })
     : youStakedRowClassName({ isYours, isFresh, isTip });
   const poolMiner =
-    isVerium &&
-    Boolean(block.miner_address) &&
-    isVeriumPoolMinerAddress(block.miner_address);
+    isVerium && Boolean(block.miner_address) && isVeriumPoolMinerAddress(block.miner_address);
   const minerLinkAddress = block.miner_address
-    ? (resolveVeriumMinerExplorerAddress(block.miner_address) ??
-      block.miner_address)
+    ? (resolveVeriumMinerExplorerAddress(block.miner_address) ?? block.miner_address)
     : null;
 
   return {
@@ -138,13 +119,11 @@ function BlockMinerLabel({
       return (
         <ExplorerLink
           coin={coin}
-          target={{ kind: "address", address: block.miner_address }}
+          target={{ kind: 'address', address: block.miner_address }}
           label="Your Wallet"
           className={cn(
-            "inline-flex max-w-full items-center gap-1.5 truncate font-medium",
-            isVerium
-              ? "text-success hover:text-success"
-              : "text-accent hover:text-accent",
+            'inline-flex max-w-full items-center gap-1.5 truncate font-medium',
+            isVerium ? 'text-success hover:text-success' : 'text-accent hover:text-accent'
           )}
         />
       );
@@ -152,8 +131,8 @@ function BlockMinerLabel({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 font-medium",
-          isVerium ? "text-success" : "text-accent",
+          'inline-flex items-center gap-1.5 font-medium',
+          isVerium ? 'text-success' : 'text-accent'
         )}
       >
         {isVerium ? (
@@ -171,18 +150,18 @@ function BlockMinerLabel({
       return (
         <ExplorerLink
           coin={coin}
-          target={{ kind: "address", address: minerLinkAddress }}
+          target={{ kind: 'address', address: minerLinkAddress }}
           label={VERIUM_POOL_DISPLAY_NAME}
           showIcon={false}
-          title={minerLinkAddress}
-          className="inline-flex max-w-full shrink-0 items-center rounded-full border border-border bg-bg-subtle px-2 py-0.5 text-xs font-medium text-fg-muted no-underline hover:border-border hover:bg-bg-subtle hover:text-fg"
+          title={`${VERIUM_POOL_DISPLAY_NAME} · ${minerLinkAddress}`}
+          className="inline-flex max-w-full shrink-0 items-center rounded-md bg-accent px-2.5 py-0.5 text-xs font-semibold text-white no-underline shadow-sm hover:bg-accent/90"
         />
       );
     }
     return (
       <ExplorerLink
         coin={coin}
-        target={{ kind: "address", address: minerLinkAddress }}
+        target={{ kind: 'address', address: minerLinkAddress }}
         label={block.miner_address}
         className="block max-w-full truncate"
       />
@@ -192,25 +171,19 @@ function BlockMinerLabel({
   return <span className="text-fg-subtle">—</span>;
 }
 
-function BlockHeightBadge({
-  model,
-  isVerium,
-}: {
-  model: RecentBlockRowModel;
-  isVerium: boolean;
-}) {
+function BlockHeightBadge({ model, isVerium }: { model: RecentBlockRowModel; isVerium: boolean }) {
   const { block, isTip, isYours, isFresh, isEntering } = model;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span
         className={cn(
-          "inline-flex items-center rounded-md px-1.5 py-0.5 tabular-nums",
+          'inline-flex items-center rounded-md px-1.5 py-0.5 tabular-nums',
           isYours &&
             (isVerium
-              ? "bg-success/12 font-semibold text-success"
-              : "bg-accent/12 font-semibold text-accent"),
-          !isYours && (isTip ? "font-medium text-accent" : "text-fg"),
+              ? 'bg-success/12 font-semibold text-success'
+              : 'bg-accent/12 font-semibold text-accent'),
+          !isYours && (isTip ? 'font-medium text-accent' : 'text-fg')
         )}
       >
         <AnimatedBlockNumber
@@ -220,22 +193,12 @@ function BlockHeightBadge({
         />
       </span>
       {isYours &&
-        (isVerium ? (
-          <YouMinedBadge fresh={isFresh} />
-        ) : (
-          <YouStakedBadge fresh={isFresh} />
-        ))}
+        (isVerium ? <YouMinedBadge fresh={isFresh} /> : <YouStakedBadge fresh={isFresh} />)}
     </div>
   );
 }
 
-function BlockTimeLabel({
-  model,
-  ageTick,
-}: {
-  model: RecentBlockRowModel;
-  ageTick: number;
-}) {
+function BlockTimeLabel({ model, ageTick }: { model: RecentBlockRowModel; ageTick: number }) {
   const { block, indexing, isYours } = model;
 
   if (indexing) {
@@ -248,13 +211,8 @@ function BlockTimeLabel({
   }
 
   return (
-    <span
-      className={cn(
-        "tabular-nums",
-        isYours ? "font-medium text-fg" : "text-fg-muted",
-      )}
-    >
-      {block.time > 0 ? formatBlockAge(block.time, ageTick) : "—"}
+    <span className={cn('tabular-nums', isYours ? 'font-medium text-fg' : 'text-fg-muted')}>
+      {block.time > 0 ? formatBlockAge(block.time, ageTick) : '—'}
     </span>
   );
 }
@@ -270,17 +228,16 @@ export function RecentBlockTableRow({
   isDashboard: boolean;
   ageTick: number;
 }) {
-  const isVerium = coin === "verium";
-  const { block, indexing, isYours, reward, isEntering, isNudging, rowClassName } =
-    model;
+  const isVerium = coin === 'verium';
+  const { block, indexing, isYours, reward, isEntering, isNudging, rowClassName } = model;
 
   return (
     <tr
       className={cn(
-        "border-t border-border transition-[background-color,box-shadow]",
+        'border-t border-border transition-[background-color,box-shadow]',
         rowClassName,
-        isEntering && "block-row-enter",
-        isNudging && "block-row-nudge",
+        isEntering && 'block-row-enter',
+        isNudging && 'block-row-nudge'
       )}
     >
       <td className="px-4 py-2.5 tabular-nums">
@@ -290,33 +247,25 @@ export function RecentBlockTableRow({
         <BlockTimeLabel model={model} ageTick={ageTick} />
       </td>
       <td
-        className={cn(
-          "px-4 py-2.5 text-right tabular-nums",
-          isYours ? "text-fg" : "text-fg-muted",
-        )}
+        className={cn('px-4 py-2.5 text-right tabular-nums', isYours ? 'text-fg' : 'text-fg-muted')}
       >
-        {indexing ? "—" : (block.n_tx ?? "—")}
+        {indexing ? '—' : (block.n_tx ?? '—')}
       </td>
       <td
         className={cn(
-          "px-4 py-2.5 text-right text-xs tabular-nums",
-          isYours &&
-            (isVerium
-              ? "font-semibold text-success"
-              : "font-semibold text-accent"),
+          'px-4 py-2.5 text-right text-xs tabular-nums',
+          isYours && (isVerium ? 'font-semibold text-success' : 'font-semibold text-accent')
         )}
       >
-        {indexing ? "—" : reward}
+        {indexing ? '—' : reward}
       </td>
       {isDashboard && (
         <>
           <td className="hidden px-4 py-2.5 text-right text-xs tabular-nums text-fg-muted sm:table-cell">
-            {!indexing && block.size != null
-              ? `${formatNumber(block.size, 0)} B`
-              : "—"}
+            {!indexing && block.size != null ? `${formatNumber(block.size, 0)} B` : '—'}
           </td>
           <td className="hidden px-4 py-2.5 text-right text-xs tabular-nums text-fg-muted md:table-cell">
-            {indexing ? "—" : formatBlockDifficulty(block.difficulty)}
+            {indexing ? '—' : formatBlockDifficulty(block.difficulty)}
           </td>
         </>
       )}
@@ -338,21 +287,17 @@ export function RecentBlockCard({
   isDashboard: boolean;
   ageTick: number;
 }) {
-  const isVerium = coin === "verium";
-  const { block, indexing, isYours, reward, isEntering, isNudging, rowClassName } =
-    model;
+  const isVerium = coin === 'verium';
+  const { block, indexing, isYours, reward, isEntering, isNudging, rowClassName } = model;
 
   return (
     <article
       className={cn(
-        "recent-block-card rounded-xl border border-border bg-bg-subtle/60 p-3 transition-[background-color,box-shadow,transform]",
+        'recent-block-card rounded-xl border border-border bg-bg-subtle/60 p-3 transition-[background-color,box-shadow,transform]',
         rowClassName,
-        isEntering && "block-row-enter",
-        isNudging && "block-row-nudge",
-        isYours &&
-          (isVerium
-            ? "border-success/25 bg-success/5"
-            : "border-accent/25 bg-accent/5"),
+        isEntering && 'block-row-enter',
+        isNudging && 'block-row-nudge',
+        isYours && (isVerium ? 'border-success/25 bg-success/5' : 'border-accent/25 bg-accent/5')
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -367,24 +312,18 @@ export function RecentBlockCard({
           <dt className="text-fg-subtle">Output</dt>
           <dd
             className={cn(
-              "mt-0.5 tabular-nums font-medium",
-              isYours &&
-                (isVerium ? "text-success" : "text-accent"),
-              !isYours && "text-fg",
+              'mt-0.5 tabular-nums font-medium',
+              isYours && (isVerium ? 'text-success' : 'text-accent'),
+              !isYours && 'text-fg'
             )}
           >
-            {indexing ? "—" : reward}
+            {indexing ? '—' : reward}
           </dd>
         </div>
         <div>
           <dt className="text-fg-subtle">Transactions</dt>
-          <dd
-            className={cn(
-              "mt-0.5 tabular-nums",
-              isYours ? "text-fg" : "text-fg-muted",
-            )}
-          >
-            {indexing ? "—" : (block.n_tx ?? "—")}
+          <dd className={cn('mt-0.5 tabular-nums', isYours ? 'text-fg' : 'text-fg-muted')}>
+            {indexing ? '—' : (block.n_tx ?? '—')}
           </dd>
         </div>
         {isDashboard && (
@@ -392,15 +331,13 @@ export function RecentBlockCard({
             <div>
               <dt className="text-fg-subtle">Size</dt>
               <dd className="mt-0.5 tabular-nums text-fg-muted">
-                {!indexing && block.size != null
-                  ? `${formatNumber(block.size, 0)} B`
-                  : "—"}
+                {!indexing && block.size != null ? `${formatNumber(block.size, 0)} B` : '—'}
               </dd>
             </div>
             <div>
               <dt className="text-fg-subtle">Difficulty</dt>
               <dd className="mt-0.5 tabular-nums text-fg-muted">
-                {indexing ? "—" : formatBlockDifficulty(block.difficulty)}
+                {indexing ? '—' : formatBlockDifficulty(block.difficulty)}
               </dd>
             </div>
           </>
@@ -409,7 +346,7 @@ export function RecentBlockCard({
 
       <div className="mt-3 border-t border-border/60 pt-2.5">
         <p className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
-          {isVerium ? "Mined by" : "Staked by"}
+          {isVerium ? 'Mined by' : 'Staked by'}
         </p>
         <div className="mt-1 text-xs">
           <BlockMinerLabel coin={coin} model={model} isVerium={isVerium} />
@@ -419,7 +356,7 @@ export function RecentBlockCard({
       <div className="mt-2 flex justify-end">
         <ExplorerLink
           coin={coin}
-          target={{ kind: "block", hashOrHeight: block.hash || block.height }}
+          target={{ kind: 'block', hashOrHeight: block.hash || block.height }}
           label="View block"
           className="text-[11px]"
         />

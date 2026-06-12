@@ -41,6 +41,16 @@ use crate::daemon::{
     wait_for_rpc_port_free, DaemonBinaryStatus,
 };
 use crate::error::{AppError, AppResult, is_rpc_warmup};
+use crate::indexer_api::{
+    fetch_indexer_address as indexer_fetch_address,
+    fetch_indexer_address_cumulative_series as indexer_fetch_address_cumulative,
+    fetch_indexer_block as indexer_fetch_block,
+    fetch_indexer_transaction as indexer_fetch_transaction,
+    CumulativeBalanceSeries,
+    IndexerAddressDetail,
+    IndexerBlockDetail,
+    IndexerTransactionDetail,
+};
 use crate::explorer_api::{
     fetch_blocks, fetch_chain_tips, fetch_extraction, fetch_explorer_blocks_for_feed,
     fetch_explorer_peers, fetch_network_stats, fetch_transactions, ExplorerBlock,
@@ -2953,7 +2963,7 @@ pub async fn check_for_updates() -> AppResult<UpdateInfo> {
 }
 
 #[tauri::command]
-pub async fn open_external_url(url: String) -> AppResult<()> {
+pub async fn open_external_url(app: AppHandle, url: String) -> AppResult<()> {
     let trimmed = url.trim();
     if trimmed.is_empty() {
         return Err(AppError::other("empty url"));
@@ -2962,10 +2972,11 @@ pub async fn open_external_url(url: String) -> AppResult<()> {
     if !(lower.starts_with("https://") || lower.starts_with("http://")) {
         return Err(AppError::other("only http(s) urls are allowed"));
     }
-    match open::that(trimmed) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(AppError::other(format!("failed to open url: {e}"))),
-    }
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(trimmed, None::<&str>)
+        .map_err(|e| AppError::other(format!("failed to open url: {e}")))?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3320,6 +3331,44 @@ pub async fn fetch_explorer_peers_cmd(coin: String) -> AppResult<Vec<ExplorerPee
 pub fn get_explorer_logo_url(coin: String) -> AppResult<String> {
     let coin = parse_coin_id(&coin)?;
     Ok(explorer_logo_url(coin))
+}
+
+#[tauri::command]
+pub async fn fetch_indexer_transaction(coin: String, txid: String) -> AppResult<IndexerTransactionDetail> {
+    let coin = parse_coin_id(&coin)?;
+    indexer_fetch_transaction(coin, &txid).await
+}
+
+#[tauri::command]
+pub async fn fetch_indexer_block(
+    coin: String,
+    hash_or_height: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> AppResult<IndexerBlockDetail> {
+    let coin = parse_coin_id(&coin)?;
+    indexer_fetch_block(coin, &hash_or_height, limit.unwrap_or(25), offset.unwrap_or(0)).await
+}
+
+#[tauri::command]
+pub async fn fetch_indexer_address(
+    coin: String,
+    address: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> AppResult<IndexerAddressDetail> {
+    let coin = parse_coin_id(&coin)?;
+    indexer_fetch_address(coin, &address, limit.unwrap_or(25), offset.unwrap_or(0)).await
+}
+
+#[tauri::command]
+pub async fn fetch_indexer_address_cumulative_series(
+    coin: String,
+    address: String,
+    max_txs: Option<u32>,
+) -> AppResult<CumulativeBalanceSeries> {
+    let coin = parse_coin_id(&coin)?;
+    indexer_fetch_address_cumulative(coin, &address, max_txs).await
 }
 
 #[tauri::command]

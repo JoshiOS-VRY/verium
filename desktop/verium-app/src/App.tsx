@@ -60,6 +60,17 @@ const AddressBook = lazy(() =>
 const BinaryChain = lazy(() =>
   import('@/pages/BinaryChain').then((m) => ({ default: m.BinaryChain }))
 );
+const ExplorerTransactionPage = lazy(() =>
+  import('@/pages/mobile/ExplorerTransactionPage').then((m) => ({
+    default: m.ExplorerTransactionPage,
+  }))
+);
+const ExplorerBlockPage = lazy(() =>
+  import('@/pages/mobile/ExplorerBlockPage').then((m) => ({ default: m.ExplorerBlockPage }))
+);
+const ExplorerAddressPage = lazy(() =>
+  import('@/pages/mobile/ExplorerAddressPage').then((m) => ({ default: m.ExplorerAddressPage }))
+);
 
 function RouteFallback() {
   return (
@@ -167,6 +178,9 @@ function AppRoutes() {
             </Route>
             {BINARYTEST_ENABLED && <Route path="/binary-chain" element={<BinaryChain />} />}
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/explorer/tx/:txid" element={<ExplorerTransactionPage />} />
+            <Route path="/explorer/block/:id" element={<ExplorerBlockPage />} />
+            <Route path="/explorer/address/:address" element={<ExplorerAddressPage />} />
             <Route path="/addresses" element={<AddressBook />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/settings" element={<Settings />} />

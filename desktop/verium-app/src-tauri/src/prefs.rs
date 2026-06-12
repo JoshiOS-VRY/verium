@@ -122,6 +122,9 @@ pub struct UserPreferences {
     /// survive refreshes and restarts without losing the user's place.
     #[serde(default)]
     pub onboarding_by_coin: Option<HashMap<String, OnboardingCheckpoint>>,
+    /// Mobile: unlock light wallet with Face ID / Touch ID after storing passphrase in keychain.
+    #[serde(default)]
+    pub biometric_unlock_enabled: bool,
 }
 
 fn default_active_coin() -> String {
@@ -208,6 +211,7 @@ impl Default for UserPreferences {
             wallet_mode_by_coin: None,
             electrum_servers_by_coin: None,
             onboarding_by_coin: None,
+            biometric_unlock_enabled: false,
         }
     }
 }
@@ -251,6 +255,7 @@ pub struct PartialUserPreferences {
     pub wallet_mode_by_coin: Option<HashMap<String, WalletMode>>,
     pub electrum_servers_by_coin: Option<HashMap<String, Vec<String>>>,
     pub onboarding_by_coin: Option<HashMap<String, OnboardingCheckpoint>>,
+    pub biometric_unlock_enabled: Option<bool>,
 }
 
 pub fn prefs_path() -> PathBuf {
@@ -293,6 +298,43 @@ pub fn set_wallet_mode_for(prefs: &mut UserPreferences, coin: CoinId, mode: Wall
     let mut map = prefs.wallet_mode_by_coin.take().unwrap_or_default();
     map.insert(coin.as_str().to_string(), mode);
     prefs.wallet_mode_by_coin = Some(map);
+}
+
+/// Effective Electrum server list for one coin: per-coin prefs, else chain defaults.
+/// Empty stored lists are ignored so a partial prefs migration cannot leave VRC with
+/// zero servers while VRM is configured.
+pub fn electrum_servers_for(prefs: &UserPreferences, coin: CoinId) -> Vec<String> {
+    let network = crate::features::effective_network_mode(prefs.network_mode);
+    prefs
+        .electrum_servers_by_coin
+        .as_ref()
+        .and_then(|m| m.get(coin.as_str()).cloned())
+        .filter(|servers| !servers.is_empty())
+        .unwrap_or_else(|| coin.default_electrum_servers(network))
+}
+
+/// Seed default Electrum endpoints for every enabled chain when prefs omit them.
+pub fn reconcile_electrum_servers(prefs: &mut UserPreferences) -> bool {
+    let network = crate::features::effective_network_mode(prefs.network_mode);
+    let mut changed = false;
+    let mut map = prefs.electrum_servers_by_coin.clone().unwrap_or_default();
+
+    for coin in CoinId::all() {
+        if !coin_enabled(prefs, *coin) {
+            continue;
+        }
+        let key = coin.as_str().to_string();
+        let needs_defaults = map.get(&key).map(|servers| servers.is_empty()).unwrap_or(true);
+        if needs_defaults {
+            map.insert(key, coin.default_electrum_servers(network));
+            changed = true;
+        }
+    }
+
+    if changed {
+        prefs.electrum_servers_by_coin = Some(map);
+    }
+    changed
 }
 
 /// Read the onboarding checkpoint for a coin (default = not started).
@@ -387,6 +429,7 @@ pub fn reconcile_setup_flags_with_keystore(prefs: &mut UserPreferences) -> AppRe
 /// keystore but no full-node `wallet.dat` and no explicit full-node override.
 fn reconcile_prefs_with_keystore(prefs: &mut UserPreferences) -> AppResult<bool> {
     let mut changed = reconcile_setup_flags_with_keystore(prefs)?;
+    changed |= reconcile_electrum_servers(prefs);
 
     for coin in [CoinId::Verium, CoinId::Vericoin] {
         if wallet_mode_for(prefs, coin).is_light() {
@@ -580,6 +623,33 @@ mod mode_tests {
     }
 
     #[test]
+    fn electrum_servers_for_ignores_empty_stored_list() {
+        let mut prefs = UserPreferences::default();
+        prefs.electrum_servers_by_coin = Some(HashMap::from([
+            (
+                CoinId::Vericoin.as_str().to_string(),
+                Vec::<String>::new(),
+            ),
+        ]));
+        let servers = electrum_servers_for(&prefs, CoinId::Vericoin);
+        assert!(
+            servers.iter().any(|s| s.contains("vrc")),
+            "expected VRC defaults when stored list is empty: {servers:?}"
+        );
+    }
+
+    #[test]
+    fn reconcile_electrum_servers_seeds_both_chains() {
+        let mut prefs = UserPreferences::default();
+        assert!(reconcile_electrum_servers(&mut prefs));
+        let map = prefs.electrum_servers_by_coin.expect("map");
+        let vrm = map.get(CoinId::Verium.as_str()).expect("vrm");
+        let vrc = map.get(CoinId::Vericoin.as_str()).expect("vrc");
+        assert!(vrm.iter().any(|s| s.contains("vrm")));
+        assert!(vrc.iter().any(|s| s.contains("vrc")));
+    }
+
+    #[test]
     fn reconcile_setup_flags_unchanged_without_keystore_wallets() {
         let mut prefs = UserPreferences::default();
         assert!(
@@ -718,5 +788,8 @@ pub fn merge(current: UserPreferences, partial: PartialUserPreferences) -> UserP
                 Some(merged)
             }
         },
+        biometric_unlock_enabled: partial
+            .biometric_unlock_enabled
+            .unwrap_or(current.biometric_unlock_enabled),
     }
 }

@@ -8,10 +8,12 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use super::connection::{ElectrumConnection, ElectrumServerEndpoint};
+use super::history::{enrich_wallet_history, HistoryTxFetcher};
 use super::indexing::{
     BURST_PAUSE_MS, BURST_SIZE, REFRESH_BURST_PAUSE_MS, REFRESH_BURST_SIZE,
 };
 use super::scripthash::scripthash_from_script_hex;
+use super::throttle;
 use crate::chain::types::*;
 use crate::chain::ChainBackend;
 use crate::coin_profile::{CoinId, CoinTarget};
@@ -186,6 +188,7 @@ impl ElectrumLightClient {
                     return Ok(v);
                 }
                 Err(e) if e.is_electrum_rate_limited() => {
+                    throttle::record_rate_limit(self.coin);
                     tracing::warn!(
                         "electrum rate limited on {} (attempt {}), backing off {:?}",
                         self.servers
@@ -204,6 +207,7 @@ impl ElectrumLightClient {
                 Err(e) => return Err(e),
             }
         }
+        throttle::record_rate_limit(self.coin);
         Err(AppError::other(format!(
             "electrum rate limited after {RATE_LIMIT_RETRIES} retries: {method}"
         )))
@@ -226,6 +230,11 @@ impl ElectrumLightClient {
     }
 
     async fn call_with_failover(&self, method: &str, params: Value) -> AppResult<Value> {
+        if throttle::is_in_cooldown(self.coin) {
+            return Err(AppError::other(
+                "electrum temporarily paused after rate limit — try again in a few minutes",
+            ));
+        }
         match self.call_primary(method, params.clone()).await {
             Ok(v) => {
                 self.consecutive_failures.store(0, Ordering::SeqCst);
@@ -396,14 +405,13 @@ impl ChainBackend for ElectrumLightClient {
         limit: usize,
     ) -> AppResult<Vec<WalletTx>> {
         let tip = self.get_tip().await.ok();
+        let hashes = self.scripthashes(script_hexes).await?;
+        let history_json = self
+            .fetch_scripthash_json("blockchain.scripthash.get_history", &hashes)
+            .await?;
         let mut merged: Vec<WalletTx> = Vec::new();
-        for sh in self.scripthashes(script_hexes).await? {
-            let items: Vec<Value> = self
-                .call_with_backoff("blockchain.scripthash.get_history", json!([sh]))
-                .await?
-                .as_array()
-                .cloned()
-                .unwrap_or_default();
+        for items in history_json {
+            let items = items.as_array().cloned().unwrap_or_default();
             for item in items {
                 let txid = item
                     .get("tx_hash")
@@ -438,8 +446,19 @@ impl ChainBackend for ElectrumLightClient {
             }
         }
         merged.sort_by(|a, b| b.height.cmp(&a.height));
+        merged.dedup_by(|a, b| a.txid == b.txid);
         merged.truncate(limit);
         Ok(merged)
+    }
+
+    async fn enrich_tx_history_batch(
+        &self,
+        coin: CoinId,
+        script_hexes: &[String],
+        txs: &mut [WalletTx],
+        max_rows: usize,
+    ) -> AppResult<()> {
+        enrich_wallet_history(coin, script_hexes, txs, self, Some(max_rows)).await
     }
 
     async fn get_raw_tx_hex(&self, txid: &str) -> AppResult<String> {
@@ -513,6 +532,53 @@ impl ChainBackend for ElectrumLightClient {
     async fn light_server_status(&self) -> Option<LightServerStatus> {
         let idx = self.active_index.load(Ordering::SeqCst);
         let ep = self.servers.get(idx)?;
+        let active_idx = self.active_index.load(Ordering::SeqCst);
+        let active_ep = self.servers.get(active_idx).unwrap_or(ep);
+        let cached_tip = *self.tip_height.read().await;
+        let has_connection = self
+            .connection
+            .try_read()
+            .map(|g| g.is_some())
+            .unwrap_or(false);
+
+        let latency_ms = *self.last_latency_ms.read().await;
+        let build_status = |connected: bool,
+                            banner_text: Option<String>,
+                            tip_height: Option<u32>,
+                            latency_ms: Option<u64>| LightServerStatus {
+            connected,
+            server_host: Some(active_ep.host.clone()),
+            server_port: Some(active_ep.port),
+            latency_ms,
+            tip_height,
+            banner: banner_text,
+            failover_index: active_idx,
+            servers_total: self.servers.len(),
+        };
+
+        // During rate-limit cooldown, return cached status without new RPCs.
+        if throttle::is_in_cooldown(self.coin) {
+            return Some(build_status(
+                has_connection && cached_tip.is_some(),
+                None,
+                cached_tip,
+                latency_ms,
+            ));
+        }
+
+        // Reuse cached tip between probes — UI polls every ~45s; subscribe every call
+        // was tripping server-side excessive-usage limits.
+        if has_connection && cached_tip.is_some() && !throttle::status_probe_due(self.coin) {
+            let banner_text = if let Some(conn) = self.connection.read().await.as_ref() {
+                conn.banner().await
+            } else {
+                None
+            };
+            return Some(build_status(true, banner_text, cached_tip, latency_ms));
+        }
+
+        throttle::mark_status_probe(self.coin);
+
         let connected = match self.ensure_connected().await {
             Ok(conn) => {
                 if let Ok(tip) = conn.call("blockchain.headers.subscribe", json!([])).await {
@@ -524,7 +590,7 @@ impl ChainBackend for ElectrumLightClient {
             }
             Err(e) => {
                 tracing::warn!("electrum status check failed for {}: {e}", ep.display());
-                false
+                cached_tip.is_some()
             }
         };
         let banner_text = if let Some(conn) = self.connection.read().await.as_ref() {
@@ -532,17 +598,15 @@ impl ChainBackend for ElectrumLightClient {
         } else {
             None
         };
-        let active_idx = self.active_index.load(Ordering::SeqCst);
-        let active_ep = self.servers.get(active_idx).unwrap_or(ep);
-        Some(LightServerStatus {
-            connected,
-            server_host: Some(active_ep.host.clone()),
-            server_port: Some(active_ep.port),
-            latency_ms: *self.last_latency_ms.read().await,
-            tip_height: *self.tip_height.read().await,
-            banner: banner_text,
-            failover_index: active_idx,
-            servers_total: self.servers.len(),
-        })
+        let tip_height = *self.tip_height.read().await;
+        let latency_ms = *self.last_latency_ms.read().await;
+        Some(build_status(connected, banner_text, tip_height, latency_ms))
+    }
+}
+
+#[async_trait]
+impl HistoryTxFetcher for ElectrumLightClient {
+    async fn fetch_raw_tx_hex(&self, txid: &str) -> AppResult<String> {
+        self.get_raw_tx_hex(txid).await
     }
 }

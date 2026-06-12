@@ -12,15 +12,19 @@ export function walletModeQueryKey(coin: CoinId) {
 }
 
 function modeFromStatus(data: WalletModeStatus | undefined) {
-  const lightWalletEnabled = LIGHT_WALLET_ENABLED || data?.light_wallet_enabled === true;
-  const isLight = lightWalletEnabled && data?.mode === 'light';
+  const mobileOnly = data?.mobile_only === true;
+  const lightWalletEnabled =
+    mobileOnly || LIGHT_WALLET_ENABLED || data?.light_wallet_enabled === true;
+  const mode = mobileOnly ? 'light' : (data?.mode ?? 'full_node');
+  const isLight = mobileOnly || (lightWalletEnabled && data?.mode === 'light');
   return {
     isLight,
     isFullNode: !isLight,
-    mode: data?.mode ?? ('full_node' as const),
+    mode,
     lightWalletEnabled,
     lightWalletExists: data?.light_wallet_exists ?? false,
     electrumServers: data?.electrum_servers ?? [],
+    mobileOnly,
   };
 }
 

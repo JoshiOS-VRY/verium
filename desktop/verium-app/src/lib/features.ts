@@ -1,6 +1,6 @@
 const env = (import.meta as unknown as { env: Record<string, string> }).env;
 
-const APP_VERSION = env?.VITE_APP_VERSION ?? '1.0.0';
+export const APP_VERSION = env?.VITE_APP_VERSION ?? '1.0.0';
 
 /**
  * DACE binarytest network (play-money testnet). Disabled in alpha releases;

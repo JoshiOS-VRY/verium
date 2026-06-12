@@ -17,6 +17,7 @@ mod dace_commands;
 mod daemon;
 mod error;
 mod explorer_api;
+mod indexer_api;
 mod local_block_feed;
 mod pool_api;
 mod pool_miner;
@@ -51,6 +52,9 @@ mod wallet;
 mod wallet_commands;
 mod wallet_secrets;
 
+#[cfg(mobile)]
+mod biometric_unlock;
+
 use state::AppState;
 use tauri::{Manager, WindowEvent};
 use tracing_subscriber::EnvFilter;
@@ -82,12 +86,18 @@ pub fn run() {
         )
         .try_init();
 
-    let app = tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build());
+    #[cfg(mobile)]
+    {
+        builder = builder.plugin(tauri_plugin_biometric::init());
+    }
+    let app = builder
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
@@ -208,6 +218,10 @@ pub fn run() {
             commands::fetch_explorer_peers_cmd,
             commands::get_explorer_logo_url,
             commands::is_explorer_api_enabled,
+            commands::fetch_indexer_transaction,
+            commands::fetch_indexer_block,
+            commands::fetch_indexer_address,
+            commands::fetch_indexer_address_cumulative_series,
             commands::is_pool_api_enabled_cmd,
             commands::fetch_pool_stats_cmd,
             commands::fetch_miner_overview_cmd,
@@ -310,12 +324,17 @@ pub fn run() {
             wallet_commands::light_wallet_import,
             wallet_commands::light_wallet_unlock,
             wallet_commands::light_wallet_rescan,
+            wallet_commands::light_wallet_refresh_pending,
             wallet_commands::light_wallet_lock,
             wallet_commands::light_wallet_exists,
             wallet_commands::light_server_status,
             wallet_commands::electrum_cross_verify_tip,
             wallet_commands::wallet_mode_get_for_coin,
             wallet_commands::wallet_mode_set_for_coin,
+            wallet_commands::biometric_unlock_status,
+            wallet_commands::biometric_unlock_enable,
+            wallet_commands::biometric_unlock_disable,
+            wallet_commands::biometric_unlock_wallet,
             onboarding_commands::wallet_profile,
             onboarding_commands::wallet_storage_diagnostics,
             onboarding_commands::secret_store_status,

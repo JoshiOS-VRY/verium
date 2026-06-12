@@ -53,6 +53,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 1.0.0
         CFBundleVersion: "1.0.0.1"
+        NSCameraUsageDescription: Vericonomy Wallet uses the camera to scan payment QR codes when you send Verium or Vericoin.
     entitlements:
       path: vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements
     scheme:
@@ -80,7 +81,11 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: export PATH="${PATH}:/opt/homebrew/bin:/usr/local/bin:${HOME}/.cargo/bin"; npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${ARCHS:?}
+      - script: |
+          set -e
+          export PATH="${PATH}:/opt/homebrew/bin:/usr/local/bin:${HOME}/.cargo/bin"
+          cd "${SRCROOT}/../../.."
+          bash "${SRCROOT}/../../../scripts/ios-xcode-prebuild-rust.sh"
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:

@@ -1,17 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { rpcGetWalletInfo } from "@/lib/rpc/client";
-import { formatCoinAmount } from "@/lib/units";
-import { cn } from "@/lib/utils";
-import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
+import { useQuery } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import { formatCoinAmount } from '@/lib/units';
+import { cn } from '@/lib/utils';
+import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';
 
 export function MobileBalanceHero() {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
@@ -31,8 +31,7 @@ export function MobileBalanceHero() {
   const immature = wallet.data.immature_balance;
   const total = spendable + unconfirmed + immature;
   const blurClass = lockedWalletBalanceClass(wallet.data);
-  const scanning =
-    typeof wallet.data.scanning === "object" ? wallet.data.scanning : null;
+  const scanning = typeof wallet.data.scanning === 'object' ? wallet.data.scanning : null;
 
   return (
     <section className="mobile-balance-hero rounded-2xl border border-border bg-gradient-to-br from-bg-panel to-bg-subtle/60 p-5 shadow-sm">
@@ -41,8 +40,8 @@ export function MobileBalanceHero() {
       </p>
       <p
         className={cn(
-          "mt-2 text-center text-3xl font-bold tabular-nums tracking-tight text-fg",
-          blurClass,
+          'mt-2 text-center text-3xl font-bold tabular-nums tracking-tight text-fg',
+          blurClass
         )}
       >
         {formatCoinAmount(total, coin, 4)}
@@ -54,12 +53,7 @@ export function MobileBalanceHero() {
           <dt className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
             Spendable
           </dt>
-          <dd
-            className={cn(
-              "mt-1 text-xs font-semibold tabular-nums text-fg",
-              blurClass,
-            )}
-          >
+          <dd className={cn('mt-1 text-xs font-semibold tabular-nums text-fg', blurClass)}>
             {formatCoinAmount(spendable, coin, 2)}
           </dd>
         </div>
@@ -67,12 +61,7 @@ export function MobileBalanceHero() {
           <dt className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
             Pending
           </dt>
-          <dd
-            className={cn(
-              "mt-1 text-xs font-semibold tabular-nums text-fg",
-              blurClass,
-            )}
-          >
+          <dd className={cn('mt-1 text-xs font-semibold tabular-nums text-fg', blurClass)}>
             {formatCoinAmount(unconfirmed, coin, 2)}
           </dd>
         </div>
@@ -80,12 +69,7 @@ export function MobileBalanceHero() {
           <dt className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
             Immature
           </dt>
-          <dd
-            className={cn(
-              "mt-1 text-xs font-semibold tabular-nums text-fg",
-              blurClass,
-            )}
-          >
+          <dd className={cn('mt-1 text-xs font-semibold tabular-nums text-fg', blurClass)}>
             {formatCoinAmount(immature, coin, 2)}
           </dd>
         </div>

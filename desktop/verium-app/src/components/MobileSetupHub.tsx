@@ -1,19 +1,11 @@
-import { ArrowRight, Loader2, Plus, RefreshCw } from "lucide-react";
-import {
-  ALL_COINS,
-  COIN_LOGO_URLS,
-  COIN_PROFILES,
-  type CoinId,
-} from "@/lib/coin/profile";
-import { useEnabledCoins } from "@/lib/coin/context";
-import { lightWalletCopy } from "@/lib/light-wallet/copy";
-import {
-  isProfileOpenable,
-  needsLightWalletRecovery,
-} from "@/lib/setup";
-import { useSetupHubProfile } from "@/hooks/useSetupHubProfiles";
-import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { ArrowRight, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { ALL_COINS, COIN_LOGO_URLS, COIN_PROFILES, type CoinId } from '@/lib/coin/profile';
+import { useEnabledCoins } from '@/lib/coin/context';
+import { lightWalletCopy } from '@/lib/light-wallet/copy';
+import { isProfileOpenable, needsLightWalletRecovery } from '@/lib/setup';
+import { useSetupHubProfile } from '@/hooks/useSetupHubProfiles';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/utils';
 
 interface MobileSetupHubProps {
   onCreateWallet: (coin: CoinId) => void | Promise<void>;
@@ -53,27 +45,20 @@ function MobileCoinCard({
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-fg">
-              {coinProfile.displayName}
-            </h3>
+            <h3 className="text-base font-semibold text-fg">{coinProfile.displayName}</h3>
             <span
               className={cn(
-                "rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                coinProfile.accentClass,
+                'rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                coinProfile.accentClass
               )}
             >
               {coinProfile.symbol}
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-subtle">{coinProfile.tagline}</p>
-          <p
-            className={cn(
-              "mt-2 text-xs font-medium",
-              ready ? "text-success" : "text-fg-muted",
-            )}
-          >
+          <p className={cn('mt-2 text-xs font-medium', ready ? 'text-success' : 'text-fg-muted')}>
             {checking
-              ? "Checking…"
+              ? 'Checking…'
               : ready
                 ? lightWalletCopy.mobileOnboardingReady
                 : lightWalletCopy.mobileOnboardingNotSetUp}
@@ -88,12 +73,7 @@ function MobileCoinCard({
       )}
 
       {ready ? (
-        <Button
-          type="button"
-          className="w-full"
-          disabled={opening}
-          onClick={onOpen}
-        >
+        <Button type="button" className="w-full" disabled={opening} onClick={onOpen}>
           {opening ? (
             <>
               Opening…
@@ -151,14 +131,8 @@ export function MobileSetupHub({
   const enabledCoins = useEnabledCoins();
   const options = ALL_COINS.filter((coin) => enabledCoins.includes(coin));
 
-  const veriumProfile = useSetupHubProfile(
-    "verium",
-    options.includes("verium"),
-  );
-  const vericoinProfile = useSetupHubProfile(
-    "vericoin",
-    options.includes("vericoin"),
-  );
+  const veriumProfile = useSetupHubProfile('verium', options.includes('verium'));
+  const vericoinProfile = useSetupHubProfile('vericoin', options.includes('vericoin'));
 
   const profileByCoin = {
     verium: veriumProfile,
@@ -184,8 +158,8 @@ export function MobileSetupHub({
             !!profile &&
             profile.ready &&
             isProfileOpenable(profile) &&
-            !needsLightWalletRecovery(profile, "light");
-          const needsRestore = needsLightWalletRecovery(profile, "light");
+            !needsLightWalletRecovery(profile, 'light');
+          const needsRestore = needsLightWalletRecovery(profile, 'light');
 
           return (
             <MobileCoinCard

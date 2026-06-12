@@ -73,6 +73,20 @@ pub fn pubkey_to_p2pkh_address(coin: CoinId, pubkey: &[u8]) -> AppResult<String>
     Ok(base58check_encode(pubkey_address_version(coin), &pk_hash))
 }
 
+/// Decode a standard P2PKH `scriptPubKey` (`OP_DUP OP_HASH160 … OP_EQUALVERIFY OP_CHECKSIG`).
+pub fn p2pkh_script_to_address(coin: CoinId, script: &[u8]) -> Option<String> {
+    if script.len() != 25
+        || script[0] != 0x76
+        || script[1] != 0xa9
+        || script[2] != 0x14
+        || script[23] != 0x88
+        || script[24] != 0xac
+    {
+        return None;
+    }
+    Some(base58check_encode(pubkey_address_version(coin), &script[3..23]))
+}
+
 /// Known Vericonomy extended-secret Base58 prefixes (mainnet + test variants).
 fn ext_secret_prefixes(coin: CoinId) -> &'static [[u8; EXT_SECRET_PREFIX_LEN]] {
     match coin {

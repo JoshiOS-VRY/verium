@@ -43,7 +43,7 @@ export function LightWalletMissingBanner() {
           Set up this chain
         </div>
         <p className="mt-2 text-xs leading-relaxed text-fg-muted">
-          Create or import a wallet for {coin === "verium" ? "Verium" : "Vericoin"} to get started.
+          Create or import a wallet for {coin === 'verium' ? 'Verium' : 'Vericoin'} to get started.
         </p>
         <Link
           to="/setup"

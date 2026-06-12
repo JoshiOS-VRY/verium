@@ -155,9 +155,11 @@ impl LightWalletCache {
     /// When the set is unchanged (the steady-state case) this performs **zero**
     /// writes, avoiding the previous DELETE-all + INSERT-all write amplification
     /// on every sync.
-    pub fn replace_utxos(&self, utxos: &[Utxo]) -> AppResult<()> {
+    /// Returns `true` when the cached set changed (insert, update, or delete).
+    pub fn replace_utxos(&self, utxos: &[Utxo]) -> AppResult<bool> {
         use std::collections::{HashMap, HashSet};
 
+        let mut changed = false;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -218,6 +220,7 @@ impl LightWalletCache {
                 if unchanged {
                     continue;
                 }
+                changed = true;
                 upsert
                     .execute(params![
                         u.txid,
@@ -238,6 +241,7 @@ impl LightWalletCache {
                 .map_err(|e| AppError::other(format!("sqlite prepare delete: {e}")))?;
             for (txid, vout) in existing.keys() {
                 if !incoming_keys.contains(&(txid.clone(), *vout)) {
+                    changed = true;
                     delete
                         .execute(params![txid, vout])
                         .map_err(|e| AppError::other(format!("sqlite utxo delete: {e}")))?;
@@ -247,7 +251,7 @@ impl LightWalletCache {
 
         tx.commit()
             .map_err(|e| AppError::other(format!("sqlite commit: {e}")))?;
-        Ok(())
+        Ok(changed)
     }
 
     /// Replace the cached transaction history with `txs` (full set, newest first

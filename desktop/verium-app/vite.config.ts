@@ -9,6 +9,9 @@ const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'ut
   version: string;
 };
 
+const buildId =
+  process.env.VITE_BUILD_ID ?? new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
 export default defineConfig(async () => ({
   plugins: [react()],
   resolve: {
@@ -18,6 +21,7 @@ export default defineConfig(async () => ({
   },
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
+    'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
   },
   clearScreen: false,
   server: {

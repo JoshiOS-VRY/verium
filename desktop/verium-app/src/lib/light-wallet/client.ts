@@ -111,6 +111,16 @@ export async function lightWalletLock(coin: CoinId): Promise<void> {
   return invoke('light_wallet_lock', { coin });
 }
 
+/** Re-sync UTXOs and history from Electrum (wallet must be unlocked). */
+export async function lightWalletRescan(coin: CoinId): Promise<void> {
+  return invoke('light_wallet_rescan', { coin });
+}
+
+/** Fast foreground refresh for pending (0-conf) UTXOs and tx history. */
+export async function lightWalletRefreshPending(coin: CoinId): Promise<void> {
+  return invoke('light_wallet_refresh_pending', { coin });
+}
+
 export async function lightWalletExists(coin: CoinId): Promise<boolean> {
   return invoke<boolean>('light_wallet_exists', { coin });
 }

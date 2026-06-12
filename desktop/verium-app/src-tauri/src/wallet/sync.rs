@@ -1,7 +1,8 @@
 //! Light-wallet chain sync: gap scan → funded scripts → UTXO set → balance.
 
-use std::collections::HashSet;
-use std::time::Duration;
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex as StdMutex;
+use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
@@ -16,7 +17,10 @@ use async_trait::async_trait;
 
 use crate::wallet::cache::LightWalletCache;
 use crate::wallet::gap_scan_hook::GapScanHook;
-use crate::wallet::hd::{discover_script_hexes, enrich_utxo_addresses};
+use crate::wallet::explorer_history::fetch_wallet_history_from_explorer;
+use crate::wallet::hd::{
+    discover_script_hexes, enrich_utxo_addresses, resolve_addresses_for_script_hexes,
+};
 use crate::wallet::keystore;
 
 struct GapScanPersist<'a> {
@@ -39,17 +43,51 @@ impl GapScanHook for GapScanPersist<'_> {
 
 const GAP_LIMIT: u32 = 20;
 const SYNC_TIMEOUT: Duration = Duration::from_secs(120);
+/// Foreground receive polling — UTXO-only unless the set changes.
+const PENDING_REFRESH_MIN_INTERVAL: Duration = Duration::from_secs(15);
 
 static SYNC_IN_FLIGHT: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static LAST_PENDING_REFRESH: Lazy<StdMutex<HashMap<CoinId, Instant>>> =
+    Lazy::new(|| StdMutex::new(HashMap::new()));
+
+fn pending_refresh_due(coin: CoinId) -> bool {
+    let mut map = match LAST_PENDING_REFRESH.lock() {
+        Ok(m) => m,
+        Err(_) => return true,
+    };
+    let now = Instant::now();
+    match map.get(&coin) {
+        Some(last) if now.duration_since(*last) < PENDING_REFRESH_MIN_INTERVAL => false,
+        _ => {
+            map.insert(coin, now);
+            true
+        }
+    }
+}
+
+pub fn reset_pending_refresh_throttle(coin: CoinId) {
+    if let Ok(mut map) = LAST_PENDING_REFRESH.lock() {
+        map.remove(&coin);
+    }
+}
 
 pub fn balance_from_utxo_cache(coin: CoinId) -> WalletBalance {
-    let confirmed = LightWalletCache::open(coin)
-        .ok()
-        .and_then(|c| c.sum_utxo_values().ok())
-        .unwrap_or(0);
+    let mut confirmed = 0i64;
+    let mut unconfirmed = 0i64;
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        if let Ok(utxos) = cache.list_utxos() {
+            for utxo in utxos {
+                if utxo.height == 0 {
+                    unconfirmed += utxo.value_sats;
+                } else {
+                    confirmed += utxo.value_sats;
+                }
+            }
+        }
+    }
     WalletBalance {
         confirmed_sats: confirmed,
-        unconfirmed_sats: 0,
+        unconfirmed_sats: unconfirmed,
         immature_sats: 0,
     }
 }
@@ -103,35 +141,151 @@ async fn sync_light_wallet_inner(state: &AppState, coin: CoinId) -> AppResult<()
     if funded.is_empty() {
         return Ok(());
     }
-    refresh_utxos(coin, &funded, backend.as_ref(), None).await?;
-    // Refresh the persisted tx-history cache on the same (tip-driven) cadence so
-    // list_transactions reads from local SQLite instead of issuing N Electrum
-    // get_history calls on every UI poll. Best-effort: never fails the sync.
-    refresh_tx_history_cache(coin, &funded, backend.as_ref()).await;
+    let utxos_changed = refresh_utxos(coin, &funded, backend.as_ref(), None)
+        .await
+        .unwrap_or(false);
+    // Explorer history is HTTP; Electrum get_history only when UTXOs changed (0-conf).
+    refresh_tx_history_cache(coin, &funded, backend.as_ref(), utxos_changed).await;
+    Ok(())
+}
+
+/// Fast foreground refresh: UTXOs (including 0-conf); Electrum history only if UTXOs changed.
+pub async fn refresh_light_wallet_pending(state: &AppState, coin: CoinId) -> AppResult<()> {
+    if !keystore::wallet_exists(coin)? || !keystore::is_unlocked(coin)? {
+        return Ok(());
+    }
+    if !pending_refresh_due(coin) {
+        return Ok(());
+    }
+    let funded = keystore::funded_script_hexes(coin)?;
+    if funded.is_empty() {
+        return Ok(());
+    }
+    let backend = crate::wallet::backend::resolve_backend(state, coin).await?;
+    let utxos_changed = match refresh_utxos(coin, &funded, backend.as_ref(), None).await {
+        Ok(changed) => changed,
+        Err(e) => {
+            tracing::debug!("pending utxo refresh failed for {}: {e}", coin.as_str());
+            false
+        }
+    };
+    if utxos_changed {
+        refresh_pending_tx_history_only(coin, &funded, backend.as_ref()).await;
+    }
     Ok(())
 }
 
 /// Number of history rows kept in the local cache (matches UI list cap).
 pub const TX_HISTORY_CACHE_LIMIT: usize = 500;
 
-async fn refresh_tx_history_cache(coin: CoinId, funded: &[String], backend: &dyn ChainBackend) {
+const PENDING_HISTORY_ENRICH_LIMIT: usize = 12;
+const PENDING_HISTORY_FETCH_LIMIT: usize = 32;
+
+fn merge_tx_history(base: Vec<crate::chain::types::WalletTx>, pending: &[crate::chain::types::WalletTx]) -> Vec<crate::chain::types::WalletTx> {
+    use std::collections::HashMap;
+
+    let mut map: HashMap<String, crate::chain::types::WalletTx> = base
+        .into_iter()
+        .map(|tx| (tx.txid.clone(), tx))
+        .collect();
+    for tx in pending {
+        if tx.height <= 0 {
+            map.insert(tx.txid.clone(), tx.clone());
+        }
+    }
+    let mut rows: Vec<_> = map.into_values().collect();
+    rows.sort_by(|a, b| {
+        let ta = a.time.unwrap_or(0);
+        let tb = b.time.unwrap_or(0);
+        tb.cmp(&ta).then(b.height.cmp(&a.height))
+    });
+    rows.truncate(TX_HISTORY_CACHE_LIMIT);
+    rows
+}
+
+async fn merge_pending_history_from_electrum(
+    coin: CoinId,
+    funded: &[String],
+    backend: &dyn ChainBackend,
+    base: Vec<crate::chain::types::WalletTx>,
+) -> Option<Vec<crate::chain::types::WalletTx>> {
+    let mut pending = backend
+        .get_history_for_scripts(funded, PENDING_HISTORY_FETCH_LIMIT)
+        .await
+        .ok()?;
+    pending.retain(|tx| tx.height <= 0);
+    if pending.is_empty() {
+        return Some(base);
+    }
+    let enrich_limit = pending.len().min(PENDING_HISTORY_ENRICH_LIMIT);
+    backend
+        .enrich_tx_history_batch(coin, funded, &mut pending, enrich_limit)
+        .await
+        .ok()?;
+    Some(merge_tx_history(base, &pending))
+}
+
+async fn write_tx_history_cache(coin: CoinId, rows: &[crate::chain::types::WalletTx]) {
+    if rows.is_empty() {
+        return;
+    }
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        if let Err(e) = cache.replace_tx_history(rows) {
+            tracing::debug!("history cache write failed for {}: {e}", coin.as_str());
+        }
+    }
+}
+
+async fn refresh_pending_tx_history_only(coin: CoinId, funded: &[String], backend: &dyn ChainBackend) {
+    let base = LightWalletCache::open(coin)
+        .ok()
+        .and_then(|cache| cache.list_tx_history(TX_HISTORY_CACHE_LIMIT).ok())
+        .unwrap_or_default();
+    if let Some(merged) = merge_pending_history_from_electrum(coin, funded, backend, base).await {
+        write_tx_history_cache(coin, &merged).await;
+    }
+}
+
+async fn refresh_tx_history_cache(
+    coin: CoinId,
+    funded: &[String],
+    backend: &dyn ChainBackend,
+    merge_pending_electrum: bool,
+) {
     if funded.is_empty() {
         return;
     }
-    match backend
-        .get_history_for_scripts(funded, TX_HISTORY_CACHE_LIMIT)
-        .await
-    {
-        Ok(history) => {
-            if let Ok(cache) = LightWalletCache::open(coin) {
-                if let Err(e) = cache.replace_tx_history(&history) {
-                    tracing::debug!("tx history cache write failed for {}: {e}", coin.as_str());
+
+    let tip = backend.get_tip().await.ok().map(|t| t.height);
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        if let Some(height) = tip {
+            let _ = cache.set_meta("tip_height", &height.to_string());
+        }
+    }
+
+    if let Ok(addresses) = addresses_for_history(coin) {
+        if let Ok(history) =
+            fetch_wallet_history_from_explorer(coin, &addresses, TX_HISTORY_CACHE_LIMIT, tip).await
+        {
+            let rows = if merge_pending_electrum {
+                match merge_pending_history_from_electrum(coin, funded, backend, history.clone()).await
+                {
+                    Some(merged) => merged,
+                    None => history,
                 }
+            } else {
+                history
+            };
+            if !rows.is_empty() {
+                write_tx_history_cache(coin, &rows).await;
             }
+            return;
         }
-        Err(e) => {
-            tracing::debug!("tx history refresh failed for {}: {e}", coin.as_str());
-        }
+    }
+
+    // Explorer unavailable — merge Electrum pending only when UTXOs changed.
+    if merge_pending_electrum {
+        refresh_pending_tx_history_only(coin, funded, backend).await;
     }
 }
 
@@ -145,7 +299,8 @@ async fn persist_funded_scripts(
         return Ok(());
     }
     keystore::set_funded_script_hexes(coin, funded)?;
-    refresh_utxos(coin, funded, backend, Some(phrase)).await
+    refresh_utxos(coin, funded, backend, Some(phrase)).await?;
+    Ok(())
 }
 
 async fn bootstrap_precache_slice(
@@ -309,18 +464,19 @@ async fn refresh_utxos(
     funded_scripts: &[String],
     backend: &dyn ChainBackend,
     phrase: Option<&str>,
-) -> AppResult<()> {
+) -> AppResult<bool> {
     let mut utxos = backend.list_utxos_for_scripts(funded_scripts).await?;
     if let Some(phrase) = phrase {
         enrich_utxo_addresses(coin, phrase, None, &mut utxos)?;
     }
+    let mut changed = false;
     if let Ok(cache) = LightWalletCache::open(coin) {
-        cache.replace_utxos(&utxos)?;
+        changed = cache.replace_utxos(&utxos)?;
         if let Ok(tip) = backend.get_tip().await {
             let _ = cache.set_meta("tip_height", &tip.height.to_string());
         }
     }
-    Ok(())
+    Ok(changed)
 }
 
 pub fn scripts_for_history(coin: CoinId) -> AppResult<Vec<String>> {
@@ -329,4 +485,42 @@ pub fn scripts_for_history(coin: CoinId) -> AppResult<Vec<String>> {
         return Ok(funded);
     }
     keystore::cached_script_hexes(coin)
+}
+
+/// P2PKH addresses for scripts the wallet has used (for explorer-indexed history).
+pub fn addresses_for_history(coin: CoinId) -> AppResult<Vec<String>> {
+    let scripts = scripts_for_history(coin)?;
+    if scripts.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut addresses: Vec<String> = Vec::new();
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        for utxo in cache.list_utxos().unwrap_or_default() {
+            if !utxo.address.is_empty() {
+                addresses.push(utxo.address);
+            }
+        }
+    }
+
+    if keystore::is_unlocked(coin)? {
+        let phrase = keystore::unlocked_mnemonic(coin, "")?;
+        let script_refs: Vec<&str> = scripts.iter().map(String::as_str).collect();
+        let map = resolve_addresses_for_script_hexes(coin, &phrase, None, &script_refs)?;
+        addresses.extend(map.values().cloned());
+    }
+
+    let mut unique: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out: Vec<String> = Vec::new();
+    for addr in addresses {
+        let clean = addr.trim();
+        if clean.is_empty() {
+            continue;
+        }
+        if unique.insert(clean.to_string()) {
+            out.push(clean.to_string());
+        }
+    }
+    out.sort();
+    Ok(out)
 }

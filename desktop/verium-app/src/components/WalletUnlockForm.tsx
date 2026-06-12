@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,8 @@ import {
   rpcUnlockTimeoutSeconds,
   shouldUnlockMintingOnly,
 } from '@/lib/wallet-unlock';
+import { BiometricUnlockButton } from '@/components/BiometricUnlockCard';
+import { usePromptBiometricUnlock } from '@/hooks/useBiometricUnlock';
 import { cn } from '@/lib/utils';
 
 interface WalletUnlockFormProps {
@@ -23,6 +25,8 @@ interface WalletUnlockFormProps {
   className?: string;
   submitDisabled?: boolean;
   submitDisabledMessage?: string;
+  /** On mobile, prompt Face ID / Touch ID once when the form mounts. */
+  autoBiometricUnlock?: boolean;
 }
 
 function formatUnlockError(error: unknown): string {
@@ -41,17 +45,79 @@ export function WalletUnlockForm({
   className,
   submitDisabled = false,
   submitDisabledMessage,
+  autoBiometricUnlock = false,
 }: WalletUnlockFormProps) {
   const coin = useActiveCoin();
-  const { isLight } = useWalletMode();
+  const { isLight, mobileOnly } = useWalletMode();
   const invalidateWalletMode = useInvalidateWalletMode();
   const queryClient = useQueryClient();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'verifying' | 'applied'>('idle');
+  const autoBiometricAttempted = useRef(false);
 
   // Full-node unlock uses wallet.dat RPC; leftover light-wallet files must not switch paths.
   const useLightUnlock = isLight;
+
+  const applyLightUnlockSuccess = () => {
+    setPassphrase('');
+    setError(null);
+    setStatus('applied');
+    queryClient.setQueryData(coinQueryKey(coin, 'getwalletinfo'), (prev) =>
+      optimisticLightWalletUnlockPatch(
+        prev as Awaited<ReturnType<typeof rpcGetWalletInfo>>,
+        coin,
+        rpcUnlockTimeoutSeconds()
+      )
+    );
+    invalidateWalletMode();
+    void queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, 'light-wallet-exists'),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, 'light-server-status'),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, 'listtransactions'),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, 'listunspent'),
+    });
+    void queryClient.invalidateQueries({ queryKey: ['wallet-mode-status'] });
+    setTimeout(() => setStatus('idle'), 1500);
+    onUnlocked?.();
+  };
+
+  const {
+    status: biometricStatus,
+    unlock: biometricUnlock,
+    prompt: promptBiometric,
+    ready: biometricReady,
+  } = usePromptBiometricUnlock(coin, applyLightUnlockSuccess);
+
+  useEffect(() => {
+    if (
+      !autoBiometricUnlock ||
+      !mobileOnly ||
+      !useLightUnlock ||
+      autoBiometricAttempted.current ||
+      biometricStatus.isLoading ||
+      !biometricReady ||
+      biometricUnlock.isPending
+    ) {
+      return;
+    }
+    autoBiometricAttempted.current = true;
+    promptBiometric();
+  }, [
+    autoBiometricUnlock,
+    mobileOnly,
+    useLightUnlock,
+    biometricStatus.isLoading,
+    biometricReady,
+    biometricUnlock.isPending,
+    promptBiometric,
+  ]);
 
   const unlock = useMutation({
     mutationFn: async () => {
@@ -68,47 +134,17 @@ export function WalletUnlockForm({
       );
     },
     onSuccess: async () => {
-      setPassphrase('');
-      setError(null);
-
       if (useLightUnlock) {
-        setStatus('applied');
-        queryClient.setQueryData(coinQueryKey(coin, 'getwalletinfo'), (prev) =>
-          optimisticLightWalletUnlockPatch(
-            prev as Awaited<ReturnType<typeof rpcGetWalletInfo>>,
-            coin,
-            rpcUnlockTimeoutSeconds()
-          )
-        );
-        invalidateWalletMode();
+        applyLightUnlockSuccess();
       } else {
+        setPassphrase('');
+        setError(null);
         setStatus('idle');
-      }
-
-      if (!useLightUnlock) {
         void queryClient.invalidateQueries({
           queryKey: coinQueryKey(coin, 'getwalletinfo'),
         });
+        onUnlocked?.();
       }
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, 'light-wallet-exists'),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, 'light-server-status'),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, 'listtransactions'),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(coin, 'listunspent'),
-      });
-      void queryClient.invalidateQueries({ queryKey: ['wallet-mode-status'] });
-
-      if (useLightUnlock) {
-        setTimeout(() => setStatus('idle'), 1500);
-      }
-
-      onUnlocked?.();
     },
     onError: (e) => {
       setStatus('idle');
@@ -179,6 +215,10 @@ export function WalletUnlockForm({
         {error && <div className="text-xs text-danger">{error}</div>}
         {submitDisabled && submitDisabledMessage && (
           <div className="text-xs text-fg-muted">{submitDisabledMessage}</div>
+        )}
+
+        {mobileOnly && useLightUnlock && (
+          <BiometricUnlockButton onUnlocked={applyLightUnlockSuccess} />
         )}
 
         <Button

@@ -62,7 +62,7 @@ export function AddressBookPicker({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -70,7 +70,7 @@ export function AddressBookPicker({
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-bg-panel shadow-2xl"
+        className="flex w-full max-w-lg max-h-[min(90dvh,calc(100vh-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-bg-panel shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold">

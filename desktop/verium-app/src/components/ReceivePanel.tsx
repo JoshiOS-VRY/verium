@@ -17,6 +17,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useDaemonStatus } from '@/hooks/useDaemonStatus';
+import { MobileReceiveForm } from '@/components/mobile/MobileReceiveForm';
+import { useLightWalletInstantReceiveSync } from '@/hooks/useLightWalletInstantReceiveSync';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { useIsTestNetwork } from '@/lib/network-mode';
 
@@ -29,6 +31,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const profile = useCoinProfile();
   const isTestNetwork = useIsTestNetwork();
   const { isLight, mobileOnly } = useWalletMode();
+  useLightWalletInstantReceiveSync(coin, isLight);
   const { data: nodeStatus } = useDaemonStatus(coin);
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');
@@ -103,17 +106,92 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
     resetAddressCopyFeedback();
   }, [selected?.address, resetAddressCopyFeedback]);
 
+  const networkReceiveBlocked =
+    !isLight &&
+    coin === 'vericoin' &&
+    nodeStatus?.connected === true &&
+    (nodeStatus.txindex_network_paused === true || nodeStatus.network_active === false);
+
+  const mobileWarnings = useMemo(() => {
+    const items: { id: string; title: string; body: string; tone?: 'warning' | 'neutral' }[] = [];
+    if (networkReceiveBlocked) {
+      items.push({
+        id: 'network-blocked',
+        title: `Incoming ${profile.symbol} payments are paused`,
+        body: 'Your node is rebuilding the transaction index. Payments may not appear until network activity resumes.',
+        tone: 'warning',
+      });
+    }
+    if (isTestNetwork) {
+      items.push({
+        id: 'testnet',
+        title: 'Binarytest network',
+        body: `Only send ${profile.symbol} from another wallet on Binarytest — mainnet addresses will not work here.`,
+      });
+    }
+    if (coin === 'vericoin') {
+      items.push({
+        id: 'vericoin-v',
+        title: 'Vericoin vs Verium addresses',
+        body: 'VRM sent here credits your Verium wallet only. Test VRC receives on the Vericoin network separately.',
+      });
+    }
+    return items;
+  }, [coin, isTestNetwork, networkReceiveBlocked, profile.symbol]);
+
   const clearForm = () => {
     setLabel('');
     setAmount('');
     setMessage('');
   };
 
-  const networkReceiveBlocked =
-    !isLight &&
-    coin === 'vericoin' &&
-    nodeStatus?.connected === true &&
-    (nodeStatus.txindex_network_paused === true || nodeStatus.network_active === false);
+  if (mobileOnly) {
+    return (
+      <div className={cn('flex flex-col', className)}>
+        <MobileReceiveForm
+          coin={coin}
+          profile={profile}
+          label={label}
+          amount={amount}
+          message={message}
+          onLabelChange={setLabel}
+          onAmountChange={setAmount}
+          onMessageChange={setMessage}
+          onClearForm={clearForm}
+          onCreate={() => create.mutate()}
+          creating={create.isPending}
+          createError={create.error ? String(create.error) : null}
+          requests={requests}
+          selected={showDetail ? selected : null}
+          onSelectRequest={(id) => {
+            setSelectedId(id);
+            setShowDetail(true);
+          }}
+          onCloseDetail={() => {
+            setShowDetail(false);
+            setSelectedId(null);
+          }}
+          onDeleteRequest={(id) => setPendingDeleteId(id)}
+          deleting={remove.isPending}
+          addressCopied={addressCopied}
+          onCopyAddress={(address) => void copyAddress(address)}
+          isLight={isLight}
+          warnings={mobileWarnings}
+        />
+        <ConfirmDialog
+          open={pendingDeleteId != null}
+          title="Are you sure?"
+          message="This payment request will be removed from your history. The address will continue working for this wallet."
+          confirmLabel="Remove"
+          confirming={remove.isPending}
+          onCancel={() => setPendingDeleteId(null)}
+          onConfirm={() => {
+            if (pendingDeleteId) remove.mutate(pendingDeleteId);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
@@ -239,8 +317,8 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
 
         <div
           className={cn(
-            "max-h-[280px] min-w-0 overflow-x-hidden",
-            mobileOnly ? "overflow-y-auto px-3 py-3" : "overflow-auto",
+            'max-h-[280px] min-w-0 overflow-x-hidden',
+            mobileOnly ? 'overflow-y-auto px-3 py-3' : 'overflow-auto'
           )}
         >
           {mobileOnly ? (
@@ -256,30 +334,26 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
                       setShowDetail(true);
                     }}
                     className={cn(
-                      "min-w-0 max-w-full cursor-pointer rounded-xl border px-3 py-3 transition-colors",
+                      'min-w-0 max-w-full cursor-pointer rounded-xl border px-3 py-3 transition-colors',
                       isSelected
-                        ? "border-accent/40 bg-accent/10"
-                        : "border-border bg-bg-panel/60 odd:bg-bg-subtle/30",
+                        ? 'border-accent/40 bg-accent/10'
+                        : 'border-border bg-bg-panel/60 odd:bg-bg-subtle/30'
                     )}
                   >
                     <div className="flex min-w-0 items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">
-                          {row.label || "Payment request"}
+                          {row.label || 'Payment request'}
                         </p>
                         <p className="mt-1 text-xs text-fg-muted">
                           {new Date(row.created_at * 1000).toLocaleString()}
                         </p>
                       </div>
                       <span className="shrink-0 text-sm font-medium tabular-nums">
-                        {row.amount != null
-                          ? formatCoinAmount(row.amount, coin, 8)
-                          : "—"}
+                        {row.amount != null ? formatCoinAmount(row.amount, coin, 8) : '—'}
                       </span>
                     </div>
-                    <p className="mt-2 break-all font-mono text-xs text-fg-muted">
-                      {row.address}
-                    </p>
+                    <p className="mt-2 break-all font-mono text-xs text-fg-muted">{row.address}</p>
                     {row.message ? (
                       <p className="mt-1.5 text-xs text-fg-muted">{row.message}</p>
                     ) : null}
@@ -321,91 +395,91 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
               )}
             </div>
           ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 bg-bg-panel text-xs uppercase text-fg-subtle">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Date</th>
-                <th className="px-4 py-2 text-left font-medium">Label</th>
-                <th className="px-4 py-2 text-left font-medium">Address</th>
-                <th className="px-4 py-2 text-left font-medium">Message</th>
-                <th className="px-4 py-2 text-right font-medium">Requested ({profile.symbol})</th>
-                <th className="px-4 py-2 text-right font-medium ">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((row) => {
-                const isSelected = row.id === selectedId;
-                return (
-                  <tr
-                    key={row.id}
-                    onClick={() => setSelectedId(row.id)}
-                    onDoubleClick={() => {
-                      setSelectedId(row.id);
-                      setShowDetail(true);
-                    }}
-                    className={cn(
-                      'cursor-pointer border-t border-border transition-colors',
-                      isSelected ? 'bg-accent/15' : 'odd:bg-bg-subtle/30 hover:bg-bg-subtle/60'
-                    )}
-                  >
-                    <td className="px-4 py-2 text-xs text-fg-muted whitespace-nowrap">
-                      {new Date(row.created_at * 1000).toLocaleString()}
-                    </td>
-                    <td className="max-w-[120px] truncate px-4 py-2">{row.label || '—'}</td>
-                    <td
-                      className="max-w-[160px] truncate px-4 py-2 font-mono text-xs text-fg-muted"
-                      title={row.address}
+            <table className="w-full border-collapse text-sm">
+              <thead className="sticky top-0 bg-bg-panel text-xs uppercase text-fg-subtle">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">Date</th>
+                  <th className="px-4 py-2 text-left font-medium">Label</th>
+                  <th className="px-4 py-2 text-left font-medium">Address</th>
+                  <th className="px-4 py-2 text-left font-medium">Message</th>
+                  <th className="px-4 py-2 text-right font-medium">Requested ({profile.symbol})</th>
+                  <th className="px-4 py-2 text-right font-medium ">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((row) => {
+                  const isSelected = row.id === selectedId;
+                  return (
+                    <tr
+                      key={row.id}
+                      onClick={() => setSelectedId(row.id)}
+                      onDoubleClick={() => {
+                        setSelectedId(row.id);
+                        setShowDetail(true);
+                      }}
+                      className={cn(
+                        'cursor-pointer border-t border-border transition-colors',
+                        isSelected ? 'bg-accent/15' : 'odd:bg-bg-subtle/30 hover:bg-bg-subtle/60'
+                      )}
                     >
-                      {row.address}
-                    </td>
-                    <td className="max-w-[180px] truncate px-4 py-2 text-fg-muted">
-                      {row.message || '—'}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {row.amount != null ? formatCoinAmount(row.amount, coin, 8) : '—'}
-                    </td>
-                    <td className="px-2 py-2 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label="Show QR code"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedId(row.id);
-                            setShowDetail(true);
-                          }}
-                        >
-                          <QrCode className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label="Remove payment request"
-                          disabled={remove.isPending}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingDeleteId(row.id);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-danger" />
-                        </Button>
-                      </div>
+                      <td className="px-4 py-2 text-xs text-fg-muted whitespace-nowrap">
+                        {new Date(row.created_at * 1000).toLocaleString()}
+                      </td>
+                      <td className="max-w-[120px] truncate px-4 py-2">{row.label || '—'}</td>
+                      <td
+                        className="max-w-[160px] truncate px-4 py-2 font-mono text-xs text-fg-muted"
+                        title={row.address}
+                      >
+                        {row.address}
+                      </td>
+                      <td className="max-w-[180px] truncate px-4 py-2 text-fg-muted">
+                        {row.message || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {row.amount != null ? formatCoinAmount(row.amount, coin, 8) : '—'}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Show QR code"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedId(row.id);
+                              setShowDetail(true);
+                            }}
+                          >
+                            <QrCode className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Remove payment request"
+                            disabled={remove.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingDeleteId(row.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-danger" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!requestsQuery.isLoading && requests.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-fg-subtle">
+                      No payment requests yet. Create a receiving address above.
                     </td>
                   </tr>
-                );
-              })}
-              {!requestsQuery.isLoading && requests.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-fg-subtle">
-                    No payment requests yet. Create a receiving address above.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

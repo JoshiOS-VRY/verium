@@ -7,7 +7,7 @@ use crate::chain::electrum::conformance::{run_all_default_servers, run_conforman
 use crate::chain::electrum::multi_server::{verify_tip_consistency, TipVerifyResult};
 use crate::coin_profile::CoinId;
 use crate::coin_profile::parse_coin_id;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::prefs::{self, UserPreferences};
 use crate::recovery;
 use crate::state::AppState;
@@ -38,16 +38,11 @@ pub struct WalletModeStatus {
 }
 
 fn wallet_mode_status_for(prefs: &UserPreferences, coin: CoinId) -> WalletModeStatus {
-    let network = crate::features::effective_network_mode(prefs.network_mode);
     WalletModeStatus {
         mode: prefs::wallet_mode_for(prefs, coin).as_str().to_string(),
         light_wallet_enabled: crate::features::light_wallet_enabled(),
         light_wallet_exists: keystore::light_wallet_on_disk(coin),
-        electrum_servers: prefs
-            .electrum_servers_by_coin
-            .as_ref()
-            .and_then(|m| m.get(coin.as_str()).cloned())
-            .unwrap_or_else(|| coin.default_electrum_servers(network)),
+        electrum_servers: prefs::electrum_servers_for(prefs, coin),
         mobile_only: crate::features::is_light_wallet(),
     }
 }
@@ -94,19 +89,16 @@ pub async fn wallet_mode_set_for_coin(coin: String, mode: String) -> AppResult<(
     let mut prefs = prefs::load().await?;
     prefs::set_wallet_mode_for(&mut prefs, coin, WalletMode::from_str_lossy(&mode));
     let _ = prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
-    prefs::save(&prefs).await
+    prefs::save(&prefs).await?;
+    crate::wallet::backend::drop_pooled_electrum_client(coin);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn electrum_servers_get(coin: String) -> AppResult<Vec<String>> {
     let coin = parse_coin_id(&coin)?;
     let prefs = prefs::load().await?;
-    let network = crate::features::effective_network_mode(prefs.network_mode);
-    Ok(prefs
-        .electrum_servers_by_coin
-        .as_ref()
-        .and_then(|m| m.get(coin.as_str()).cloned())
-        .unwrap_or_else(|| coin.default_electrum_servers(network)))
+    Ok(prefs::electrum_servers_for(&prefs, coin))
 }
 
 #[tauri::command]
@@ -123,7 +115,9 @@ pub async fn electrum_servers_set(coin: String, servers: Vec<String>) -> AppResu
             .collect(),
     );
     prefs.electrum_servers_by_coin = Some(map);
-    prefs::save(&prefs).await
+    prefs::save(&prefs).await?;
+    crate::wallet::backend::drop_pooled_electrum_client(coin);
+    Ok(())
 }
 
 #[tauri::command]
@@ -179,6 +173,18 @@ pub async fn light_wallet_create(
     Ok(())
 }
 
+/// 2FA for light import only when replacing a working light wallet. First-time setup and
+/// recovery from unreadable keystore skip 2FA — onboarding enables 2FA on the next step.
+fn light_wallet_import_requires_2fa(coin: CoinId) -> AppResult<bool> {
+    if !crate::two_factor::is_action_gated("restore_wallet", None, "")? {
+        return Ok(false);
+    }
+    if !keystore::wallet_exists(coin)? || !keystore::light_wallet_usable(coin) {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
 #[tauri::command]
 pub async fn light_wallet_import(
     state: State<'_, AppState>,
@@ -188,8 +194,10 @@ pub async fn light_wallet_import(
     label: Option<String>,
     totp_code: Option<String>,
 ) -> AppResult<()> {
-    crate::security_policy::require_gated_action("restore_wallet", totp_code.as_deref())?;
     let coin = parse_coin_id(&coin)?;
+    if light_wallet_import_requires_2fa(coin)? {
+        crate::security_policy::require_gated_action("restore_wallet", totp_code.as_deref())?;
+    }
     let trimmed = crate::wallet::hd::normalize_hd_master_secret(&mnemonic);
     if crate::wallet::hd::is_hd_master_secret(coin, &trimmed) {
         crate::wallet::hd::parse_root_xpriv(coin, &trimmed)?;
@@ -249,6 +257,18 @@ pub async fn light_wallet_rescan(
 }
 
 #[tauri::command]
+pub async fn light_wallet_refresh_pending(
+    state: State<'_, AppState>,
+    coin: String,
+) -> AppResult<()> {
+    let coin = parse_coin_id(&coin)?;
+    if !keystore::is_unlocked(coin)? {
+        return Ok(());
+    }
+    crate::wallet::sync::refresh_light_wallet_pending(&state, coin).await
+}
+
+#[tauri::command]
 pub async fn light_wallet_lock(coin: String) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
     // Release the pooled Electrum connection for this coin when locking.
@@ -271,15 +291,127 @@ pub async fn light_server_status(
     service::light_server_status(&state, coin).await
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BiometricUnlockBackendStatus {
+    pub enabled: bool,
+    pub configured: bool,
+}
+
+#[tauri::command]
+pub async fn biometric_unlock_status(coin: String) -> AppResult<BiometricUnlockBackendStatus> {
+    let coin = parse_coin_id(&coin)?;
+    #[cfg(not(mobile))]
+    {
+        let _ = coin;
+        return Ok(BiometricUnlockBackendStatus {
+            enabled: false,
+            configured: false,
+        });
+    }
+    #[cfg(mobile)]
+    {
+        let prefs = prefs::load().await?;
+        let configured = crate::biometric_unlock::is_configured(coin)?;
+        let enabled = if configured && !prefs.biometric_unlock_enabled {
+            let mut repaired = prefs.clone();
+            repaired.biometric_unlock_enabled = true;
+            if let Err(e) = prefs::save(&repaired).await {
+                tracing::warn!("biometric unlock: could not repair enabled pref: {e}");
+                false
+            } else {
+                true
+            }
+        } else {
+            prefs.biometric_unlock_enabled
+        };
+        Ok(BiometricUnlockBackendStatus {
+            enabled: configured && enabled,
+            configured,
+        })
+    }
+}
+
+#[tauri::command]
+pub async fn biometric_unlock_enable(coin: String, passphrase: String) -> AppResult<()> {
+    #[cfg(not(mobile))]
+    {
+        let _ = (coin, passphrase);
+        return Err(crate::error::AppError::other(
+            "Biometric unlock is only available on mobile",
+        ));
+    }
+    #[cfg(mobile)]
+    {
+        let coin = parse_coin_id(&coin)?;
+        keystore::verify_passphrase(coin, &passphrase)?;
+        crate::biometric_unlock::store_passphrase(coin, &passphrase)?;
+        let mut prefs = prefs::load().await?;
+        prefs.biometric_unlock_enabled = true;
+        prefs::save(&prefs).await?;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+pub async fn biometric_unlock_disable(coin: String) -> AppResult<()> {
+    #[cfg(not(mobile))]
+    {
+        let _ = coin;
+        return Ok(());
+    }
+    #[cfg(mobile)]
+    {
+        let coin = parse_coin_id(&coin)?;
+        crate::biometric_unlock::clear_passphrase(coin);
+        let mut prefs = prefs::load().await?;
+        prefs.biometric_unlock_enabled = false;
+        prefs::save(&prefs).await?;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+pub async fn biometric_unlock_wallet(
+    state: State<'_, AppState>,
+    coin: String,
+    seconds: Option<u32>,
+) -> AppResult<()> {
+    #[cfg(not(mobile))]
+    {
+        let _ = (state, coin, seconds);
+        return Err(crate::error::AppError::other(
+            "Biometric unlock is only available on mobile",
+        ));
+    }
+    #[cfg(mobile)]
+    {
+        let coin = parse_coin_id(&coin)?;
+        let prefs = prefs::load().await?;
+        let configured = crate::biometric_unlock::is_configured(coin)?;
+        if !prefs.biometric_unlock_enabled && !configured {
+            return Err(crate::error::AppError::other(
+                "Biometric unlock is not enabled in Settings",
+            ));
+        }
+        let pass = crate::biometric_unlock::load_passphrase(coin)?
+            .ok_or_else(|| AppError::other("Biometric unlock is not set up on this device"))?;
+        let seconds = seconds.unwrap_or(4 * 60 * 60);
+        keystore::unlock_wallet(coin, &pass, seconds)?;
+        ensure_light_wallet_mode_active(coin).await?;
+        let app = state.inner().clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {
+                tracing::error!("biometric unlock sync failed for {}: {e}", coin.as_str());
+            }
+        });
+        Ok(())
+    }
+}
+
 #[tauri::command]
 pub async fn electrum_cross_verify_tip(coin: String) -> AppResult<TipVerifyResult> {
     let coin = parse_coin_id(&coin)?;
     let prefs = prefs::load().await?;
-    let network = crate::features::effective_network_mode(prefs.network_mode);
-    let servers = prefs
-        .electrum_servers_by_coin
-        .as_ref()
-        .and_then(|m| m.get(coin.as_str()).cloned())
-        .unwrap_or_else(|| coin.default_electrum_servers(network));
+    let servers = prefs::electrum_servers_for(&prefs, coin);
     verify_tip_consistency(coin, &servers, 1).await
 }

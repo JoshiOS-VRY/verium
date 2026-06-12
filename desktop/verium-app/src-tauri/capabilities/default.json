@@ -14,7 +14,9 @@
     "dialog:default",
     "fs:default",
     "shell:default",
+    "opener:default",
     "deep-link:default",
+    "biometric:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [

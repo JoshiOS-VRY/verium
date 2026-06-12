@@ -30,6 +30,17 @@ pub trait ChainBackend: Send + Sync {
         limit: usize,
     ) -> AppResult<Vec<WalletTx>>;
 
+    /// Fill in amount/time/address on history rows (Electrum only). No-op on full node.
+    async fn enrich_tx_history_batch(
+        &self,
+        _coin: CoinId,
+        _script_hexes: &[String],
+        _txs: &mut [WalletTx],
+        _max_rows: usize,
+    ) -> AppResult<()> {
+        Ok(())
+    }
+
     async fn get_raw_tx_hex(&self, txid: &str) -> AppResult<String>;
     async fn estimate_fee(&self, target_blocks: u32) -> AppResult<FeeRate>;
     async fn broadcast_tx(&self, raw_hex: &str) -> AppResult<String>;

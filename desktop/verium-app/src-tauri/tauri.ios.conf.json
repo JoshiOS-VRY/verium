@@ -14,12 +14,13 @@
     "shortDescription": "Vericonomy light wallet for iOS",
     "longDescription": "Mobile light wallet for Verium (VRM) and Vericoin (VRC). Connects to a remote node over RPC — no bundled veriumd/vericoind on iOS.",
     "iOS": {
-      "minimumSystemVersion": "14.0"
+      "minimumSystemVersion": "14.0",
+      "infoPlist": "Info.ios.plist"
     }
   },
   "app": {
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' data: blob: asset: https://staging-explorer.vericonomy.com https://explorer.vericonomy.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: https://staging-explorer.vericonomy.com https://explorer.vericonomy.com https://files.vericonomy.com"
+      "csp": "default-src 'self' 'unsafe-inline' data: blob: asset: https://staging-explorer.vericonomy.com https://explorer.vericonomy.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: https://staging-explorer.vericonomy.com https://explorer.vericonomy.com https://files.vericonomy.com; media-src 'self' blob:; worker-src 'self' blob:"
     }
   }
 }

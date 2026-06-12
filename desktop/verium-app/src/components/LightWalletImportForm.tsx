@@ -100,7 +100,7 @@ export function LightWalletImportForm({ onSuccess }: LightWalletImportFormProps)
 
   const isBusy = importWallet.isPending || syncingBalance;
 
-  const canSubmit = seed.trim().length > 0 && matches && score.score >= 2 && !isBusy;
+  const canSubmit = seed.trim().length > 0 && matches && passphrase.trim().length > 0 && !isBusy;
 
   const progressPhase = importWallet.isPending
     ? 'importing'
@@ -177,6 +177,9 @@ export function LightWalletImportForm({ onSuccess }: LightWalletImportFormProps)
 
             {passphrase.length > 0 && confirm.length > 0 && !matches && (
               <p className="text-xs text-danger">Passphrases do not match.</p>
+            )}
+            {passphrase.length > 0 && score.score < 2 && (
+              <p className="text-[11px] text-fg-subtle">Tip: {score.hint}</p>
             )}
           </>
         )}

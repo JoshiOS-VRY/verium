@@ -10,7 +10,6 @@ use crate::chain::full_node::FullNodeRpcClient;
 use crate::chain::ChainBackend;
 use crate::coin_profile::CoinId;
 use crate::error::{AppError, AppResult};
-use crate::features::effective_network_mode;
 use crate::prefs;
 use crate::state::AppState;
 
@@ -46,6 +45,7 @@ pub fn drop_pooled_electrum_client(coin: CoinId) {
     if let Ok(mut pool) = ELECTRUM_POOL.lock() {
         pool.remove(&coin);
     }
+    crate::chain::electrum::throttle::clear_cooldown(coin);
 }
 
 /// Drop all pooled Electrum clients (app shutdown / teardown), closing their
@@ -58,15 +58,9 @@ pub fn drop_all_pooled_electrum_clients() {
 
 pub async fn resolve_backend(state: &AppState, coin: CoinId) -> AppResult<Arc<dyn ChainBackend>> {
     let prefs = prefs::load().await?;
-    let network = effective_network_mode(prefs.network_mode);
 
     if prefs::wallet_mode_for(&prefs, coin).is_light() {
-        let servers = prefs
-            .electrum_servers_by_coin
-            .as_ref()
-            .and_then(|m| m.get(coin.as_str()).cloned())
-            .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| coin.default_electrum_servers(network));
+        let servers = prefs::electrum_servers_for(&prefs, coin);
         let client = pooled_electrum_client(coin, &servers)?;
         Ok(client as Arc<dyn ChainBackend>)
     } else {

@@ -236,8 +236,17 @@ fn parse_latest_api_block(item: &Value) -> Option<ExplorerBlock> {
         .get("extractedByAddress")
         .and_then(|v| v.as_str().map(str::to_string))
         .or_else(|| {
+            item.get("extractedBy")
+                .and_then(|v| v.as_str().map(str::to_string))
+        })
+        .or_else(|| {
             item.get("miner")
                 .and_then(|m| m.get("address"))
+                .and_then(|v| v.as_str().map(str::to_string))
+        })
+        .or_else(|| {
+            item.get("miner")
+                .and_then(|m| m.get("name"))
                 .and_then(|v| v.as_str().map(str::to_string))
         });
     Some(ExplorerBlock {
@@ -659,4 +668,40 @@ async fn write_peers_cache(coin: CoinId, peers: Vec<ExplorerPeerEntry>) {
         });
     })
     .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_latest_block_uses_extracted_by_when_address_missing() {
+        let item = json!({
+            "height": 1102884,
+            "hash": "2e62b8785a9eac3d588bc54e38d1673736abc9794fcb4fb97c2d9e83fcc411c6",
+            "time": 1781230933,
+            "txCount": 1,
+            "extractedBy": "Verium Pool",
+            "extractedByAddress": null
+        });
+        let row = parse_latest_api_block(&item).expect("parse");
+        assert_eq!(row.miner_address.as_deref(), Some("Verium Pool"));
+    }
+
+    #[test]
+    fn parse_latest_block_prefers_extracted_by_address() {
+        let item = json!({
+            "height": 1102886,
+            "hash": "900cb5761d406e77f722f6295d36b80c12fec0db18172c6805589abc1800bf1f",
+            "time": 1781231361,
+            "extractedBy": "Verium Pool",
+            "extractedByAddress": "VGJ6WixxqFvtKrLtC2Q9DXfFcXpXyMLdTd"
+        });
+        let row = parse_latest_api_block(&item).expect("parse");
+        assert_eq!(
+            row.miner_address.as_deref(),
+            Some("VGJ6WixxqFvtKrLtC2Q9DXfFcXpXyMLdTd")
+        );
+    }
 }

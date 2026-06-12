@@ -1,15 +1,15 @@
-import { ChevronDown, TrendingUp } from "lucide-react";
-import { AnimatedBlockNumber } from "@/components/AnimatedBlockNumber";
-import { BlockAgeLabel } from "@/components/BlockAgeLabel";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { useDashboardData } from "@/hooks/useDashboardData";
-import { getCoinProfile, type CoinId } from "@/lib/coin/profile";
-import { formatCoinAmount } from "@/lib/units";
-import { cn, formatNumber } from "@/lib/utils";
-import { lockedWalletBalanceClass } from "@/lib/wallet-unlock";
+import { ChevronDown, TrendingUp } from 'lucide-react';
+import { AnimatedBlockNumber } from '@/components/AnimatedBlockNumber';
+import { BlockAgeLabel } from '@/components/BlockAgeLabel';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { getCoinProfile, type CoinId } from '@/lib/coin/profile';
+import { formatCoinAmount } from '@/lib/units';
+import { cn, formatNumber } from '@/lib/utils';
+import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';
 
 function formatUsd(value?: number | null): string {
-  if (value === undefined || value === null) return "—";
+  if (value === undefined || value === null) return '—';
   if (value >= 1_000_000) return `$${formatNumber(value / 1_000_000, 2)}M`;
   if (value >= 1_000) return `$${formatNumber(value / 1_000, 2)}K`;
   return `$${formatNumber(value, 4)}`;
@@ -27,19 +27,12 @@ export function MobileDashboardHero({ coin }: { coin: CoinId }) {
       <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-            online
-              ? "bg-success/10 text-success"
-              : "bg-warning/10 text-warning",
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+            online ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
           )}
         >
-          <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              online ? "bg-success" : "bg-warning",
-            )}
-          />
-          {online ? "Connected" : "Offline"}
+          <span className={cn('h-1.5 w-1.5 rounded-full', online ? 'bg-success' : 'bg-warning')} />
+          {online ? 'Connected' : 'Offline'}
         </span>
         <span className="text-[11px] font-medium text-fg-subtle">Light wallet</span>
       </div>
@@ -54,7 +47,7 @@ export function MobileDashboardHero({ coin }: { coin: CoinId }) {
               <AnimatedBlockNumber
                 value={data.tipHeight}
                 className="text-2xl font-bold tabular-nums text-fg"
-                fallback={data.activity.showSpinner ? "…" : "—"}
+                fallback={data.activity.showSpinner ? '…' : '—'}
               />
             </div>
             <div className="mt-1 [&_p]:mt-0 [&_p]:text-xs">
@@ -64,7 +57,7 @@ export function MobileDashboardHero({ coin }: { coin: CoinId }) {
           {data.tipHash && (
             <ExplorerLink
               coin={coin}
-              target={{ kind: "block", hashOrHeight: data.tipHash }}
+              target={{ kind: 'block', hashOrHeight: data.tipHash }}
               label="View"
               className="shrink-0 text-xs"
             />
@@ -78,9 +71,7 @@ export function MobileDashboardHero({ coin }: { coin: CoinId }) {
               <p className="text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
                 {profile.symbol} price
               </p>
-              <p className="text-sm font-semibold tabular-nums text-fg">
-                {formatUsd(priceUsd)}
-              </p>
+              <p className="text-sm font-semibold tabular-nums text-fg">{formatUsd(priceUsd)}</p>
             </div>
           </div>
         )}
@@ -96,13 +87,11 @@ export function MobileDashboardHero({ coin }: { coin: CoinId }) {
             <dt className="text-fg-subtle">Wallet balance</dt>
             <dd
               className={cn(
-                "mt-0.5 font-semibold tabular-nums text-fg",
-                wallet && lockedWalletBalanceClass(wallet),
+                'mt-0.5 font-semibold tabular-nums text-fg',
+                wallet && lockedWalletBalanceClass(wallet)
               )}
             >
-              {wallet
-                ? formatCoinAmount(wallet.balance, coin, 4)
-                : "—"}
+              {wallet ? formatCoinAmount(wallet.balance, coin, 4) : '—'}
             </dd>
           </div>
           <div>
@@ -110,7 +99,7 @@ export function MobileDashboardHero({ coin }: { coin: CoinId }) {
             <dd className="mt-0.5 font-semibold tabular-nums text-fg">
               {data.explorer.data?.pooled_tx != null
                 ? formatNumber(data.explorer.data.pooled_tx, 0)
-                : "—"}
+                : '—'}
             </dd>
           </div>
           <div className="col-span-2">

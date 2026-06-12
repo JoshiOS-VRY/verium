@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeftRight,
   BookOpen,
@@ -13,8 +13,8 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Terminal,
-} from "lucide-react";
-import type { CoinId } from "@/lib/coin/profile";
+} from 'lucide-react';
+import type { CoinId } from '@/lib/coin/profile';
 
 export interface AppNavItem {
   to: string;
@@ -31,82 +31,82 @@ export interface AppNavItem {
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
   {
-    to: "/dashboard",
-    label: "Dashboard",
-    shortLabel: "Home",
+    to: '/dashboard',
+    label: 'Dashboard',
+    shortLabel: 'Home',
     icon: Gauge,
     mobileTab: true,
   },
   {
-    to: "/mining",
-    label: "Mining",
+    to: '/mining',
+    label: 'Mining',
     icon: Cpu,
-    coins: ["verium"],
+    coins: ['verium'],
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
   {
-    to: "/staking",
-    label: "Staking",
+    to: '/staking',
+    label: 'Staking',
     icon: Coins,
-    coins: ["vericoin"],
+    coins: ['vericoin'],
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
   {
-    to: "/network",
-    label: "Network",
+    to: '/network',
+    label: 'Network',
     icon: NetworkIcon,
     fullNodeOnly: true,
   },
   {
-    to: "/binary-chain",
-    label: "Binary Chain",
+    to: '/binary-chain',
+    label: 'Binary Chain',
     icon: Link2,
     testNetworkOnly: true,
   },
   {
-    to: "/transactions",
-    label: "Transactions",
-    shortLabel: "Activity",
+    to: '/transactions',
+    label: 'Transactions',
+    shortLabel: 'Activity',
     icon: ArrowLeftRight,
     requiresPassphrase: true,
     mobileTab: true,
   },
   {
-    to: "/addresses",
-    label: "Address book",
-    shortLabel: "Addresses",
+    to: '/addresses',
+    label: 'Address book',
+    shortLabel: 'Addresses',
     icon: BookUser,
     mobileTab: true,
   },
-  { to: "/security", label: "Security", icon: Lock, requiresPassphrase: true },
+  { to: '/security', label: 'Security', icon: Lock, requiresPassphrase: true },
   {
-    to: "/sign",
-    label: "Sign & verify",
+    to: '/sign',
+    label: 'Sign & verify',
     icon: ShieldCheck,
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
   {
-    to: "/console",
-    label: "RPC console",
+    to: '/console',
+    label: 'RPC console',
     icon: Terminal,
     requiresPassphrase: true,
     fullNodeOnly: true,
   },
-  { to: "/logs", label: "Logs", icon: ScrollText, fullNodeOnly: true },
-  { to: "/resources", label: "Resources", icon: BookOpen },
+  { to: '/logs', label: 'Logs', icon: ScrollText, fullNodeOnly: true },
+  { to: '/resources', label: 'Resources', icon: BookOpen },
   {
-    to: "/settings",
-    label: "Settings",
+    to: '/settings',
+    label: 'Settings',
     icon: SettingsIcon,
     mobileTab: true,
   },
 ];
 
 export const APP_ROUTE_TITLES: Record<string, string> = Object.fromEntries(
-  APP_NAV_ITEMS.map((item) => [item.to, item.label]),
+  APP_NAV_ITEMS.map((item) => [item.to, item.label])
 );
 
 export interface NavFilterOptions {
@@ -119,13 +119,7 @@ export interface NavFilterOptions {
 
 export function filterAppNavItems(
   items: AppNavItem[],
-  {
-    activeCoin,
-    enabledCoins,
-    isLight,
-    isTestNetwork,
-    binarytestEnabled,
-  }: NavFilterOptions,
+  { activeCoin, enabledCoins, isLight, isTestNetwork, binarytestEnabled }: NavFilterOptions
 ): AppNavItem[] {
   return items.filter((item) => {
     if (item.fullNodeOnly && isLight) return false;
@@ -133,8 +127,6 @@ export function filterAppNavItems(
       return false;
     }
     if (!item.coins) return true;
-    return item.coins.some(
-      (coin) => enabledCoins.includes(coin) && coin === activeCoin,
-    );
+    return item.coins.some((coin) => enabledCoins.includes(coin) && coin === activeCoin);
   });
 }

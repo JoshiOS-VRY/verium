@@ -1,47 +1,35 @@
-import { Blocks } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Blocks } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from '@tanstack/react-query';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 
-import { ExplorerLink } from "@/components/ExplorerLink";
+import { ExplorerLink } from '@/components/ExplorerLink';
 
-import {
-  BlockFoundBanner,
-  MinedBlocksSummary,
-} from "@/components/YouMinedCelebration";
+import { BlockFoundBanner, MinedBlocksSummary } from '@/components/YouMinedCelebration';
 
-import {
-  StakeFoundBanner,
-  StakedRewardsSummary,
-} from "@/components/YouStakedCelebration";
+import { StakeFoundBanner, StakedRewardsSummary } from '@/components/YouStakedCelebration';
 
 import {
   buildRecentBlockRowModel,
   RecentBlockCard,
   RecentBlockTableRow,
-} from "@/components/ExplorerRecentBlockRow";
+} from '@/components/ExplorerRecentBlockRow';
 
-import { useWalletMiningContext } from "@/hooks/useWalletMiningContext";
-import { useWalletStakingContext } from "@/hooks/useWalletStakingContext";
+import { useWalletMiningContext } from '@/hooks/useWalletMiningContext';
+import { useWalletStakingContext } from '@/hooks/useWalletStakingContext';
 
-import { subscribeBlockMined } from "@/hooks/useBlockMinedWatcher";
-import { subscribeStakeReward } from "@/hooks/useStakeRewardWatcher";
-import { useBlockRowEnterAnimation } from "@/hooks/useBlockRowEnterAnimation";
-import { useChainSynced } from "@/hooks/useChainSynced";
+import { subscribeBlockMined } from '@/hooks/useBlockMinedWatcher';
+import { subscribeStakeReward } from '@/hooks/useStakeRewardWatcher';
+import { useBlockRowEnterAnimation } from '@/hooks/useBlockRowEnterAnimation';
+import { useChainSynced } from '@/hooks/useChainSynced';
 
-import { useBlockAgeTick } from "@/hooks/useBlockAgeTick";
-import { useEffectiveLocalChainTip } from "@/hooks/useEffectiveLocalChainTip";
+import { useBlockAgeTick } from '@/hooks/useBlockAgeTick';
+import { useEffectiveLocalChainTip } from '@/hooks/useEffectiveLocalChainTip';
 
-import { fetchExplorerBlocks, isExplorerApiEnabled } from "@/lib/explorer-api";
-import type { ExplorerBlock } from "@/lib/explorer-api";
+import { fetchExplorerBlocks, isExplorerApiEnabled } from '@/lib/explorer-api';
+import type { ExplorerBlock } from '@/lib/explorer-api';
 import {
   blockNeedsRpcEnrichment,
   blockRowFromRewardEvent,
@@ -50,19 +38,19 @@ import {
   enrichBlocksFromRpc,
   MAX_PENDING_BLOCKS_ABOVE,
   mergeRecentBlocks,
-} from "@/lib/local-recent-block";
-import { useWalletMode } from "@/hooks/useWalletMode";
+} from '@/lib/local-recent-block';
+import { useWalletMode } from '@/hooks/useWalletMode';
 
-import { explorerBlocksHash } from "@/lib/explorer-links";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { formatCoinAmount } from "@/lib/units";
-import { cn } from "@/lib/utils";
-import { useWindowVisible } from "@/hooks/useWindowVisible";
+import { explorerBlocksHash } from '@/lib/explorer-links';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { formatCoinAmount } from '@/lib/units';
+import { cn } from '@/lib/utils';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 
 interface ExplorerRecentBlocksProps {
-  coin: import("@/lib/coin/profile").CoinId;
+  coin: import('@/lib/coin/profile').CoinId;
 
-  variant?: "default" | "dashboard";
+  variant?: 'default' | 'dashboard';
 
   className?: string;
 }
@@ -95,13 +83,13 @@ interface CelebrationState {
 export function ExplorerRecentBlocks({
   coin,
 
-  variant = "default",
+  variant = 'default',
 
   className,
 }: ExplorerRecentBlocksProps) {
-  const isDashboard = variant === "dashboard";
+  const isDashboard = variant === 'dashboard';
 
-  const isVerium = coin === "verium";
+  const isVerium = coin === 'verium';
 
   const miningCtx = useWalletMiningContext(isVerium);
   const stakingCtx = useWalletStakingContext(!isVerium);
@@ -133,19 +121,17 @@ export function ExplorerRecentBlocks({
   }, [coin]);
 
   const enabled = useQuery({
-    queryKey: ["explorer-api-enabled"],
+    queryKey: ['explorer-api-enabled'],
 
     queryFn: isExplorerApiEnabled,
 
     staleTime: Infinity,
   });
 
-  const blocksPollMs = isLight
-    ? BLOCKS_LIGHT_REFETCH_MS
-    : BLOCKS_FALLBACK_REFETCH_MS;
+  const blocksPollMs = isLight ? BLOCKS_LIGHT_REFETCH_MS : BLOCKS_FALLBACK_REFETCH_MS;
 
   const blocks = useQuery({
-    queryKey: coinQueryKey(coin, "explorer-blocks", 10),
+    queryKey: coinQueryKey(coin, 'explorer-blocks', 10),
 
     queryFn: () => fetchExplorerBlocks(coin, 10),
 
@@ -162,9 +148,7 @@ export function ExplorerRecentBlocks({
 
   const explorerTopHeight = blocks.data?.[0]?.height;
   const indexingLag =
-    localTipHeight != null &&
-    explorerTopHeight != null &&
-    localTipHeight > explorerTopHeight;
+    localTipHeight != null && explorerTopHeight != null && localTipHeight > explorerTopHeight;
 
   useEffect(() => {
     if (!visible || !indexingLag) return;
@@ -178,8 +162,7 @@ export function ExplorerRecentBlocks({
     return () => window.clearInterval(fastPoll);
   }, [blocks.refetch, indexingLag, visible]);
 
-  const explorerBlocksSignature =
-    blocks.data?.map((block) => block.height).join(",") ?? "";
+  const explorerBlocksSignature = blocks.data?.map((block) => block.height).join(',') ?? '';
 
   useEffect(() => {
     if (!visible) return;
@@ -206,9 +189,7 @@ export function ExplorerRecentBlocks({
     let cancelled = false;
 
     const targetForHeight = (height: number): ExplorerBlock => {
-      const fromExplorer = blocks.data?.find(
-        (block) => block.height === height,
-      );
+      const fromExplorer = blocks.data?.find((block) => block.height === height);
       if (fromExplorer) return fromExplorer;
       return {
         id: height,
@@ -252,17 +233,17 @@ export function ExplorerRecentBlocks({
   ]);
 
   useEffect(() => {
-    if (coin === "verium") {
+    if (coin === 'verium') {
       return subscribeBlockMined((event) => {
         setCelebration({
           height: event.height,
           reward:
             event.amount != null && Number.isFinite(event.amount)
-              ? formatCoinAmount(event.amount, "verium", 4)
-              : "—",
+              ? formatCoinAmount(event.amount, 'verium', 4)
+              : '—',
         });
 
-        void blockRowFromRewardEvent("verium", event).then((row) => {
+        void blockRowFromRewardEvent('verium', event).then((row) => {
           if (!row) return;
           setLocalBlocks((prev) => {
             const next = prev.filter((b) => b.height !== row.height);
@@ -277,11 +258,11 @@ export function ExplorerRecentBlocks({
         height: event.height,
         reward:
           event.amount != null && Number.isFinite(event.amount)
-            ? formatCoinAmount(event.amount, "vericoin", 4)
-            : "—",
+            ? formatCoinAmount(event.amount, 'vericoin', 4)
+            : '—',
       });
 
-      void blockRowFromRewardEvent("vericoin", event).then((row) => {
+      void blockRowFromRewardEvent('vericoin', event).then((row) => {
         if (!row) return;
         setLocalBlocks((prev) => {
           const next = prev.filter((b) => b.height !== row.height);
@@ -340,24 +321,18 @@ export function ExplorerRecentBlocks({
       localTipHeight,
       localTipHash,
       localTipTime,
-      knownHeights,
+      knownHeights
     );
-  }, [
-    explorerBlocks,
-    liveAndLocal,
-    localTipHash,
-    localTipHeight,
-    localTipTime,
-  ]);
+  }, [explorerBlocks, liveAndLocal, localTipHash, localTipHeight, localTipTime]);
 
   const blockRows = useMemo(
     () =>
       mergeRecentBlocks(
         mergeRecentBlocks(explorerBlocks, pendingLocal, feedLimit + 4),
         liveAndLocal,
-        feedLimit,
+        feedLimit
       ),
-    [explorerBlocks, feedLimit, liveAndLocal, pendingLocal],
+    [explorerBlocks, feedLimit, liveAndLocal, pendingLocal]
   );
 
   /** Same tip source as the dashboard hero. */
@@ -375,20 +350,20 @@ export function ExplorerRecentBlocks({
   };
 
   const yoursInFeed = blockRows.filter(
-    (block) => buildRecentBlockRowModel(block, rowContext).isYours,
+    (block) => buildRecentBlockRowModel(block, rowContext).isYours
   );
 
   const yoursRewardTotal = yoursInFeed.reduce(
     (sum, block) => sum + parseBlockOutput(block.output_total ?? block.mint),
-    0,
+    0
   );
 
   return (
     <Card
       className={cn(
-        isDashboard && "flex  flex-col",
+        isDashboard && 'flex  flex-col',
 
-        className,
+        className
       )}
     >
       <CardHeader className="flex-row items-start justify-between shrink-0">
@@ -400,10 +375,7 @@ export function ExplorerRecentBlocks({
 
           <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {!loading && yoursInFeed.length > 0 && isVerium && (
-              <MinedBlocksSummary
-                count={yoursInFeed.length}
-                totalRewardVrm={yoursRewardTotal}
-              />
+              <MinedBlocksSummary count={yoursInFeed.length} totalRewardVrm={yoursRewardTotal} />
             )}
             {!loading && yoursInFeed.length > 0 && !isVerium && (
               <StakedRewardsSummary count={yoursInFeed.length} />
@@ -413,14 +385,12 @@ export function ExplorerRecentBlocks({
 
         <ExplorerLink
           coin={coin}
-          target={{ kind: "raw", url: explorerBlocksHash(coin) }}
+          target={{ kind: 'raw', url: explorerBlocksHash(coin) }}
           label="All blocks"
         />
       </CardHeader>
 
-      <CardContent
-        className={cn("p-0", isDashboard && "flex min-h-0 flex-1 flex-col")}
-      >
+      <CardContent className={cn('p-0', isDashboard && 'flex min-h-0 flex-1 flex-col')}>
         {celebration && synced && isVerium && (
           <div className="shrink-0 pt-1">
             <BlockFoundBanner
@@ -443,15 +413,13 @@ export function ExplorerRecentBlocks({
         {blocks.isError ? (
           <div className="px-4 py-6 text-xs text-fg-subtle">
             Could not load blocks from explorer.
-            {blocks.error != null && (
-              <div className="mt-1 text-danger">{String(blocks.error)}</div>
-            )}
+            {blocks.error != null && <div className="mt-1 text-danger">{String(blocks.error)}</div>}
           </div>
         ) : mobileOnly ? (
           <div
             className={cn(
-              "relative isolate overflow-x-hidden overflow-y-auto px-3 pb-3",
-              isDashboard ? "flex-1" : "max-h-[480px]",
+              'relative isolate overflow-x-hidden overflow-y-auto px-3 pb-3',
+              isDashboard ? 'flex-1' : 'max-h-[480px]'
             )}
           >
             <div className="flex flex-col gap-2.5">
@@ -475,17 +443,15 @@ export function ExplorerRecentBlocks({
                 ))}
 
               {!loading && blockRows.length === 0 && (
-                <p className="py-8 text-center text-sm text-fg-subtle">
-                  No blocks returned.
-                </p>
+                <p className="py-8 text-center text-sm text-fg-subtle">No blocks returned.</p>
               )}
             </div>
           </div>
         ) : (
           <div
             className={cn(
-              "relative isolate overflow-auto",
-              isDashboard ? "flex-1" : "max-h-[360px]",
+              'relative isolate overflow-auto',
+              isDashboard ? 'flex-1' : 'max-h-[360px]'
             )}
           >
             <table className="w-full border-collapse text-sm">
@@ -505,9 +471,7 @@ export function ExplorerRecentBlocks({
                       </th>
                     </>
                   )}
-                  <th className="px-4 py-2 text-left font-medium">
-                    Extracted by
-                  </th>
+                  <th className="px-4 py-2 text-left font-medium">Extracted by</th>
                 </tr>
               </thead>
 

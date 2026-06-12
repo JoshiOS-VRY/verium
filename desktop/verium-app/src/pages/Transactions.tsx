@@ -1,39 +1,29 @@
-import { useActiveCoin, useCoinProfile } from "@/lib/coin/context";
-import { coinQueryKey } from "@/lib/coin/profile";
-import { useState, useEffect, useMemo } from "react";
-import { useLocation } from "react-router-dom";
-import { useMinerPayoutsQuery } from "@/hooks/usePoolQueries";
-import { useWalletMode } from "@/hooks/useWalletMode";
-import { resolvePoolDashboardAddress } from "@/lib/pool-dashboard-address";
-import { useUserPreferences } from "@/lib/user-preferences";
-import { rpcListAddressGroupings } from "@/lib/rpc/client";
-import { useQuery } from "@tanstack/react-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Loader2,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { ConfirmationProgress } from "@/components/ConfirmationProgress";
-import { ExplorerLink } from "@/components/ExplorerLink";
-import { ReceivePanel } from "@/components/ReceivePanel";
-import { SendPanel } from "@/components/SendPanel";
-import { TransactionHistoryCard } from "@/components/TransactionHistoryRow";
-import { MobileBalanceHero } from "@/components/mobile/MobileBalanceHero";
-import { MobileSegmented } from "@/components/mobile/MobileSegmented";
-import { WalletBalanceSummary } from "@/components/WalletBalanceSummary";
-import { WalletUnlockGate } from "@/components/WalletUnlockGate";
-import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from "@/lib/rpc/client";
+import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useMinerPayoutsQuery } from '@/hooks/usePoolQueries';
+import { useWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
+import { resolvePoolDashboardAddress } from '@/lib/pool-dashboard-address';
+import { useUserPreferences } from '@/lib/user-preferences';
+import { rpcListAddressGroupings } from '@/lib/rpc/client';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, ArrowDownLeft, ArrowUpRight, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ConfirmationProgress } from '@/components/ConfirmationProgress';
+import { ExplorerLink } from '@/components/ExplorerLink';
+import { ReceivePanel } from '@/components/ReceivePanel';
+import { SendPanel } from '@/components/SendPanel';
+import { TransactionHistoryCard } from '@/components/TransactionHistoryRow';
+import { MobileBalanceHero } from '@/components/mobile/MobileBalanceHero';
+import { MobileSegmented } from '@/components/mobile/MobileSegmented';
+import { MobileTransactionHistory } from '@/components/mobile/MobileTransactionHistory';
+import { WalletBalanceSummary } from '@/components/WalletBalanceSummary';
+import { WalletUnlockGate } from '@/components/WalletUnlockGate';
+import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from '@/lib/rpc/client';
 import {
   listTransactionsFetchParams,
   paginateTransactions,
@@ -41,21 +31,21 @@ import {
   TRANSACTIONS_LIST_CAP,
   TRANSACTIONS_PAGE_SIZE,
   transactionPageCount,
-} from "@/lib/transactions-list";
-import { formatCoinAmount } from "@/lib/units";
+} from '@/lib/transactions-list';
+import { formatCoinAmount, formatTransactionTime } from '@/lib/units';
 import {
   transactionCategoryLabel,
   transactionCategoryBadgeClass,
-} from "@/lib/transaction-category";
-import { cn, formatNumber } from "@/lib/utils";
-import { consumePendingPaymentUri } from "@/lib/payment-uri-pending";
+} from '@/lib/transaction-category';
+import { cn, formatNumber } from '@/lib/utils';
+import { consumePendingPaymentUri } from '@/lib/payment-uri-pending';
 
-type TransferMode = "send" | "receive";
-type MobileActivityView = TransferMode | "history";
+type TransferMode = 'send' | 'receive';
+type MobileActivityView = TransferMode | 'history';
 
 const stickyTableHeadClass =
-  "sticky top-0 z-10 border-b border-border bg-bg-panel text-xs uppercase text-fg-subtle";
-const stickyTableHeadCellClass = "bg-bg-panel px-4 py-2 font-medium";
+  'sticky top-0 z-10 border-b border-border bg-bg-panel text-xs uppercase text-fg-subtle';
+const stickyTableHeadCellClass = 'bg-bg-panel px-4 py-2 font-medium';
 
 function TransferModeToggle({
   value,
@@ -73,13 +63,13 @@ function TransferModeToggle({
       <button
         type="button"
         role="radio"
-        aria-checked={value === "send"}
-        onClick={() => onChange("send")}
+        aria-checked={value === 'send'}
+        onClick={() => onChange('send')}
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
-          value === "send"
-            ? "bg-accent text-accent-fg"
-            : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+          'inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
+          value === 'send'
+            ? 'bg-accent text-accent-fg'
+            : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
         )}
       >
         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -88,13 +78,13 @@ function TransferModeToggle({
       <button
         type="button"
         role="radio"
-        aria-checked={value === "receive"}
-        onClick={() => onChange("receive")}
+        aria-checked={value === 'receive'}
+        onClick={() => onChange('receive')}
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
-          value === "receive"
-            ? "bg-accent text-accent-fg"
-            : "text-fg-muted hover:bg-bg-panel hover:text-fg",
+          'inline-flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
+          value === 'receive'
+            ? 'bg-accent text-accent-fg'
+            : 'text-fg-muted hover:bg-bg-panel hover:text-fg'
         )}
       >
         <ArrowDownLeft className="h-3.5 w-3.5" />
@@ -109,9 +99,10 @@ export function Transactions() {
   const profile = useCoinProfile();
   const location = useLocation();
   const { isLight, mobileOnly } = useWalletMode();
+  const visible = useWindowVisible();
   const prefs = useUserPreferences((s) => s.prefs);
-  const [mode, setMode] = useState<TransferMode>("send");
-  const [mobileView, setMobileView] = useState<MobileActivityView>("send");
+  const [mode, setMode] = useState<TransferMode>('send');
+  const [mobileView, setMobileView] = useState<MobileActivityView>('send');
   const [prefill, setPrefill] = useState<{
     address?: string;
     amount?: string;
@@ -121,14 +112,11 @@ export function Transactions() {
   useEffect(() => {
     const pending = consumePendingPaymentUri();
     if (!pending) return;
-    setMode("send");
-    if (mobileOnly) setMobileView("send");
+    setMode('send');
+    if (mobileOnly) setMobileView('send');
     setPrefill({
       address: pending.address,
-      amount:
-        pending.amount != null && pending.amount > 0
-          ? String(pending.amount)
-          : undefined,
+      amount: pending.amount != null && pending.amount > 0 ? String(pending.amount) : undefined,
       label: pending.label ?? undefined,
     });
   }, [mobileOnly]);
@@ -138,7 +126,7 @@ export function Transactions() {
       ?.mobileActivityView;
     if (!mobileOnly || !view) return;
     setMobileView(view);
-    if (view === "send" || view === "receive") setMode(view);
+    if (view === 'send' || view === 'receive') setMode(view);
   }, [location.state, mobileOnly]);
   const [page, setPage] = useState(0);
 
@@ -147,30 +135,25 @@ export function Transactions() {
   }, [coin]);
 
   const wallet = useQuery({
-    queryKey: coinQueryKey(coin, "getwalletinfo"),
+    queryKey: coinQueryKey(coin, 'getwalletinfo'),
     queryFn: () => rpcGetWalletInfo(coin),
     refetchInterval: false,
   });
 
   const addressGroupings = useQuery({
-    queryKey: coinQueryKey(coin, "listaddressgroupings"),
+    queryKey: coinQueryKey(coin, 'listaddressgroupings'),
     queryFn: () => rpcListAddressGroupings(coin),
-    enabled: coin === "verium" && !isLight,
+    enabled: coin === 'verium' && !isLight,
     staleTime: 30_000,
   });
 
   const poolDashboardAddress = useMemo(
     () =>
-      coin === "verium"
-        ? resolvePoolDashboardAddress(prefs, addressGroupings.data)
-        : undefined,
-    [coin, prefs, addressGroupings.data],
+      coin === 'verium' ? resolvePoolDashboardAddress(prefs, addressGroupings.data) : undefined,
+    [coin, prefs, addressGroupings.data]
   );
 
-  const poolPayouts = useMinerPayoutsQuery(
-    poolDashboardAddress,
-    coin === "verium",
-  );
+  const poolPayouts = useMinerPayoutsQuery(poolDashboardAddress, coin === 'verium');
 
   const poolPayoutTxids = useMemo(() => {
     const rows = poolPayouts.data?.rows ?? [];
@@ -178,42 +161,43 @@ export function Transactions() {
   }, [poolPayouts.data]);
 
   const walletTxCount = wallet.data?.txcount ?? 0;
-  const historyCapped = walletTxCount > TRANSACTIONS_LIST_CAP;
+  // Light wallets used to report txcount=0 always, so never gate history fetches on it.
+  const historyFetchCount = isLight
+    ? TRANSACTIONS_LIST_CAP
+    : listTransactionsFetchParams(walletTxCount).count;
+  const historyFetchSkip = isLight ? 0 : listTransactionsFetchParams(walletTxCount).skip;
+  const historyCapped = !isLight && walletTxCount > TRANSACTIONS_LIST_CAP;
+
+  const lightSyncing = Boolean(wallet.data?.light_syncing);
 
   const txs = useQuery({
-    queryKey: coinQueryKey(coin, "listtransactions", "history", walletTxCount),
+    queryKey: coinQueryKey(coin, 'listtransactions', 'history', isLight ? 'light' : walletTxCount),
     queryFn: async () => {
-      const { count, skip } = listTransactionsFetchParams(walletTxCount);
-      if (count <= 0) return [];
-      const rows = await rpcListTransactions(coin, count, skip);
+      if (historyFetchCount <= 0) return [];
+      const rows = await rpcListTransactions(coin, historyFetchCount, historyFetchSkip);
       return sortTransactionsNewestFirst(rows);
     },
     enabled: wallet.isSuccess,
-    // Heavy payload (up to 500 rows) — refresh on chain-tip invalidation only.
-    refetchInterval: false,
-    retry: 0,
+    // Light wallets: poll SQLite-backed history while the screen is open.
+    refetchInterval:
+      isLight && visible ? (lightSyncing ? 10_000 : 15_000) : lightSyncing ? 20_000 : false,
+    retry: 1,
   });
 
   const sortedTxs = txs.data ?? [];
-  const isHistoryLoading =
-    wallet.isPending || (wallet.isSuccess && txs.isPending);
-  const showEmptyHistory =
-    !isHistoryLoading && !txs.isError && sortedTxs.length === 0;
+  const historyNeedsRefresh =
+    isLight && sortedTxs.length > 0 && sortedTxs.every((t) => !t.time || t.time <= 0);
+  const isHistoryLoading = wallet.isPending || (wallet.isSuccess && txs.isPending);
+  const showEmptyHistory = !isHistoryLoading && !txs.isError && sortedTxs.length === 0;
 
   const totalPages = transactionPageCount(sortedTxs.length);
   const effectivePage = Math.min(page, Math.max(0, totalPages - 1));
   const pageRows = useMemo(
     () => paginateTransactions(sortedTxs, effectivePage),
-    [sortedTxs, effectivePage],
+    [sortedTxs, effectivePage]
   );
-  const rangeFrom =
-    sortedTxs.length === 0
-      ? 0
-      : effectivePage * TRANSACTIONS_PAGE_SIZE + 1;
-  const rangeTo = Math.min(
-    sortedTxs.length,
-    (effectivePage + 1) * TRANSACTIONS_PAGE_SIZE,
-  );
+  const rangeFrom = sortedTxs.length === 0 ? 0 : effectivePage * TRANSACTIONS_PAGE_SIZE + 1;
+  const rangeTo = Math.min(sortedTxs.length, (effectivePage + 1) * TRANSACTIONS_PAGE_SIZE);
 
   function renderPagination({
     totalItems,
@@ -233,12 +217,9 @@ export function Transactions() {
       <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs text-fg-muted">
           <span>
-            Showing {formatNumber(from)}–{formatNumber(to)} of{" "}
-            {formatNumber(totalItems)}
+            Showing {formatNumber(from)}–{formatNumber(to)} of {formatNumber(totalItems)}
           </span>
-          {cappedNote ? (
-            <span className="mt-1 block text-fg-subtle">{cappedNote}</span>
-          ) : null}
+          {cappedNote ? <span className="mt-1 block text-fg-subtle">{cappedNote}</span> : null}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
           <Button
@@ -272,32 +253,31 @@ export function Transactions() {
   }
 
   const historySection = (
-    <Card className={mobileOnly ? "mobile-panel overflow-hidden rounded-2xl" : undefined}>
-      <CardHeader className={mobileOnly ? "px-4 py-4" : undefined}>
+    <Card className={mobileOnly ? 'mobile-panel overflow-hidden rounded-2xl' : undefined}>
+      <CardHeader className={mobileOnly ? 'px-4 py-4' : undefined}>
         <CardTitle className="flex items-center gap-2 text-base">
-          {mobileOnly ? "History" : "Recent transactions"}
+          {mobileOnly ? 'History' : 'Recent transactions'}
           {isHistoryLoading ? (
-            <Loader2
-              className="h-4 w-4 animate-spin text-accent"
-              aria-hidden
-            />
+            <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden />
           ) : null}
         </CardTitle>
         <CardDescription>
           {isHistoryLoading
-            ? "Loading your wallet transaction history…"
+            ? 'Loading your wallet transaction history…'
             : txs.isError
-              ? "Could not load transaction history from the wallet."
+              ? 'Could not load transaction history from the wallet.'
               : showEmptyHistory
-                ? "Transactions you send or receive will appear here."
-                : "Newest first."}
+                ? 'Transactions you send or receive will appear here.'
+                : historyNeedsRefresh
+                  ? 'Loading amounts and dates from the explorer index…'
+                  : 'Newest first.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="min-w-0 p-0">
         <div
           className={cn(
-            "max-h-[480px] min-w-0 overflow-x-hidden",
-            mobileOnly ? "overflow-y-auto px-3 py-3" : "overflow-auto",
+            'max-h-[480px] min-w-0 overflow-x-hidden',
+            mobileOnly ? 'overflow-y-auto px-3 py-3' : 'overflow-auto'
           )}
         >
           {isHistoryLoading ? (
@@ -311,101 +291,57 @@ export function Transactions() {
                 ))}
               </div>
             ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead className={stickyTableHeadClass}>
-                <tr>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-left",
-                    )}
-                  >
-                    When
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-left",
-                    )}
-                  >
-                    Type
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-left",
-                    )}
-                  >
-                    Address
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-right",
-                    )}
-                  >
-                    Amount
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-right",
-                    )}
-                  >
-                    Confs
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-right",
-                    )}
-                  >
-                    Explorer
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={`loading-${i}`} className="border-t border-border">
-                    <td colSpan={6} className="px-4 py-2">
-                      <div className="h-4 animate-pulse rounded bg-bg-subtle" />
-                    </td>
+              <table className="w-full border-collapse text-sm">
+                <thead className={stickyTableHeadClass}>
+                  <tr>
+                    <th className={cn(stickyTableHeadCellClass, 'text-left')}>When</th>
+                    <th className={cn(stickyTableHeadCellClass, 'text-left')}>Type</th>
+                    <th className={cn(stickyTableHeadCellClass, 'text-left')}>Address</th>
+                    <th className={cn(stickyTableHeadCellClass, 'text-right')}>Amount</th>
+                    <th className={cn(stickyTableHeadCellClass, 'text-right')}>Confs</th>
+                    <th className={cn(stickyTableHeadCellClass, 'text-right')}>Explorer</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={`loading-${i}`} className="border-t border-border">
+                      <td colSpan={6} className="px-4 py-2">
+                        <div className="h-4 animate-pulse rounded bg-bg-subtle" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )
           ) : showEmptyHistory ? (
-            <div className={cn("py-10", mobileOnly ? "px-2" : "px-4")}>
+            <div className={cn('py-10', mobileOnly ? 'px-2' : 'px-4')}>
               <div className="mx-auto max-w-md space-y-5 text-center">
                 {!mobileOnly && (
-                <div
-                  className="space-y-2.5 opacity-50"
-                  aria-hidden
-                >
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={`empty-skeleton-${i}`}
-                      className="flex items-center gap-3"
-                    >
-                      <div className="h-3 w-24 shrink-0 animate-pulse rounded bg-bg-subtle" />
-                      <div className="h-3 w-16 shrink-0 animate-pulse rounded bg-bg-subtle" />
-                      <div className="h-3 min-w-0 flex-1 animate-pulse rounded bg-bg-subtle" />
-                      <div className="h-3 w-14 shrink-0 animate-pulse rounded bg-bg-subtle" />
-                    </div>
-                  ))}
-                </div>
+                  <div className="space-y-2.5 opacity-50" aria-hidden>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={`empty-skeleton-${i}`} className="flex items-center gap-3">
+                        <div className="h-3 w-24 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                        <div className="h-3 w-16 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                        <div className="h-3 min-w-0 flex-1 animate-pulse rounded bg-bg-subtle" />
+                        <div className="h-3 w-14 shrink-0 animate-pulse rounded bg-bg-subtle" />
+                      </div>
+                    ))}
+                  </div>
                 )}
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium text-fg-muted">
-                    {mobileOnly
-                      ? "No transactions yet"
-                      : "This wallet has not made any transactions yet."}
+                    {lightSyncing
+                      ? 'Scanning for past transactions…'
+                      : mobileOnly
+                        ? 'No transactions yet'
+                        : 'This wallet has not made any transactions yet.'}
                   </p>
                   <p className="text-xs text-fg-subtle">
-                    {mobileOnly
-                      ? `Send or receive ${profile.symbol} and your activity will show up here.`
-                      : `Use Send or Receive above to move ${profile.symbol}. Your history will show up here once activity is recorded in the wallet.`}
+                    {lightSyncing
+                      ? `After import, the light wallet scans your addresses on Vericonomy servers. History can take a few minutes — pull to refresh on Dashboard or wait here.`
+                      : mobileOnly
+                        ? `Send or receive ${profile.symbol} and your activity will show up here. Imported wallets only show on-chain history once address scan finds your past receives.`
+                        : `Use Send or Receive above to move ${profile.symbol}. Your history will show up here once activity is recorded in the wallet.`}
                   </p>
                 </div>
               </div>
@@ -414,12 +350,10 @@ export function Transactions() {
             <div className="flex flex-col gap-2.5">
               {pageRows.map((tx: TransactionItem) => (
                 <TransactionHistoryCard
-                  key={`${tx.txid}-${tx.category}-${tx.address ?? ""}-${tx.time}`}
+                  key={`${tx.txid}-${tx.category}-${tx.address ?? ''}-${tx.time}`}
                   tx={tx}
                   coin={coin}
-                  isPoolPayout={
-                    coin === "verium" && poolPayoutTxids.has(tx.txid)
-                  }
+                  isPoolPayout={coin === 'verium' && poolPayoutTxids.has(tx.txid)}
                 />
               ))}
             </div>
@@ -427,80 +361,34 @@ export function Transactions() {
             <table className="w-full border-collapse text-sm">
               <thead className={stickyTableHeadClass}>
                 <tr>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-left",
-                    )}
-                  >
-                    When
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-left",
-                    )}
-                  >
-                    Type
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-left",
-                    )}
-                  >
-                    Address
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-right",
-                    )}
-                  >
-                    Amount
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-right",
-                    )}
-                  >
-                    Confs
-                  </th>
-                  <th
-                    className={cn(
-                      stickyTableHeadCellClass,
-                      "text-right",
-                    )}
-                  >
-                    Explorer
-                  </th>
+                  <th className={cn(stickyTableHeadCellClass, 'text-left')}>When</th>
+                  <th className={cn(stickyTableHeadCellClass, 'text-left')}>Type</th>
+                  <th className={cn(stickyTableHeadCellClass, 'text-left')}>Address</th>
+                  <th className={cn(stickyTableHeadCellClass, 'text-right')}>Amount</th>
+                  <th className={cn(stickyTableHeadCellClass, 'text-right')}>Confs</th>
+                  <th className={cn(stickyTableHeadCellClass, 'text-right')}>Explorer</th>
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((tx: TransactionItem) => (
                   <tr
-                    key={`${tx.txid}-${tx.category}-${tx.address ?? ""}-${tx.time}`}
+                    key={`${tx.txid}-${tx.category}-${tx.address ?? ''}-${tx.time}`}
                     className="border-t border-border odd:bg-bg-subtle/30"
                   >
                     <td className="px-4 py-2 text-xs text-fg-muted">
-                      {new Date(tx.time * 1000).toLocaleString()}
+                      {formatTransactionTime(tx.time)}
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge
-                          className={transactionCategoryBadgeClass(tx.category)}
-                        >
+                        <Badge className={transactionCategoryBadgeClass(tx.category)}>
                           {transactionCategoryLabel(tx.category)}
                         </Badge>
-                        {coin === "verium" && poolPayoutTxids.has(tx.txid) ? (
+                        {coin === 'verium' && poolPayoutTxids.has(tx.txid) ? (
                           <Badge tone="neutral">Pool payout</Badge>
                         ) : null}
                       </div>
                     </td>
-                    <td className="truncate px-4 py-2 text-xs">
-                      {tx.address ?? "—"}
-                    </td>
+                    <td className="truncate px-4 py-2 text-xs">{tx.address ?? '—'}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {formatCoinAmount(tx.amount, coin, 8)}
                     </td>
@@ -513,7 +401,7 @@ export function Transactions() {
                     <td className="px-4 py-2 text-right">
                       <ExplorerLink
                         coin={coin}
-                        target={{ kind: "tx", txid: tx.txid }}
+                        target={{ kind: 'tx', txid: tx.txid }}
                         label="View"
                         title={`Open tx ${tx.txid} on the explorer`}
                       />
@@ -546,83 +434,99 @@ export function Transactions() {
     >
       {mobileOnly ? (
         <div className="mobile-page">
-          <MobileBalanceHero />
+          {mobileView === 'history' ? <MobileBalanceHero /> : null}
           <MobileSegmented
             value={mobileView}
             ariaLabel="Activity"
             onChange={(view) => {
               setMobileView(view);
-              if (view === "send" || view === "receive") setMode(view);
+              if (view === 'send' || view === 'receive') setMode(view);
             }}
             options={[
-              { value: "send", label: "Send", icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
-              { value: "receive", label: "Receive", icon: <ArrowDownLeft className="h-3.5 w-3.5" /> },
-              { value: "history", label: "History" },
+              { value: 'send', label: 'Send', icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
+              {
+                value: 'receive',
+                label: 'Receive',
+                icon: <ArrowDownLeft className="h-3.5 w-3.5" />,
+              },
+              { value: 'history', label: 'History' },
             ]}
           />
-          {mobileView === "send" ? (
-            <Card className="mobile-panel overflow-hidden rounded-2xl">
-              <CardHeader className="px-4 py-4">
-                <CardTitle className="text-base">Send {profile.symbol}</CardTitle>
-                <CardDescription>
-                  Pay to one or more {profile.displayName} addresses.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 pb-5">
-                <SendPanel
-                  initialAddress={prefill.address}
-                  initialAmount={prefill.amount}
-                  initialLabel={prefill.label}
-                />
-              </CardContent>
-            </Card>
-          ) : null}
-          {mobileView === "receive" ? (
-            <Card className="mobile-panel overflow-hidden rounded-2xl">
-              <CardHeader className="px-4 py-4">
-                <CardTitle className="text-base">Receive {profile.symbol}</CardTitle>
-                <CardDescription>
-                  Create a receiving address or payment request.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-4 pb-5">
-                <ReceivePanel />
-              </CardContent>
-            </Card>
-          ) : null}
-          {mobileView === "history" ? historySection : null}
-        </div>
-      ) : (
-      <div className="flex min-w-0 max-w-full flex-col gap-6">
-        <WalletBalanceSummary />
-
-        <Card>
-          <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
-            <div>
-              <CardTitle>{mode === "send" ? "Send" : "Receive"}</CardTitle>
-              <CardDescription>
-                {mode === "send"
-                  ? `Pay to one or more ${profile.displayName} addresses. Labels are saved locally with the transaction comment.`
-                  : `Create ${profile.symbol} receiving addresses with optional label, amount, and message.`}
-              </CardDescription>
-            </div>
-            <TransferModeToggle value={mode} onChange={setMode} />
-          </CardHeader>
-          <CardContent>
-            {mode === "send" ? (
+          {mobileView === 'send' ? (
+            <section className="mobile-panel min-w-0">
+              <div className="mb-3 px-1">
+                <h2 className="text-lg font-semibold tracking-tight text-fg">
+                  Send {profile.symbol}
+                </h2>
+                <p className="mt-0.5 text-sm text-fg-muted">
+                  Scan, paste, or enter a {profile.displayName} address.
+                </p>
+              </div>
               <SendPanel
                 initialAddress={prefill.address}
                 initialAmount={prefill.amount}
                 initialLabel={prefill.label}
               />
-            ) : (
+            </section>
+          ) : null}
+          {mobileView === 'receive' ? (
+            <section className="mobile-panel min-w-0">
+              <div className="mb-3 px-1">
+                <h2 className="text-lg font-semibold tracking-tight text-fg">
+                  Receive {profile.symbol}
+                </h2>
+                <p className="mt-0.5 text-sm text-fg-muted">
+                  Show a QR code for in-person payments.
+                </p>
+              </div>
               <ReceivePanel />
-            )}
-          </CardContent>
-        </Card>
+            </section>
+          ) : null}
+          {mobileView === 'history' ? (
+            <MobileTransactionHistory
+              coin={coin}
+              txs={sortedTxs}
+              isLoading={isHistoryLoading}
+              isError={txs.isError}
+              showEmpty={showEmptyHistory}
+              lightSyncing={lightSyncing}
+              historyNeedsRefresh={historyNeedsRefresh}
+              poolPayoutTxids={poolPayoutTxids}
+              profileSymbol={profile.symbol}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex min-w-0 max-w-full flex-col gap-6">
+          <WalletBalanceSummary />
 
-        {historySection}
-      </div>
+          <Card>
+            <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle>{mode === 'send' ? 'Send' : 'Receive'}</CardTitle>
+                <CardDescription>
+                  {mode === 'send'
+                    ? `Pay to one or more ${profile.displayName} addresses. Labels are saved locally with the transaction comment.`
+                    : `Create ${profile.symbol} receiving addresses with optional label, amount, and message.`}
+                </CardDescription>
+              </div>
+              <TransferModeToggle value={mode} onChange={setMode} />
+            </CardHeader>
+            <CardContent>
+              {mode === 'send' ? (
+                <SendPanel
+                  initialAddress={prefill.address}
+                  initialAmount={prefill.amount}
+                  initialLabel={prefill.label}
+                />
+              ) : (
+                <ReceivePanel />
+              )}
+            </CardContent>
+          </Card>
+
+          {historySection}
+        </div>
       )}
     </WalletUnlockGate>
   );

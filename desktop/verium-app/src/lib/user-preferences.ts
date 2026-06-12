@@ -55,6 +55,8 @@ export interface UserPreferences {
   wallet_mode_by_coin?: Partial<Record<CoinId, WalletMode>>;
   /** Resumable onboarding checkpoint per chain. */
   onboarding_by_coin?: Partial<Record<CoinId, OnboardingCheckpoint>>;
+  /** Mobile: unlock with Face ID / Touch ID when configured in Settings. */
+  biometric_unlock_enabled?: boolean;
 }
 
 interface PrefsState {

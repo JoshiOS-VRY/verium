@@ -154,6 +154,14 @@ impl CoinId {
         }
     }
 
+    /// Indexer V2 chain id (`/api/indexer/:chainId/...`).
+    pub fn explorer_indexer_chain_id(self) -> &'static str {
+        match self {
+            CoinId::Verium => "vrm",
+            CoinId::Vericoin => "vrc",
+        }
+    }
+
     pub fn explorer_logo_url(self) -> &'static str {
         match self {
             CoinId::Verium => "https://explorer.vericonomy.com/img/vericonomy/verium-logo.svg",

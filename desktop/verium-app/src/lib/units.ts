@@ -27,6 +27,12 @@ export function coinSymbol(coin: CoinId): string {
   return getCoinProfile(coin).symbol;
 }
 
+/** Wallet RPC timestamps are Unix seconds; missing/zero means not yet enriched. */
+export function formatTransactionTime(seconds?: number | null): string {
+  if (seconds == null || seconds <= 0) return '—';
+  return new Date(seconds * 1000).toLocaleString();
+}
+
 export function coinMaturityConfirmations(coin: CoinId): number {
   return getCoinProfile(coin).confirmationsMatured;
 }

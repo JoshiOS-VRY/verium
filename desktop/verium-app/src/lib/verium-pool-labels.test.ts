@@ -10,6 +10,7 @@ describe('verium pool miner labels', () => {
   it('recognizes payout address and display name', () => {
     expect(isVeriumPoolMinerAddress(VERIUM_POOL_PAYOUT_ADDRESS)).toBe(true);
     expect(isVeriumPoolMinerAddress(VERIUM_POOL_DISPLAY_NAME)).toBe(true);
+    expect(isVeriumPoolMinerAddress('VeriumPool')).toBe(true);
     expect(isVeriumPoolMinerAddress('VLZEz6CBem7XpqbEm9tik9rLi7uQggccu5')).toBe(false);
   });
 

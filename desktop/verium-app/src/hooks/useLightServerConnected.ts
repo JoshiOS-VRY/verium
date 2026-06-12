@@ -15,7 +15,7 @@ export function useLightServerConnected() {
     queryKey: coinQueryKey(coin, 'light-server-status'),
     queryFn: () => lightServerStatus(coin),
     enabled: isLight,
-    refetchInterval: isLight && visible ? 15_000 : false,
+    refetchInterval: isLight && visible ? 45_000 : false,
     staleTime: 10_000,
   });
 

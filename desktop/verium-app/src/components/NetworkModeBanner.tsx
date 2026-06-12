@@ -7,9 +7,9 @@
 // loud — it's the visual safety guard that prevents users from confusing
 // their test wallet with their real wallet.
 
-import { Link } from "react-router-dom";
-import { BINARYTEST_ENABLED } from "@/lib/features";
-import { useIsTestNetwork } from "@/lib/network-mode";
+import { Link } from 'react-router-dom';
+import { BINARYTEST_ENABLED } from '@/lib/features';
+import { useIsTestNetwork } from '@/lib/network-mode';
 
 export function NetworkModeBanner() {
   const isTest = useIsTestNetwork();
@@ -20,12 +20,10 @@ export function NetworkModeBanner() {
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse" />
-          <span className="shrink-0 font-semibold uppercase tracking-wide">
-            Binarytest
-          </span>
+          <span className="shrink-0 font-semibold uppercase tracking-wide">Binarytest</span>
           <span className="min-w-0 text-amber-200/80">
-            DACE test network — funds have no real value. Distinct datadirs and
-            ports; cannot connect to mainnet peers.
+            DACE test network — funds have no real value. Distinct datadirs and ports; cannot
+            connect to mainnet peers.
           </span>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">

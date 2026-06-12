@@ -29,6 +29,8 @@ import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
 import { coinQueryKey, getCoinProfile, type CoinId } from '@/lib/coin/profile';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { coinSymbol, formatCoinAmount } from '@/lib/units';
+import { MobileSendForm } from '@/components/mobile/MobileSendForm';
+import { useWalletMode } from '@/hooks/useWalletMode';
 import { cn } from '@/lib/utils';
 import { listAddressBookEntries, upsertAddressBookEntry } from '@/lib/address-book';
 import { validateSendAddress } from '@/lib/address-validation';
@@ -175,6 +177,7 @@ export function SendPanel({
 }: SendPanelProps) {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
+  const { isLight, mobileOnly } = useWalletMode();
   const symbol = coinSymbol(coin);
   const exampleAddress = EXAMPLE_ADDRESSES[coin];
   const queryClient = useQueryClient();
@@ -571,6 +574,49 @@ export function SendPanel({
         }}
       />
 
+      {mobileOnly ? (
+        <MobileSendForm
+          coin={coin}
+          profile={profile}
+          symbol={symbol}
+          exampleAddress={exampleAddress}
+          balance={balance}
+          feeRate={feeRate}
+          subtractFee={subtractFee}
+          onSubtractFeeChange={setSubtractFee}
+          recipients={recipients}
+          updateRecipient={updateRecipient}
+          removeRecipient={removeRecipient}
+          addRecipient={addRecipient}
+          pasteAddress={pasteAddress}
+          useAvailableBalance={useAvailableBalance}
+          openQrScan={(id) => {
+            setQrTargetId(id);
+            setQrOpen(true);
+          }}
+          openAddressBook={(id) => setAddressBookFor(id)}
+          openFeeDialog={() => setFeeDialogOpen(true)}
+          openCoinControl={() => setCoinControlOpen(true)}
+          coinControlCount={coinControl.length}
+          coinControlTotal={coinControlTotal}
+          clearCoinControl={() => setCoinControl([])}
+          showCoinControl={!isLight}
+          canSend={canSend}
+          preparingConfirm={preparingConfirm}
+          sendPending={send.isPending}
+          onSend={() => void openConfirm()}
+          onClear={() => {
+            clearAll();
+            setLastSend(null);
+          }}
+          clipboardGuardError={clipboardGuardError}
+          spendWarning={spendWarning}
+          sendError={send.error ? String(send.error) : null}
+          lastSend={lastSend}
+          onDismissSuccess={() => setLastSend(null)}
+        />
+      ) : (
+        <>
       <div className="flex min-h-0 flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-fg-muted">
@@ -699,15 +745,26 @@ export function SendPanel({
                       Amount
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        id={`amount-${row.id}`}
-                        type="number"
-                        min={0}
-                        step="0.00000001"
-                        value={row.amount}
-                        onChange={(e) => updateRecipient(row.id, { amount: e.target.value })}
-                        className="h-10 w-36 rounded-md border border-border bg-bg-panel px-3 text-sm tabular-nums outline-none focus:border-accent"
-                      />
+                      <div className="relative min-w-[8rem] flex-1 sm:max-w-xs">
+                        <input
+                          id={`amount-${row.id}`}
+                          type="number"
+                          min={0}
+                          step="0.00000001"
+                          value={row.amount}
+                          onChange={(e) => updateRecipient(row.id, { amount: e.target.value })}
+                          className="h-10 w-full rounded-md border border-border bg-bg-panel py-2 pl-3 pr-14 text-sm tabular-nums outline-none focus:border-accent"
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-semibold text-accent hover:bg-accent/10 disabled:opacity-40"
+                          onClick={() => useAvailableBalance(row.id)}
+                          disabled={balance <= 0}
+                          aria-label="Use maximum available balance"
+                        >
+                          Max
+                        </button>
+                      </div>
 
                       {index === 0 && (
                         <label className="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
@@ -720,16 +777,6 @@ export function SendPanel({
                           Subtract fee from amount
                         </label>
                       )}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="ml-auto shrink-0"
-                        onClick={() => useAvailableBalance(row.id)}
-                        disabled={balance <= 0}
-                      >
-                        Use available balance
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -835,6 +882,8 @@ export function SendPanel({
           Balance: {formatCoinAmount(balance, coin, 8)}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

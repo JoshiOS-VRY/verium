@@ -866,7 +866,12 @@ pub fn decrypt_mnemonic_for_send(coin: CoinId, passphrase: &str) -> AppResult<St
 }
 
 pub fn verify_passphrase(coin: CoinId, passphrase: &str) -> AppResult<()> {
-    decrypt_mnemonic_for_send(coin, passphrase)?;
+    let store = load_keystore()?;
+    let record = store
+        .wallets
+        .get(coin.as_str())
+        .ok_or_else(|| AppError::other("light wallet not found"))?;
+    decrypt_mnemonic(record, passphrase)?;
     Ok(())
 }
 
