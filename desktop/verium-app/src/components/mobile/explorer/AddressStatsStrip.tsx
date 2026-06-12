@@ -48,9 +48,7 @@ export function AddressStatsStrip({
           <Badge tone="accent" className="gap-1">
             <Trophy className="h-3 w-3" aria-hidden />
             Rich list #{richlist.rank.toLocaleString()}
-            {richlist.percentile != null
-              ? ` · top ${(100 - richlist.percentile).toFixed(1)}%`
-              : ''}
+            {richlist.percentile != null ? ` · top ${(100 - richlist.percentile).toFixed(1)}%` : ''}
           </Badge>
         </div>
       )}
@@ -66,11 +64,7 @@ export function AddressStatsStrip({
           label="Sent"
           value={formatIndexerAmount(balance.totalSent ?? undefined)}
         />
-        <StatCard
-          icon={<Hash className="h-3.5 w-3.5" />}
-          label="Transactions"
-          value={txCount}
-        />
+        <StatCard icon={<Hash className="h-3.5 w-3.5" />} label="Transactions" value={txCount} />
         {balance.firstSeenTime != null && (
           <StatCard
             icon={<Calendar className="h-3.5 w-3.5" />}
@@ -89,7 +83,10 @@ export function AddressStatsStrip({
             label="Last active"
             value={`#${balance.lastSeenHeight.toLocaleString()}`}
             sub={
-              <ExplorerInternalLink to={explorerBlockPath(balance.lastSeenHeight)} className="text-[10px]">
+              <ExplorerInternalLink
+                to={explorerBlockPath(balance.lastSeenHeight)}
+                className="text-[10px]"
+              >
                 View block
               </ExplorerInternalLink>
             }

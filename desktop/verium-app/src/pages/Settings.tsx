@@ -36,7 +36,6 @@ import {
   playStakeRewardSound,
   unlockBlockMinedAudio,
 } from '@/lib/block-mined-sound';
-import { playReceivedVrmSound, unlockReceivedVrmAudio } from '@/lib/received-vrm-sound';
 import {
   defaultAddressExplorerTemplate,
   defaultBlockExplorerTemplate,
@@ -45,9 +44,11 @@ import {
 import { DOCS_DOWNLOADS } from '@/lib/verium-links';
 import { ADVANCED_SETTINGS_ENABLED } from '@/lib/features';
 import { BiometricUnlockCard } from '@/components/BiometricUnlockCard';
+import { NotificationSettingsCard } from '@/components/NotificationSettingsCard';
 import { MobileBuildStamp } from '@/components/mobile/MobileBuildStamp';
 import { MobileLightServersCard } from '@/components/mobile/MobileLightServersCard';
 import { MobileSettingsGroup } from '@/components/mobile/MobileSettingsGroup';
+import { LightWalletRescanCard } from '@/components/LightWalletRescanCard';
 
 export function Settings() {
   const enabledCoins = useEnabledCoins();
@@ -133,6 +134,8 @@ export function Settings() {
 
         {mobileOnly ? <MobileLightServersCard /> : <WalletModeCard />}
 
+        <LightWalletRescanCard mobileLayout />
+
         <BiometricUnlockCard />
 
         <MobileSettingsGroup title="Chains" description="Show Verium and Vericoin in the wallet.">
@@ -161,58 +164,7 @@ export function Settings() {
           </Link>
         </MobileSettingsGroup>
 
-        <MobileSettingsGroup title="Notifications" defaultOpen={false}>
-          <label className="mobile-checkbox-row">
-            <input
-              type="checkbox"
-              checked={prefs.notify_on_vrm_received !== false}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                void unlockReceivedVrmAudio();
-                void updatePrefs({ notify_on_vrm_received: checked });
-                if (checked) void playReceivedVrmSound();
-              }}
-            />
-            <span>Notify when VRM is received</span>
-          </label>
-          <label className="mobile-checkbox-row">
-            <input
-              type="checkbox"
-              checked={prefs.notify_on_vrc_received !== false}
-              onChange={(e) => void updatePrefs({ notify_on_vrc_received: e.target.checked })}
-            />
-            <span>Notify when VRC is received</span>
-          </label>
-        </MobileSettingsGroup>
-
-        <MobileSettingsGroup title="Updates" defaultOpen={false}>
-          <Button
-            className="h-11 w-full rounded-xl"
-            variant="secondary"
-            onClick={() => updates.mutate()}
-            disabled={updates.isPending}
-          >
-            {updates.isPending ? 'Checking…' : 'Check for updates'}
-          </Button>
-          {updates.data && (
-            <p className="mt-3 text-center text-xs text-fg-muted">
-              {updates.data.update_available
-                ? `Update available: ${updates.data.latest}`
-                : `Up to date (${updates.data.current})`}
-            </p>
-          )}
-          {updates.error && (
-            <p className="mt-2 text-center text-xs text-danger">{String(updates.error)}</p>
-          )}
-          {updates.data?.download_url && (
-            <ExternalLinkButton
-              href={updates.data.download_url}
-              className="mt-3 h-11 w-full justify-center rounded-xl"
-            >
-              Download update
-            </ExternalLinkButton>
-          )}
-        </MobileSettingsGroup>
+        <NotificationSettingsCard mobileLayout />
 
         <MobileBuildStamp />
       </div>
@@ -261,6 +213,8 @@ export function Settings() {
 
       <WalletModeCard />
 
+      <LightWalletRescanCard />
+
       <Card>
         <CardHeader>
           <CardTitle>Chains</CardTitle>
@@ -299,34 +253,12 @@ export function Settings() {
         <CardHeader>
           <CardTitle>Notifications</CardTitle>
           <CardDescription>
-            Alerts while the wallet app is open. Bursts of many incoming transactions are grouped
+            Alerts when incoming VRM or VRC is detected. Bursts of many transactions are grouped
             into one summary.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <label className="flex cursor-pointer items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={prefs.notify_on_vrm_received !== false}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                void unlockReceivedVrmAudio();
-                void updatePrefs({ notify_on_vrm_received: checked });
-                if (checked) void playReceivedVrmSound();
-              }}
-              className="h-4 w-4 rounded border-border accent-accent"
-            />
-            <span>Notify when VRM is received</span>
-          </label>
-          <label className="flex cursor-pointer items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={prefs.notify_on_vrc_received !== false}
-              onChange={(e) => void updatePrefs({ notify_on_vrc_received: e.target.checked })}
-              className="h-4 w-4 rounded border-border accent-accent"
-            />
-            <span>Notify when VRC is received</span>
-          </label>
+        <CardContent>
+          <NotificationSettingsCard />
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import { Loader2, Pickaxe, Trophy } from 'lucide-react';
-import { ExplorerLink } from '@/components/ExplorerLink';
+import { ExplorerCardLink, ExplorerLink } from '@/components/ExplorerLink';
 import { AnimatedBlockNumber } from '@/components/AnimatedBlockNumber';
 import { YouMinedBadge, youMinedRowClassName } from '@/components/YouMinedCelebration';
 import { YouStakedBadge, youStakedRowClassName } from '@/components/YouStakedCelebration';
@@ -291,7 +291,10 @@ export function RecentBlockCard({
   const { block, indexing, isYours, reward, isEntering, isNudging, rowClassName } = model;
 
   return (
-    <article
+    <ExplorerCardLink
+      target={{ kind: 'block', hashOrHeight: block.hash || block.height }}
+      coin={coin}
+      ariaLabel={`View block ${block.height}`}
       className={cn(
         'recent-block-card rounded-xl border border-border bg-bg-subtle/60 p-3 transition-[background-color,box-shadow,transform]',
         rowClassName,
@@ -353,14 +356,7 @@ export function RecentBlockCard({
         </div>
       </div>
 
-      <div className="mt-2 flex justify-end">
-        <ExplorerLink
-          coin={coin}
-          target={{ kind: 'block', hashOrHeight: block.hash || block.height }}
-          label="View block"
-          className="text-[11px]"
-        />
-      </div>
-    </article>
+      <p className="mt-2 text-right text-[11px] font-medium text-accent">View block</p>
+    </ExplorerCardLink>
   );
 }

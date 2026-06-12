@@ -18,10 +18,12 @@ export function WalletBalanceSummary() {
 
   if (wallet.isLoading || !wallet.data) return null;
 
-  const spendable = wallet.data.balance;
+  const isLight = wallet.data.light_wallet === true;
+  const available = wallet.data.balance;
+  const confirmed = wallet.data.confirmed_balance ?? available;
   const unconfirmed = wallet.data.unconfirmed_balance;
   const immature = wallet.data.immature_balance;
-  const total = spendable + unconfirmed + immature;
+  const total = isLight ? available + immature : available + unconfirmed + immature;
   const scanning = typeof wallet.data.scanning === 'object' ? wallet.data.scanning : null;
   const mature = coinMaturityConfirmations(coin);
   const blurClass = lockedWalletBalanceClass(wallet.data);
@@ -37,13 +39,21 @@ export function WalletBalanceSummary() {
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
           <span>
-            Spendable{' '}
+            {isLight ? 'Available' : 'Spendable'}{' '}
             <span className={cn('font-medium tabular-nums text-fg', blurClass)}>
-              {formatCoinAmount(spendable, coin, 4)}
+              {formatCoinAmount(available, coin, 4)}
             </span>
           </span>
+          {isLight && (
+            <span>
+              Confirmed{' '}
+              <span className={cn('font-medium tabular-nums text-fg', blurClass)}>
+                {formatCoinAmount(confirmed, coin, 4)}
+              </span>
+            </span>
+          )}
           <span>
-            Unconfirmed{' '}
+            {isLight ? 'Pending change' : 'Unconfirmed'}{' '}
             <span className={cn('font-medium tabular-nums text-fg', blurClass)}>
               {formatCoinAmount(unconfirmed, coin, 4)}
             </span>

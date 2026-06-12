@@ -18,9 +18,7 @@ export function nearestPointByTime(
   return best;
 }
 
-export function pointIndexFromChartState(
-  state: MouseHandlerDataParam | undefined
-): number | null {
+export function pointIndexFromChartState(state: MouseHandlerDataParam | undefined): number | null {
   const raw = state?.activeTooltipIndex ?? state?.activeIndex;
   if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 0) return raw;
   return null;

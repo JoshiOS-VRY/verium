@@ -7,7 +7,8 @@ use async_trait::async_trait;
 use crate::chain::types::WalletTx;
 use crate::coin_profile::CoinId;
 use crate::error::{AppError, AppResult};
-use crate::wallet::hd::{p2pkh_script_to_address, sats_to_coins};
+use crate::wallet::hd::p2pkh_script_to_address;
+use crate::wallet::listtransactions_rows::rows_from_decoded_tx;
 use crate::wallet::vericonomy_tx::{decode_verium_tx, VeriumMutableTx};
 
 #[async_trait]
@@ -19,22 +20,9 @@ fn script_matches_wallet(script: &[u8], wallet_scripts: &HashSet<Vec<u8>>) -> bo
     wallet_scripts.iter().any(|s| s.as_slice() == script)
 }
 
-fn category_for(height: i32, delta_sats: i64) -> String {
-    if height <= 0 {
-        if delta_sats < 0 {
-            "send".into()
-        } else {
-            "unconfirmed".into()
-        }
-    } else if delta_sats < 0 {
-        "send".into()
-    } else {
-        "receive".into()
-    }
-}
-
 fn decode_tx_hex(raw_hex: &str) -> AppResult<VeriumMutableTx> {
-    let bytes = hex::decode(raw_hex.trim())
+    let hex = crate::chain::tx_hex::normalize_transaction_hex(raw_hex, "tx hex")?;
+    let bytes = hex::decode(&hex)
         .map_err(|e| AppError::other(format!("tx hex decode: {e}")))?;
     decode_verium_tx(&bytes).map_err(|e| AppError::other(format!("tx decode: {e}")))
 }
@@ -54,9 +42,12 @@ async fn ensure_decoded(
 
 /// Copy enriched fields from a prior cache generation so sync refreshes do not wipe them.
 pub fn merge_preserved_enrichment(new_rows: &mut [WalletTx], existing: &[WalletTx]) {
-    let prior: HashMap<&str, &WalletTx> = existing.iter().map(|t| (t.txid.as_str(), t)).collect();
+    let prior: HashMap<String, &WalletTx> = existing
+        .iter()
+        .map(|t| (crate::wallet::listtransactions_rows::wallet_tx_row_key(t), t))
+        .collect();
     for row in new_rows {
-        if let Some(old) = prior.get(row.txid.as_str()) {
+        if let Some(old) = prior.get(&crate::wallet::listtransactions_rows::wallet_tx_row_key(row)) {
             if old.time.is_some() {
                 row.time = old.time;
                 row.amount = old.amount;
@@ -70,39 +61,46 @@ pub fn merge_preserved_enrichment(new_rows: &mut [WalletTx], existing: &[WalletT
     }
 }
 
-/// Populate `amount`, `time`, `address`, and `category` on history rows fetched via
-/// `blockchain.scripthash.get_history` (which only returns txid + height).
-pub async fn enrich_wallet_history(
+/// Expand scripthash history stubs into Core-style send/receive rows.
+pub async fn expand_wallet_history_rows(
     coin: CoinId,
     script_hexes: &[String],
-    txs: &mut [WalletTx],
+    txs: &[WalletTx],
     fetcher: &impl HistoryTxFetcher,
     max_rows: Option<usize>,
-) -> AppResult<()> {
+    tip: Option<u32>,
+) -> AppResult<Vec<WalletTx>> {
     let wallet_scripts: HashSet<Vec<u8>> = script_hexes
         .iter()
         .filter_map(|h| hex::decode(h.trim()).ok())
         .collect();
     if wallet_scripts.is_empty() || txs.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
-    let mut decoded_cache: HashMap<String, VeriumMutableTx> = HashMap::new();
-    let mut enriched = 0usize;
+    let wallet_addresses: HashSet<String> = script_hexes
+        .iter()
+        .filter_map(|h| {
+            hex::decode(h.trim()).ok().and_then(|script| {
+                p2pkh_script_to_address(coin, &script)
+            })
+        })
+        .collect();
 
-    for row in txs.iter_mut() {
-        if row.time.is_some() {
-            continue;
-        }
+    let mut decoded_cache: HashMap<String, VeriumMutableTx> = HashMap::new();
+    let mut expanded = 0usize;
+    let mut rows = Vec::new();
+
+    for row in txs {
         if let Some(max) = max_rows {
-            if enriched >= max {
+            if expanded >= max {
                 break;
             }
         }
 
         let row_txid = row.txid.clone();
         if let Err(e) = ensure_decoded(&row_txid, &mut decoded_cache, fetcher).await {
-            tracing::debug!("history enrich skip {}: {e}", row_txid);
+            tracing::debug!("history expand skip {}: {e}", row_txid);
             continue;
         }
 
@@ -118,13 +116,11 @@ pub async fn enrich_wallet_history(
 
         for prev_txid in prev_txids {
             if let Err(e) = ensure_decoded(&prev_txid, &mut decoded_cache, fetcher).await {
-                tracing::debug!("history enrich prev {} for {}: {e}", prev_txid, row_txid);
+                tracing::debug!("history expand prev {} for {}: {e}", prev_txid, row_txid);
             }
         }
 
         let decoded = decoded_cache.get(&row_txid).unwrap();
-        row.time = Some(decoded.n_time as u64);
-
         let input_refs: Vec<(String, u32)> = decoded
             .inputs
             .iter()
@@ -136,14 +132,8 @@ pub async fn enrich_wallet_history(
             })
             .collect();
 
-        let mut prev_output_values: HashMap<(String, u32), i64> = HashMap::new();
         let mut prev_output_is_ours: HashSet<(String, u32)> = HashSet::new();
-
         for (txid, vout) in &input_refs {
-            let key = (txid.clone(), *vout);
-            if prev_output_values.contains_key(&key) {
-                continue;
-            }
             let prev_tx = match decoded_cache.get(txid) {
                 Some(t) => t,
                 None => continue,
@@ -152,51 +142,54 @@ pub async fn enrich_wallet_history(
             if vout_idx >= prev_tx.outputs.len() {
                 continue;
             }
-            let prev_out = &prev_tx.outputs[vout_idx];
-            prev_output_values.insert(key, prev_out.value.to_sat() as i64);
-            let prev_script = prev_out.script_pubkey.as_bytes();
+            let prev_script = prev_tx.outputs[vout_idx].script_pubkey.as_bytes();
             if script_matches_wallet(prev_script, &wallet_scripts) {
                 prev_output_is_ours.insert((txid.clone(), *vout));
             }
         }
 
-        let mut delta = 0i64;
-        let mut address: Option<String> = None;
-
-        for out in &decoded.outputs {
-            let script = out.script_pubkey.as_bytes();
-            if script_matches_wallet(script, &wallet_scripts) {
-                delta += out.value.to_sat() as i64;
-                if address.is_none() {
-                    address = p2pkh_script_to_address(coin, script);
-                }
-            }
-        }
-
-        for (txid, vout) in &input_refs {
-            if prev_output_is_ours.contains(&(txid.clone(), *vout)) {
-                if let Some(value_sats) = prev_output_values.get(&(txid.clone(), *vout)) {
-                    delta -= *value_sats;
-                }
-                if address.is_none() {
-                    if let Some(prev_tx) = decoded_cache.get(txid) {
-                        let vout_idx = *vout as usize;
-                        if vout_idx < prev_tx.outputs.len() {
-                            let prev_script =
-                                prev_tx.outputs[vout_idx].script_pubkey.as_bytes();
-                            address = p2pkh_script_to_address(coin, prev_script);
-                        }
-                    }
-                }
-            }
-        }
-
-        row.amount = sats_to_coins(delta);
-        row.address = address;
-        row.category = category_for(row.height, delta);
-        enriched += 1;
+        rows.extend(rows_from_decoded_tx(
+            coin,
+            &row_txid,
+            decoded,
+            row.height,
+            tip,
+            &wallet_scripts,
+            &wallet_addresses,
+            &prev_output_is_ours,
+        ));
+        expanded += 1;
     }
 
+    Ok(rows)
+}
+
+/// Legacy single-row enrich path (kept for callers that still mutate one row per txid).
+pub async fn enrich_wallet_history(
+    coin: CoinId,
+    script_hexes: &[String],
+    txs: &mut [WalletTx],
+    fetcher: &impl HistoryTxFetcher,
+    max_rows: Option<usize>,
+) -> AppResult<()> {
+    let tip = txs
+        .iter()
+        .filter_map(|t| t.blockheight)
+        .max();
+    let expanded =
+        expand_wallet_history_rows(coin, script_hexes, txs, fetcher, max_rows, tip).await?;
+    let by_txid: HashMap<String, WalletTx> = expanded
+        .into_iter()
+        .map(|row| (row.txid.clone(), row))
+        .collect();
+    for row in txs.iter_mut() {
+        if let Some(first) = by_txid.get(&row.txid) {
+            row.time = first.time;
+            row.amount = first.amount;
+            row.address.clone_from(&first.address);
+            row.category.clone_from(&first.category);
+        }
+    }
     Ok(())
 }
 

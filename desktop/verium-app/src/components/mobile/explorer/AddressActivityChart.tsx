@@ -79,7 +79,10 @@ export function AddressActivityChart({
               width={42}
               tickFormatter={(v) => (Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(3))}
             />
-            <Tooltip content={<ChartTooltip ticker={ticker} />} cursor={{ fill: 'var(--bg-subtle)' }} />
+            <Tooltip
+              content={<ChartTooltip ticker={ticker} />}
+              cursor={{ fill: 'var(--bg-subtle)' }}
+            />
             <Bar dataKey="delta" radius={[3, 3, 0, 0]} maxBarSize={28}>
               {bars.map((entry) => (
                 <Cell

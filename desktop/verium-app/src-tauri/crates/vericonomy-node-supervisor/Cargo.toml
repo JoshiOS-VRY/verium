@@ -1,6 +1,6 @@
 [package]
 name = "vericonomy-node-supervisor"
-version = "1.0.0-alpha.1"
+version = "1.0.0"
 description = "Pure node lifecycle state machine, process registry, and retry guards for the Vericonomy wallet."
 authors = ["Vericonomy developers"]
 edition = "2021"

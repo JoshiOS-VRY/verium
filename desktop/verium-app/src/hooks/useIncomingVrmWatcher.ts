@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { useCoinWalletMode } from '@/hooks/useWalletMode';
 import { useDaemonStatus } from '@/hooks/useDaemonStatus';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { useWalletTransactions } from '@/hooks/useWalletTransactions';
+import { isIncomingReceiveTx } from '@/lib/wallet-transactions-query';
 import { type TransactionItem } from '@/lib/rpc/client';
 
 export interface IncomingVrmEvent {
@@ -37,14 +39,17 @@ const SEEN_STORAGE_KEY = 'verium-notified-receive-txids';
 const MAX_SEEN_TXIDS = 2_000;
 const VERIUM = 'verium' as const;
 
-function isIncomingReceive(tx: TransactionItem): boolean {
-  return tx.category === 'receive' && tx.amount > 0;
+function storage(): Storage | null {
+  if (typeof localStorage !== 'undefined') return localStorage;
+  if (typeof sessionStorage !== 'undefined') return sessionStorage;
+  return null;
 }
 
 function loadSeenTxids(): Set<string> {
-  if (typeof sessionStorage === 'undefined') return new Set();
+  const store = storage();
+  if (!store) return new Set();
   try {
-    const raw = sessionStorage.getItem(SEEN_STORAGE_KEY);
+    const raw = store.getItem(SEEN_STORAGE_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return new Set();
@@ -55,11 +60,12 @@ function loadSeenTxids(): Set<string> {
 }
 
 function persistSeenTxids(seen: Set<string>): void {
-  if (typeof sessionStorage === 'undefined') return;
+  const store = storage();
+  if (!store) return;
   try {
     const ids = [...seen];
     const trimmed = ids.length > MAX_SEEN_TXIDS ? ids.slice(-MAX_SEEN_TXIDS) : ids;
-    sessionStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(trimmed));
+    store.setItem(SEEN_STORAGE_KEY, JSON.stringify(trimmed));
   } catch {
     // Ignore quota / privacy mode failures.
   }
@@ -84,14 +90,17 @@ function mergeReceiveEvent(map: Map<string, IncomingVrmEvent>, tx: TransactionIt
 
 export function useIncomingVrmWatcher(): void {
   const notify = useUserPreferences((s) => s.prefs.notify_on_vrm_received !== false);
-  const { data: status } = useDaemonStatus(VERIUM, { enabled: notify });
+  const { isLight } = useCoinWalletMode(VERIUM);
+  const { data: status } = useDaemonStatus(VERIUM, { enabled: notify && !isLight });
+  const pollEnabled = notify && (isLight || status?.connected === true);
   const seen = useRef<Set<string>>(loadSeenTxids());
   const initialized = useRef(false);
   const pending = useRef<IncomingVrmEvent[]>([]);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const txs = useWalletTransactions(VERIUM, {
-    enabled: notify && status?.connected === true,
+    enabled: pollEnabled,
+    incomingWatch: pollEnabled && isLight,
   });
 
   useEffect(() => {
@@ -103,7 +112,7 @@ export function useIncomingVrmWatcher(): void {
   useEffect(() => {
     if (!txs.isSuccess || txs.data === undefined) return;
 
-    const incoming = txs.data.filter(isIncomingReceive);
+    const incoming = txs.data.filter(isIncomingReceiveTx);
 
     if (!initialized.current) {
       for (const tx of incoming) {

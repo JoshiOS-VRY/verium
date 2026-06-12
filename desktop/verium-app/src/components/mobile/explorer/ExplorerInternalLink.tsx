@@ -7,15 +7,18 @@ export function ExplorerInternalLink({
   children,
   className,
   mono,
+  onClick,
 }: {
   to: string;
   children: ReactNode;
   className?: string;
   mono?: boolean;
+  onClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={cn(
         'text-accent underline-offset-2 hover:underline',
         mono && 'font-mono text-[11px] break-all',

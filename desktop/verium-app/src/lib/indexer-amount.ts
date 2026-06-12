@@ -16,11 +16,7 @@ export function sumIndexerAmountCoins(
   return amounts.reduce((sum, amount) => sum + parseIndexerAmountCoins(amount), 0);
 }
 
-export function formatIndexerCoinsTotal(
-  total: number,
-  ticker: string,
-  digits = 8
-): string {
+export function formatIndexerCoinsTotal(total: number, ticker: string, digits = 8): string {
   if (!ticker) return total.toFixed(digits);
   const frac = Math.abs(total) >= 1 ? Math.min(4, digits) : Math.min(8, digits);
   return `${total.toFixed(frac)} ${ticker}`;

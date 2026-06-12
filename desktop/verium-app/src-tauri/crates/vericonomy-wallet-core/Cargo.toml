@@ -1,6 +1,6 @@
 [package]
 name = "vericonomy-wallet-core"
-version = "1.0.0-alpha.1"
+version = "1.0.0"
 description = "Portable, Tauri-free wallet core: BIP39 mnemonics, BIP32 derivation, and chain-agnostic WIF encoding shared by desktop and future mobile shells."
 authors = ["Vericonomy developers"]
 edition = "2021"

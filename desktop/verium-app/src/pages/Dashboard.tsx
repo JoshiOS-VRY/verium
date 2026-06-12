@@ -10,7 +10,9 @@ import { MobileDashboardHero } from '@/components/mobile/MobileDashboardHero';
 import { MobileQuickActions } from '@/components/mobile/MobileQuickActions';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useIsTestNetwork } from '@/lib/network-mode';
+import { useLightWalletInstantReceiveSync } from '@/hooks/useLightWalletInstantReceiveSync';
 import { useWalletMode } from '@/hooks/useWalletMode';
+import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { LightWalletDashboardUnlock } from '@/components/LightWalletDashboardUnlock';
 import { LightWalletMissingBanner } from '@/components/LightWalletMissingBanner';
 import { LightWalletSyncBanner } from '@/components/LightWalletSyncBanner';
@@ -21,7 +23,10 @@ export function Dashboard() {
   const coin = useActiveCoin();
   const isTestNetwork = useIsTestNetwork();
   const { isLight, mobileOnly } = useWalletMode();
+  const visible = useWindowVisible();
   const queryClient = useQueryClient();
+
+  useLightWalletInstantReceiveSync(coin, isLight && visible);
 
   const handleMobileRefresh = useCallback(async () => {
     await refreshMobileDashboard(queryClient, coin, isLight);

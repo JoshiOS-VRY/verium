@@ -70,7 +70,6 @@ fn macos_perf_cores() -> Option<u32> {
 
 #[cfg(target_os = "macos")]
 fn macos_perf_cores() -> Option<u32> {
-    use std::ffi::CStr;
     use std::os::raw::c_char;
 
     extern "C" {

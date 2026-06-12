@@ -13,10 +13,20 @@ export function electrumServerShortLabel(
   const symbol = COIN_PROFILES[coin].symbol;
   const host = status.server_host?.toLowerCase() ?? '';
 
-  if (host.includes('vrm1') || host.includes('vrc1')) {
+  if (
+    host.includes('vrm3') ||
+    host.includes('vrm-3') ||
+    host.includes('vrc3') ||
+    host.includes('vrc-3')
+  ) {
     return `${symbol} primary`;
   }
-  if (host.includes('vrm2') || host.includes('vrc2')) {
+  if (
+    host.includes('vrm1') ||
+    host.includes('vrm2') ||
+    host.includes('vrc1') ||
+    host.includes('vrc2')
+  ) {
     return `${symbol} backup`;
   }
   if (status.servers_total > 1) {

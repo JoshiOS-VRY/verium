@@ -13,13 +13,7 @@ export const TRANSACTION_HISTORY_FILTERS: {
   { id: 'mining', label: 'Mining' },
 ];
 
-const MINING_CATEGORIES = new Set([
-  'generate',
-  'immature',
-  'stake',
-  'stake-mint',
-  'stake-orphan',
-]);
+const MINING_CATEGORIES = new Set(['generate', 'immature', 'stake', 'stake-mint', 'stake-orphan']);
 
 export function transactionMatchesHistoryFilter(
   tx: TransactionItem,

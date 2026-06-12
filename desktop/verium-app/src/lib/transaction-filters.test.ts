@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { TransactionItem } from '@/lib/rpc/client';
 import { filterTransactions, transactionMatchesHistoryFilter } from '@/lib/transaction-filters';
 
-function tx(partial: Partial<TransactionItem> & Pick<TransactionItem, 'category'>): TransactionItem {
+function tx(
+  partial: Partial<TransactionItem> & Pick<TransactionItem, 'category'>
+): TransactionItem {
   return {
     address: 'VRabc',
     amount: 1,

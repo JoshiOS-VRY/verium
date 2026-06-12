@@ -150,6 +150,10 @@ export function MobileSetupHub({
         {lightWalletCopy.mobileOnboardingWelcome}
       </p>
 
+      <p className="rounded-xl border border-warning/30 bg-warning/5 px-3 py-3 text-xs leading-relaxed text-fg-muted">
+        {lightWalletCopy.mobileFundsDisclaimer}
+      </p>
+
       <div className="grid min-w-0 gap-4">
         {options.map((coin) => {
           const query = profileByCoin[coin];

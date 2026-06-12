@@ -89,6 +89,8 @@ export interface WalletInfo {
   walletname: string;
   walletversion: number;
   balance: number;
+  /** Light wallet: confirmed UTXOs only (subset of `balance`). */
+  confirmed_balance?: number;
   unconfirmed_balance: number;
   immature_balance: number;
   txcount: number;
@@ -103,6 +105,10 @@ export interface WalletInfo {
   unlocked_minting_only?: boolean;
   light_wallet?: boolean;
   light_syncing?: boolean;
+  /** Gap scan or balance refresh in progress. */
+  light_balance_syncing?: boolean;
+  /** All HD addresses probed and last balance refresh finished. */
+  light_balance_ready?: boolean;
   /** True when the wallet can sign (unlocked with keys available). */
   private_keys_enabled?: boolean;
 }
@@ -314,7 +320,8 @@ export async function rpcSendToAddress(
   comment?: string,
   totpCode?: string,
   walletPassphrase?: string,
-  extraConfirmed = true
+  extraConfirmed = true,
+  feeRateVrmPerKb?: number
 ): Promise<string> {
   return invoke<string>('send_to_address', {
     coin,
@@ -324,6 +331,10 @@ export async function rpcSendToAddress(
     totpCode: totpCode?.trim() || null,
     walletPassphrase: walletPassphrase?.trim() || null,
     extraConfirmed,
+    feeRateVrmPerKb:
+      feeRateVrmPerKb != null && Number.isFinite(feeRateVrmPerKb) && feeRateVrmPerKb > 0
+        ? feeRateVrmPerKb
+        : null,
   });
 }
 

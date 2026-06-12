@@ -1,21 +1,25 @@
 import { useState } from 'react';
 import { ChevronDown, Hammer, Layers } from 'lucide-react';
+import { TappableExplorerSurface, useExplorerNavigate } from '@/components/ExplorerLink';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import type { IndexerAddressTransaction, IndexerPaging } from '@/lib/indexer-api';
 import { formatSignedIndexerAmount, parseIndexerAmountCoins } from '@/lib/indexer-amount';
-import { explorerBlockPath, explorerTxPath } from '@/lib/explorer-nav';
+import { explorerBlockPath } from '@/lib/explorer-nav';
 import { formatTransactionTime } from '@/lib/units';
 import { cn } from '@/lib/utils';
 import { ExplorerInternalLink } from './ExplorerInternalLink';
 import { shortTxid } from './tx-detail-utils';
 
 function ActivityRow({ tx }: { tx: IndexerAddressTransaction }) {
+  const navigateExplorer = useExplorerNavigate();
   const delta = parseIndexerAmountCoins(tx.netDelta);
   const tone = delta > 0 ? 'receive' : delta < 0 ? 'send' : 'neutral';
 
   return (
-    <article
+    <TappableExplorerSurface
+      onActivate={() => navigateExplorer({ kind: 'tx', txid: tx.txid })}
+      ariaLabel={`View transaction ${tx.txid}`}
       className={cn(
         'rounded-xl border px-3 py-2.5',
         tone === 'receive' && 'border-emerald-500/25 bg-emerald-500/8',
@@ -32,23 +36,26 @@ function ActivityRow({ tx }: { tx: IndexerAddressTransaction }) {
                 Coinbase
               </Badge>
             ) : tx.isCoinstake ? (
-              <Badge tone="neutral" className="text-[10px]">Coinstake</Badge>
+              <Badge tone="neutral" className="text-[10px]">
+                Coinstake
+              </Badge>
             ) : (
-              <Badge tone="neutral" className="text-[10px]">Transfer</Badge>
+              <Badge tone="neutral" className="text-[10px]">
+                Transfer
+              </Badge>
             )}
             {tx.blockHeight != null && (
               <ExplorerInternalLink
                 to={explorerBlockPath(tx.blockHeight)}
                 className="text-[10px] text-fg-muted"
+                onClick={(e) => e.stopPropagation()}
               >
-                <Layers className="mr-0.5 inline h-3 w-3" aria-hidden />
-                #{tx.blockHeight.toLocaleString()}
+                <Layers className="mr-0.5 inline h-3 w-3" aria-hidden />#
+                {tx.blockHeight.toLocaleString()}
               </ExplorerInternalLink>
             )}
           </div>
-          <ExplorerInternalLink to={explorerTxPath(tx.txid)} mono className="mt-1 block">
-            {shortTxid(tx.txid)}
-          </ExplorerInternalLink>
+          <p className="mt-1 font-mono text-[11px] text-accent break-all">{shortTxid(tx.txid)}</p>
           {tx.time != null && (
             <p className="mt-1 text-[11px] text-fg-muted">{formatTransactionTime(tx.time)}</p>
           )}
@@ -64,7 +71,7 @@ function ActivityRow({ tx }: { tx: IndexerAddressTransaction }) {
           {formatSignedIndexerAmount(tx.netDelta ?? undefined)}
         </p>
       </div>
-    </article>
+    </TappableExplorerSurface>
   );
 }
 
@@ -97,7 +104,9 @@ export function AddressActivitySection({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-fg">Transaction history</h3>
-            <Badge tone="neutral" className="text-[10px]">{total.toLocaleString()}</Badge>
+            <Badge tone="neutral" className="text-[10px]">
+              {total.toLocaleString()}
+            </Badge>
           </div>
           <p className="mt-0.5 text-[11px] text-fg-muted">
             Page {page} of {totalPages} · indexed net change per tx

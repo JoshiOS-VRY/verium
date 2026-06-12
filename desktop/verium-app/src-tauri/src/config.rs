@@ -86,11 +86,13 @@ pub fn app_config_base() -> PathBuf {
     base.join("Vericonomy").join("desktop-app")
 }
 
+#[cfg(mobile)]
 pub fn migrate_legacy_configs() -> AppResult<()> {
-    #[cfg(mobile)]
-    {
-        return Ok(());
-    }
+    Ok(())
+}
+
+#[cfg(not(mobile))]
+pub fn migrate_legacy_configs() -> AppResult<()> {
     let legacy_daemon = app_config_base()
         .parent()
         .map(|p| p.join("Verium").join("desktop-app").join("daemon.json"));
@@ -193,14 +195,13 @@ pub fn load_or_default_config(coin: CoinId) -> AppResult<DaemonConfig> {
 /// Resolve daemon settings for a coin on a specific network mode. Uses the
 /// saved daemon-*.json when its chain matches the requested mode; otherwise
 /// returns fresh defaults for that network (binarytest ports/datadirs).
+#[cfg(mobile)]
 pub fn load_config_for_network(coin: CoinId, mode: NetworkMode) -> AppResult<DaemonConfig> {
-    // iOS/Android light wallet: no local node datadir or .conf I/O at startup.
-    #[cfg(mobile)]
-    {
-        let _ = migrate_legacy_configs();
-        return Ok(default_config_for_target(CoinTarget::new(coin, mode)));
-    }
+    Ok(default_config_for_target(CoinTarget::new(coin, mode)))
+}
 
+#[cfg(not(mobile))]
+pub fn load_config_for_network(coin: CoinId, mode: NetworkMode) -> AppResult<DaemonConfig> {
     let _ = migrate_legacy_configs();
     let want_binarytest = mode.is_test();
     let mut cfg = if let Some(saved) = load_saved_daemon_config(coin)? {

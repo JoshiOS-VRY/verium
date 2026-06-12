@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
-import { lightWalletRescan } from '@/lib/light-wallet/client';
+import { lightWalletRefreshBalance, lightWalletRefreshPending } from '@/lib/light-wallet/client';
+import { walletTransactionsKeyPrefix } from '@/lib/wallet-transactions-query';
 import { rpcGetWalletInfo } from '@/lib/rpc/client';
 import { isWalletLocked } from '@/lib/wallet-unlock';
 
@@ -38,10 +39,14 @@ export async function refreshMobileDashboard(
     queryClient.invalidateQueries({
       queryKey: coinQueryKey(coin, 'wallet-cumulative-txs'),
     }),
+    queryClient.invalidateQueries({
+      queryKey: walletTransactionsKeyPrefix(coin),
+    }),
   ];
 
   if (isLight && unlocked) {
-    invalidateTasks.push(lightWalletRescan(coin));
+    invalidateTasks.push(lightWalletRefreshBalance(coin));
+    invalidateTasks.push(lightWalletRefreshPending(coin));
   }
 
   await Promise.all(invalidateTasks);

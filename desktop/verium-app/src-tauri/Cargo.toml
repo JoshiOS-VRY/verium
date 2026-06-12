@@ -1,6 +1,6 @@
 [package]
 name = "vericonomy-wallet"
-version = "1.0.0-alpha.1"
+version = "1.0.0"
 description = "Vericonomy Wallet — dual-chain desktop UI for Verium and Vericoin."
 authors = ["Vericonomy developers"]
 edition = "2021"
@@ -61,9 +61,8 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 tokio-rustls = "0.26"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "0.26"
-
-[target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
 tauri-plugin-biometric = "2"
+tauri-plugin-notification = "2"
 
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 hidapi = "2"

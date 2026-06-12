@@ -50,6 +50,54 @@ describe('cumulative balance chart', () => {
     expect(domain[1]).toBeGreaterThan(300);
   });
 
+  it('does not exceed anchor when send rows have inflated outgoing amounts', () => {
+    const txs: TransactionItem[] = [
+      {
+        txid: 'send',
+        category: 'send',
+        amount: -160,
+        confirmations: 10,
+        time: 1_700_000_100,
+        timereceived: 1_700_000_100,
+      },
+      {
+        txid: 'recv',
+        category: 'receive',
+        amount: 300,
+        confirmations: 100,
+        time: 1_600_000_000,
+        timereceived: 1_600_000_000,
+      },
+    ];
+
+    const series = buildWalletCumulativeSeries(txs, 340);
+    expect(Math.max(...series.points.map((p) => p.balance))).toBeLessThanOrEqual(340);
+  });
+
+  it('does not show negative history when send rows have wrong positive amounts', () => {
+    const txs: TransactionItem[] = [
+      {
+        txid: 'send',
+        category: 'send',
+        amount: 299,
+        confirmations: 0,
+        time: 1_700_000_100,
+        timereceived: 1_700_000_100,
+      },
+      {
+        txid: 'recv',
+        category: 'receive',
+        amount: 300,
+        confirmations: 100,
+        time: 1_600_000_000,
+        timereceived: 1_600_000_000,
+      },
+    ];
+
+    const series = buildWalletCumulativeSeries(txs, 1);
+    expect(Math.min(...series.points.map((p) => p.balance))).toBeGreaterThanOrEqual(0);
+  });
+
   it('downsample keeps extrema', () => {
     const points = Array.from({ length: 100 }, (_, i) => ({
       id: String(i),

@@ -12,6 +12,7 @@ import { useAutoLock } from '@/hooks/useAutoLock';
 import { useScheduledBackup } from '@/hooks/useScheduledBackup';
 import { useMiningPollCoordinator } from '@/hooks/useMiningPollCoordinator';
 import { useAdaptiveMiningThreads } from '@/hooks/useAdaptiveMiningThreads';
+import { useLightWalletBalanceSync } from '@/hooks/useLightWalletBalanceSync';
 import { useWalletInfoPollCoordinator } from '@/hooks/useWalletInfoPollCoordinator';
 import { useBlockchainInfoPollCoordinator } from '@/hooks/useBlockchainInfoPollCoordinator';
 import { useExplorerStatsPollCoordinator } from '@/hooks/useExplorerStatsPollCoordinator';
@@ -27,6 +28,7 @@ import { useStakeRewardDashboardSync } from '@/hooks/useStakeRewardDashboardSync
 import { useChainTipWatcher } from '@/hooks/useChainTipWatcher';
 import { useIncomingVrmNotifications } from '@/hooks/useIncomingVrmNotifications';
 import { useIncomingVrmWatcher } from '@/hooks/useIncomingVrmWatcher';
+import { useLightIncomingChainSync } from '@/hooks/useLightIncomingChainSync';
 import { useIncomingVrcNotifications } from '@/hooks/useIncomingVrcNotifications';
 import { useIncomingVrcWatcher } from '@/hooks/useIncomingVrcWatcher';
 import { FullNodeOnlyRoute } from '@/components/FullNodeOnlyRoute';
@@ -118,6 +120,7 @@ function AppHooks() {
   const prefs = useUserPreferences((s) => s.prefs);
   useAutoMine();
   useMiningPollCoordinator();
+  useLightWalletBalanceSync();
   useWalletInfoPollCoordinator();
   useBlockchainInfoPollCoordinator();
   useExplorerStatsPollCoordinator();
@@ -134,6 +137,7 @@ function AppHooks() {
   useStakeRewardWatcher();
   useStakeRewardDashboardSync();
   useStakeRewardSound();
+  useLightIncomingChainSync();
   useIncomingVrmWatcher();
   useIncomingVrmNotifications();
   useIncomingVrcWatcher();

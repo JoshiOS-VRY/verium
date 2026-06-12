@@ -31,10 +31,22 @@ export const lightWalletCopy = {
     'Pick Verium or Vericoin, then set up a light wallet for each chain. No local node or blockchain sync on mobile.',
   mobileOnboardingWelcome:
     'Your keys stay encrypted on this device. Balance and history sync through Vericonomy Electrum servers — no blockchain download required.',
+  mobileFundsDisclaimer:
+    'This is wallet software for real mainnet assets. Only store amounts you are prepared to lose if something goes wrong. Always back up your recovery phrase before sending funds.',
   mobileOnboardingCreate:
     'Generate a new wallet with a recovery phrase you write down and store safely.',
   mobileOnboardingImport:
     'Already have a wallet? Restore it with your 24-word recovery phrase and passphrase.',
+  sendAvailableIncludesChange:
+    'Available balance includes unconfirmed change from your sends until the next block confirms.',
+  balanceUpdating: 'Updating balance…',
+  balanceUpToDate: 'Balance up to date',
+  balanceCheckingAddresses: 'Checking all wallet addresses…',
+  rescanTitle: 'Rescan addresses',
+  rescanDescription:
+    'Re-discovers receive and change addresses on Vericonomy servers and rebuilds your local balance cache. Use this if balance looks too low compared to a full-node wallet with the same recovery phrase.',
+  rescanUnlockHint: 'Unlock the wallet on that chain before rescanning.',
+  rescanSuccess: 'Address rescan started. Balance may update over the next few minutes.',
   mobileOnboardingRestoreHint:
     'We found wallet data on this device that could not be unlocked. Import your recovery phrase to restore access.',
   mobileOnboardingNotSetUp: 'Not set up yet',

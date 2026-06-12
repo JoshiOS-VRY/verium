@@ -112,6 +112,44 @@ impl LightWalletCache {
         Ok(out)
     }
 
+    pub fn remove_utxo(&self, txid: &str, vout: u32) -> AppResult<bool> {
+        let n = self
+            .conn
+            .execute(
+                "DELETE FROM utxo_cache WHERE txid = ?1 AND vout = ?2",
+                params![txid, vout],
+            )
+            .map_err(|e| AppError::other(format!("sqlite utxo delete: {e}")))?;
+        Ok(n > 0)
+    }
+
+    pub fn upsert_utxo(&self, utxo: &Utxo) -> AppResult<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        self.conn
+            .execute(
+                "INSERT INTO utxo_cache(txid, vout, value_sats, script_hex, height, fetched_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(txid, vout) DO UPDATE SET
+                   value_sats = excluded.value_sats,
+                   script_hex = excluded.script_hex,
+                   height = excluded.height,
+                   fetched_at = excluded.fetched_at",
+                params![
+                    utxo.txid,
+                    utxo.vout,
+                    utxo.value_sats,
+                    utxo.script_hex,
+                    utxo.height,
+                    now
+                ],
+            )
+            .map_err(|e| AppError::other(format!("sqlite utxo upsert: {e}")))?;
+        Ok(())
+    }
+
     pub fn sum_utxo_values(&self) -> AppResult<i64> {
         let mut stmt = self
             .conn
@@ -275,7 +313,8 @@ impl LightWalletCache {
                 let payload = serde_json::to_string(t)
                     .map_err(|e| AppError::other(format!("history encode: {e}")))?;
                 let sort_time = t.time.unwrap_or(0) as i64;
-                stmt.execute(params![t.txid, t.category, sort_time, payload])
+                let storage_category = crate::wallet::listtransactions_rows::cache_storage_category(t);
+                stmt.execute(params![t.txid, storage_category, sort_time, payload])
                     .map_err(|e| AppError::other(format!("sqlite history insert: {e}")))?;
             }
         }

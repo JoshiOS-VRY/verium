@@ -1,10 +1,11 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { CoinSwitcher } from '@/components/CoinSwitcher';
 import { DaemonStatusBadge } from '@/components/DaemonStatusBadge';
 import { LightServerBadge } from '@/components/LightServerBadge';
 import { APP_ROUTE_TITLES } from '@/lib/app-nav';
 import { isExplorerDetailPath } from '@/lib/explorer-nav';
+import { mobileBackAriaLabel, performMobileBack } from '@/lib/mobile-back-nav';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { cn } from '@/lib/utils';
 
@@ -26,31 +27,17 @@ export function MobileHeader() {
   return (
     <header className="mobile-header z-30 shrink-0 border-b border-border bg-bg-subtle/95 backdrop-blur-md">
       <div className="flex min-w-0 items-center gap-2 px-3 py-1.5">
-        {explorerDetail ? (
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={cn(
-              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-muted',
-              'transition-colors hover:bg-bg-panel hover:text-fg'
-            )}
-            aria-label="Back"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-        ) : (
-          <Link
-            to="/setup"
-            state={{ setupHub: true }}
-            className={cn(
-              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-muted',
-              'transition-colors hover:bg-bg-panel hover:text-fg'
-            )}
-            aria-label="Back to wallet menu"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        )}
+        <button
+          type="button"
+          onClick={() => performMobileBack(navigate, pathname)}
+          className={cn(
+            'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-muted',
+            'transition-colors hover:bg-bg-panel hover:text-fg'
+          )}
+          aria-label={mobileBackAriaLabel(pathname)}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-base font-semibold leading-tight">{title}</h1>
         </div>

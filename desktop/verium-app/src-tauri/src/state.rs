@@ -4,13 +4,15 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+#[cfg(mobile)]
+use tauri::Manager;
 use tokio::sync::RwLock;
 
 use crate::coin_profile::CoinId;
-use crate::config::{
-    init_app_storage_base, load_config_for_network, refresh_config_paths, DaemonConfig,
-};
+use crate::config::{load_config_for_network, refresh_config_paths, DaemonConfig};
+#[cfg(mobile)]
+use crate::config::init_app_storage_base;
 use crate::daemon::DaemonManager;
 use crate::error::{AppError, AppResult};
 use crate::features::effective_network_mode;

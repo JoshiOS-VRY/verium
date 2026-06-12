@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useDaemonStatus } from '@/hooks/useDaemonStatus';
 import { MobileReceiveForm } from '@/components/mobile/MobileReceiveForm';
-import { useLightWalletInstantReceiveSync } from '@/hooks/useLightWalletInstantReceiveSync';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { useIsTestNetwork } from '@/lib/network-mode';
 
@@ -31,7 +30,6 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const profile = useCoinProfile();
   const isTestNetwork = useIsTestNetwork();
   const { isLight, mobileOnly } = useWalletMode();
-  useLightWalletInstantReceiveSync(coin, isLight);
   const { data: nodeStatus } = useDaemonStatus(coin);
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');

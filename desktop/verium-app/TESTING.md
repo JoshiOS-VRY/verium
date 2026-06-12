@@ -120,3 +120,30 @@ before promoting the GitHub Release out of draft.
       removes config (but never wallet.dat in the user data dir).
 
 When everything above is green, promote the draft release.
+
+## 15. iOS / TestFlight
+
+See **[docs/ios-testflight.md](docs/ios-testflight.md)** for the full build,
+upload, and App Store Connect workflow.
+
+Quick path:
+
+```bash
+cd desktop/verium-app
+export APPLE_DEVELOPMENT_TEAM=396ZMFA3PP   # real team ID, not YOUR_TEAM_ID
+npm run ios:archive
+```
+
+Upload the IPA from `src-tauri/gen/apple/build/app-store/` via Transporter.
+
+### iOS smoke checklist
+
+- [ ] Setup hub shows mainnet funds disclaimer.
+- [ ] Create and import light wallets for VRM and VRC.
+- [ ] Face ID unlock enable / disable.
+- [ ] Balance syncs (Electrum).
+- [ ] Send small amount (default fee); tx appears in history.
+- [ ] QR scan on send (camera permission).
+- [ ] In-app explorer links (tx / block / address).
+- [ ] Settings has **no** external update download UI.
+- [ ] `verium://` / `vericoin://` payment URIs open send flow.

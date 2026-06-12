@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Desktop-only permissions (bundled node sidecars).",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/veriumd",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/vericoind",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
+  ]
+}

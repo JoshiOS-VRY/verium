@@ -57,6 +57,10 @@ export interface UserPreferences {
   onboarding_by_coin?: Partial<Record<CoinId, OnboardingCheckpoint>>;
   /** Mobile: unlock with Face ID / Touch ID when configured in Settings. */
   biometric_unlock_enabled?: boolean;
+  /** User dismissed the one-time Face ID setup prompt (or completed setup). */
+  biometric_unlock_prompt_dismissed?: boolean;
+  /** User dismissed the one-time notification permission prompt. */
+  notifications_prompt_dismissed?: boolean;
 }
 
 interface PrefsState {

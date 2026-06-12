@@ -428,6 +428,17 @@
   }
 }
 
+@keyframes toast-enter-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes bootstrap-indeterminate {
   0% {
     transform: translateX(-100%);
@@ -443,6 +454,20 @@
 
 .toast-enter {
   animation: toast-enter 0.25s ease-out;
+}
+
+.toast-enter-mobile {
+  animation: toast-enter-mobile 0.25s ease-out;
+}
+
+/* iOS / mobile shell — sit above tab bar + home indicator */
+.toast-host-mobile {
+  top: auto;
+  bottom: calc(2.875rem + env(safe-area-inset-bottom, 0px));
+}
+
+.toast-host-mobile-no-tab {
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* CPU miner widget — soft status glow */

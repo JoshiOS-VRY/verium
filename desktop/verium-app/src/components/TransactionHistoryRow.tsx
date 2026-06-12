@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmationProgress } from '@/components/ConfirmationProgress';
-import { ExplorerLink } from '@/components/ExplorerLink';
+import { ExplorerCardLink } from '@/components/ExplorerLink';
 import type { CoinId } from '@/lib/coin/profile';
 import type { TransactionItem } from '@/lib/rpc/client';
 import {
@@ -20,7 +20,10 @@ export function TransactionHistoryCard({
   isPoolPayout?: boolean;
 }) {
   return (
-    <article
+    <ExplorerCardLink
+      target={{ kind: 'tx', txid: tx.txid }}
+      coin={coin}
+      ariaLabel={`View transaction ${tx.txid}`}
       className={cn(
         'min-w-0 max-w-full rounded-xl border border-border bg-bg-panel/60 px-3 py-3',
         'odd:bg-bg-subtle/30'
@@ -51,14 +54,8 @@ export function TransactionHistoryCard({
 
       <div className="mt-2.5 flex min-w-0 items-center justify-between gap-2 border-t border-border/60 pt-2">
         <ConfirmationProgress confirmations={tx.confirmations} category={tx.category} />
-        <ExplorerLink
-          coin={coin}
-          target={{ kind: 'tx', txid: tx.txid }}
-          label="View"
-          title={`Open tx ${tx.txid} on the explorer`}
-          className="shrink-0 text-[11px]"
-        />
+        <span className="shrink-0 font-mono text-[11px] text-accent">{tx.txid.slice(0, 10)}…</span>
       </div>
-    </article>
+    </ExplorerCardLink>
   );
 }

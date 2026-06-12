@@ -91,11 +91,15 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+        .plugin(tauri_plugin_deep_link::init());
+    #[cfg(not(mobile))]
+    {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
     #[cfg(mobile)]
     {
         builder = builder.plugin(tauri_plugin_biometric::init());
+        builder = builder.plugin(tauri_plugin_notification::init());
     }
     let app = builder
         .on_window_event(|window, event| {
@@ -324,6 +328,7 @@ pub fn run() {
             wallet_commands::light_wallet_import,
             wallet_commands::light_wallet_unlock,
             wallet_commands::light_wallet_rescan,
+            wallet_commands::light_wallet_refresh_balance,
             wallet_commands::light_wallet_refresh_pending,
             wallet_commands::light_wallet_lock,
             wallet_commands::light_wallet_exists,
