@@ -33,6 +33,17 @@ npm run tauri:ios:init -- --ci
 
 ## Build an App Store IPA
 
+Create `desktop/verium-app/.env` or `.env.local` **before** archiving (values are
+embedded into the iOS binary at compile time):
+
+```bash
+VERICONOMY_PUSH_API_URL=https://push.vericonomy.com
+VERICONOMY_PUSH_API_SECRET=<same as PUSH_API_SECRET on vericonomy-push droplet>
+```
+
+Remote lock-screen push is skipped if `VERICONOMY_PUSH_API_SECRET` is empty. See
+[push-notifications.md](push-notifications.md).
+
 ```bash
 cd desktop/verium-app
 # Optional if DEVELOPMENT_TEAM is in the Xcode project:
@@ -95,6 +106,7 @@ Run on a **release** build before inviting external testers.
 | Send       | Small test send with default fee; confirm tx in history / explorer          |
 | QR scan    | Camera permission prompt; scan payment QR on send                           |
 | Explorer   | Tap tx / block / address links (in-app routes)                              |
+| Push       | Allow notifications; unlock wallet; kill app; receive test VRM → lock screen alert |
 | Settings   | **No** “Check for updates” / download UI; Electrum server card works        |
 | Deep links | Open `verium://…` payment URI → lands on send flow                          |
 

@@ -21,6 +21,8 @@ mod indexer_api;
 mod local_block_feed;
 mod pool_api;
 mod pool_miner;
+mod push_commands;
+mod push_registration;
 mod features;
 mod http_shared;
 mod memory_telemetry;
@@ -100,6 +102,7 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_plugin_biometric::init());
         builder = builder.plugin(tauri_plugin_notification::init());
+        builder = builder.plugin(tauri_plugin_mobile_push::init());
     }
     let app = builder
         .on_window_event(|window, event| {
@@ -340,6 +343,10 @@ pub fn run() {
             wallet_commands::biometric_unlock_enable,
             wallet_commands::biometric_unlock_disable,
             wallet_commands::biometric_unlock_wallet,
+            push_commands::push_sync_device,
+            push_commands::push_heartbeat_device,
+            push_commands::push_unregister_device,
+            push_commands::push_registration_configured,
             onboarding_commands::wallet_profile,
             onboarding_commands::wallet_storage_diagnostics,
             onboarding_commands::secret_store_status,

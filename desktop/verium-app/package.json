@@ -80,6 +80,7 @@
     "react-router-dom": "^7.16.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0",
+    "tauri-plugin-mobile-push-api": "^0.1.4",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
