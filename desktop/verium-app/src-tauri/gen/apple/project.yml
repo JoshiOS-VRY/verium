@@ -83,6 +83,11 @@ targets:
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
         CODE_SIGN_STYLE: Automatic
       groups: [app]
+      configs:
+        debug:
+          CODE_SIGN_ENTITLEMENTS: vericonomy-wallet_iOS/vericonomy-wallet_iOS-debug.entitlements
+        release:
+          CODE_SIGN_ENTITLEMENTS: vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements
     dependencies:
       - framework: libapp.a
         embed: false
