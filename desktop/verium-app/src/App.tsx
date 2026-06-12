@@ -28,6 +28,7 @@ import { useStakeRewardDashboardSync } from '@/hooks/useStakeRewardDashboardSync
 import { useChainTipWatcher } from '@/hooks/useChainTipWatcher';
 import { useIncomingVrmNotifications } from '@/hooks/useIncomingVrmNotifications';
 import { useIncomingVrmWatcher } from '@/hooks/useIncomingVrmWatcher';
+import { useRemotePushRegistration } from '@/hooks/useRemotePushRegistration';
 import { useLightIncomingChainSync } from '@/hooks/useLightIncomingChainSync';
 import { useIncomingVrcNotifications } from '@/hooks/useIncomingVrcNotifications';
 import { useIncomingVrcWatcher } from '@/hooks/useIncomingVrcWatcher';
@@ -137,6 +138,7 @@ function AppHooks() {
   useStakeRewardWatcher();
   useStakeRewardDashboardSync();
   useStakeRewardSound();
+  useRemotePushRegistration();
   useLightIncomingChainSync();
   useIncomingVrmWatcher();
   useIncomingVrmNotifications();

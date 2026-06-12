@@ -3,5 +3,5 @@
   "identifier": "ios",
   "description": "iOS-only permissions (Face ID / Touch ID unlock).",
   "windows": ["main"],
-  "permissions": ["biometric:default", "notification:default"]
+  "permissions": ["biometric:default", "notification:default", "mobile-push:default"]
 }

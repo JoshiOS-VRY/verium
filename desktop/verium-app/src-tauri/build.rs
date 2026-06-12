@@ -27,6 +27,16 @@ fn main() {
     println!("cargo:rerun-if-env-changed=VITE_POOL_SUPABASE_ANON_KEY");
     println!("cargo:rerun-if-env-changed=POOL_SUPABASE_URL");
     println!("cargo:rerun-if-env-changed=VITE_POOL_SUPABASE_URL");
+
+    // iOS bundles have no .env at runtime — embed push API config at compile time.
+    let push_secret = env::var("VERICONOMY_PUSH_API_SECRET").unwrap_or_default();
+    let push_url = env::var("VERICONOMY_PUSH_API_URL")
+        .unwrap_or_else(|_| "https://push.vericonomy.com".to_string());
+    println!("cargo:rustc-env=VERICONOMY_PUSH_API_SECRET={push_secret}");
+    println!("cargo:rustc-env=VERICONOMY_PUSH_API_URL={push_url}");
+    println!("cargo:rerun-if-env-changed=VERICONOMY_PUSH_API_SECRET");
+    println!("cargo:rerun-if-env-changed=VERICONOMY_PUSH_API_URL");
+
     println!("cargo:rerun-if-changed=.env");
     println!("cargo:rerun-if-changed=../.env");
     println!("cargo:rerun-if-changed=../.env.local");

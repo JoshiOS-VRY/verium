@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEnabledCoins } from '@/lib/coin/context';
-import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
+import type { CoinId } from '@/lib/coin/profile';
 import { lightWalletRefreshPending, lightServerStatus } from '@/lib/light-wallet/client';
 import {
   LIGHT_INCOMING_NOTIFY_BACKGROUND_POLL_MS,

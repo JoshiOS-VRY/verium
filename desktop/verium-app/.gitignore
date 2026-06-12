@@ -3,6 +3,7 @@ dist
 dist-ssr
 *.tsbuildinfo
 *.local
+.env
 .vite
 .cache
 
