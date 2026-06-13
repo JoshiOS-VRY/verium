@@ -58,6 +58,22 @@ fn push_api_secret() -> Option<String> {
     None
 }
 
+const MAX_PUSH_SCRIPTHASHES_PER_CHAIN: usize = 64;
+
+fn cap_scripthashes(mut hashes: Vec<String>) -> Vec<String> {
+    hashes.sort();
+    hashes.dedup();
+    if hashes.len() > MAX_PUSH_SCRIPTHASHES_PER_CHAIN {
+        tracing::warn!(
+            registered = MAX_PUSH_SCRIPTHASHES_PER_CHAIN,
+            total = hashes.len(),
+            "capping push scripthashes for remote registration"
+        );
+        hashes.truncate(MAX_PUSH_SCRIPTHASHES_PER_CHAIN);
+    }
+    hashes
+}
+
 fn scripthashes_for_coin(coin: CoinId) -> AppResult<Vec<String>> {
     if !keystore::wallet_exists(coin)? || !keystore::is_unlocked(coin)? {
         return Ok(Vec::new());
@@ -80,12 +96,12 @@ async fn build_register_body(device_token: &str) -> AppResult<RegisterBody> {
         prefs.notify_on_vrc_received && prefs::coin_enabled(&prefs, CoinId::Vericoin);
 
     let verium_scripthashes = if notify_vrm {
-        scripthashes_for_coin(CoinId::Verium)?
+        cap_scripthashes(scripthashes_for_coin(CoinId::Verium)?)
     } else {
         Vec::new()
     };
     let vericoin_scripthashes = if notify_vrc {
-        scripthashes_for_coin(CoinId::Vericoin)?
+        cap_scripthashes(scripthashes_for_coin(CoinId::Vericoin)?)
     } else {
         Vec::new()
     };
