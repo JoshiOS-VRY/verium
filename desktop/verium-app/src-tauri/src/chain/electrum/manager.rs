@@ -230,7 +230,20 @@ impl ElectrumLightClient {
     }
 
     async fn call_with_failover(&self, method: &str, params: Value) -> AppResult<Value> {
-        if throttle::is_in_cooldown(self.coin) {
+        self.call_with_failover_inner(method, params, false).await
+    }
+
+    async fn call_with_failover_critical(&self, method: &str, params: Value) -> AppResult<Value> {
+        self.call_with_failover_inner(method, params, true).await
+    }
+
+    async fn call_with_failover_inner(
+        &self,
+        method: &str,
+        params: Value,
+        bypass_cooldown: bool,
+    ) -> AppResult<Value> {
+        if !bypass_cooldown && throttle::is_in_cooldown(self.coin) {
             return Err(AppError::other(
                 "electrum temporarily paused after rate limit — try again in a few minutes",
             ));
@@ -465,13 +478,13 @@ impl ChainBackend for ElectrumLightClient {
         let txid = txid.trim();
         // Electrum spec: verbose=false returns raw tx as hex; verbose=true returns JSON.
         let raw = self
-            .call_with_failover("blockchain.transaction.get", json!([txid, false]))
+            .call_with_failover_critical("blockchain.transaction.get", json!([txid, false]))
             .await?;
         match crate::chain::tx_hex::parse_electrum_transaction_get(&raw) {
             Ok(hex) => Ok(hex),
             Err(first) => {
                 let verbose = self
-                    .call_with_failover("blockchain.transaction.get", json!([txid, true]))
+                    .call_with_failover_critical("blockchain.transaction.get", json!([txid, true]))
                     .await?;
                 crate::chain::tx_hex::parse_electrum_transaction_get(&verbose)
                     .map_err(|_| first)
@@ -504,7 +517,7 @@ impl ChainBackend for ElectrumLightClient {
 
     async fn broadcast_tx(&self, raw_hex: &str) -> AppResult<String> {
         let txid = self
-            .call_with_failover("blockchain.transaction.broadcast", json!([raw_hex]))
+            .call_with_failover_critical("blockchain.transaction.broadcast", json!([raw_hex]))
             .await?;
         Ok(txid
             .as_str()

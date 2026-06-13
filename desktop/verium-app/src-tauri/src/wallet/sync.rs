@@ -252,6 +252,37 @@ fn mark_precache_probe_complete(coin: CoinId) {
     }
 }
 
+/// Refresh UTXOs for send using scripts already in the funded set / local cache.
+/// Skips precache probing so send does not fan out 160+ balance RPCs before signing.
+pub(crate) async fn refresh_send_utxos_from_network(
+    coin: CoinId,
+    phrase: Option<&str>,
+    backend: &dyn ChainBackend,
+) -> AppResult<()> {
+    let mut scripts = keystore::funded_script_hexes(coin)?;
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        if let Ok(utxos) = cache.list_utxos() {
+            for utxo in utxos {
+                if utxo.script_hex.is_empty() {
+                    continue;
+                }
+                if scripts
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case(&utxo.script_hex))
+                {
+                    continue;
+                }
+                scripts.push(utxo.script_hex.clone());
+            }
+        }
+    }
+    if scripts.is_empty() {
+        return Ok(());
+    }
+    refresh_utxos(coin, &scripts, backend, phrase).await?;
+    Ok(())
+}
+
 /// Discover funded scripts + refresh UTXO cache (no transaction history RPC).
 pub(crate) async fn refresh_light_wallet_utxos_from_network(
     coin: CoinId,

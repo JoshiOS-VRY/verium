@@ -196,10 +196,8 @@ async fn fetch_utxos_for_send(
         .ok()
         .and_then(|c| c.list_utxos().ok())
         .unwrap_or_default();
-    let should_refresh =
-        cached_before.is_empty() || scan_incomplete || !is_utxo_cache_recent(coin);
 
-    if should_refresh {
+    if cached_before.is_empty() || scan_incomplete {
         if let Err(e) =
             crate::wallet::sync::refresh_light_wallet_utxos_from_network(
                 coin,
@@ -209,6 +207,19 @@ async fn fetch_utxos_for_send(
             .await
         {
             tracing::warn!("send utxo refresh failed for {}: {e}", coin.as_str());
+        }
+    } else if !is_utxo_cache_recent(coin) {
+        // Full precache probe + listunspent for every funded script can exceed the
+        // send timeout when many addresses are tracked. Background balance polling
+        // keeps cache warm; only refresh scripts we already know about.
+        if let Err(e) = crate::wallet::sync::refresh_send_utxos_from_network(
+            coin,
+            Some(phrase),
+            backend.as_ref(),
+        )
+        .await
+        {
+            tracing::warn!("send utxo light refresh failed for {}: {e}", coin.as_str());
         }
     }
 
@@ -244,7 +255,7 @@ async fn fetch_utxos_for_send(
 const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
 /// Minimum gap between gap-scan indexing slices (Electrum RPC budget per slice).
 const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
-const SEND_FLOW_TIMEOUT: Duration = Duration::from_secs(120);
+const SEND_FLOW_TIMEOUT: Duration = Duration::from_secs(180);
 
 static LAST_STEADY_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
