@@ -1,38 +1,71 @@
 #!/usr/bin/env bash
-# Verify the App Store xcarchive has production push entitlements before TestFlight upload.
+# Verify App Store export has production push entitlements before TestFlight upload.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ARCHIVE="${ROOT}/src-tauri/gen/apple/build/vericonomy-wallet_iOS.xcarchive"
-APP="${ARCHIVE}/Products/Applications/Vericonomy Wallet.app"
+ARCHIVE_APP="${ARCHIVE}/Products/Applications/Vericonomy Wallet.app"
+IPA="${ROOT}/src-tauri/gen/apple/build/app-store/Vericonomy Wallet.ipa"
 
-if [[ ! -d "${APP}" ]]; then
-  echo "error: archive app not found at:" >&2
-  echo "  ${APP}" >&2
+read_aps() {
+  local app_path="$1"
+  codesign -d --entitlements :- "${app_path}" 2>/dev/null \
+    | plutil -extract aps-environment raw -o - - 2>/dev/null || true
+}
+
+read_task_allow() {
+  local app_path="$1"
+  codesign -d --entitlements :- "${app_path}" 2>/dev/null \
+    | plutil -extract get-task-allow raw -o - - 2>/dev/null || true
+}
+
+check_app() {
+  local label="$1"
+  local app_path="$2"
+  local aps task_allow
+  aps="$(read_aps "${app_path}")"
+  task_allow="$(read_task_allow "${app_path}")"
+  echo "==> ${label}"
+  codesign -d --entitlements :- "${app_path}" 2>/dev/null || true
+  echo ""
+  echo "aps-environment: ${aps:-<missing>}"
+  echo "get-task-allow: ${task_allow:-<missing>}"
+  echo ""
+  if [[ "${aps}" == "production" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# TestFlight uploads the exported IPA — export re-signs with App Store distribution.
+if [[ -f "${IPA}" ]]; then
+  TMPDIR_IPA="$(mktemp -d)"
+  unzip -q "${IPA}" -d "${TMPDIR_IPA}"
+  IPA_APP="${TMPDIR_IPA}/Payload/Vericonomy Wallet.app"
+  if check_app "Exported IPA (upload this to TestFlight)" "${IPA_APP}"; then
+    rm -rf "${TMPDIR_IPA}"
+    echo "OK: production push entitlements present in IPA."
+    exit 0
+  fi
+  rm -rf "${TMPDIR_IPA}"
+  echo "FAIL: IPA missing production push entitlements." >&2
+  echo "Re-run npm run ios:archive (export step re-signs for App Store)." >&2
+  exit 1
+fi
+
+if [[ ! -d "${ARCHIVE_APP}" ]]; then
+  echo "error: no IPA or xcarchive found." >&2
+  echo "  IPA:     ${IPA}" >&2
+  echo "  Archive: ${ARCHIVE_APP}" >&2
   echo "Run npm run ios:archive first." >&2
   exit 1
 fi
 
-echo "==> Embedded entitlements"
-ENTITLEMENTS="$(mktemp)"
-codesign -d --entitlements :- "${APP}" 2>/dev/null > "${ENTITLEMENTS}" || true
-if [[ ! -s "${ENTITLEMENTS}" ]]; then
-  echo "error: could not read entitlements from signed app" >&2
-  exit 1
-fi
-cat "${ENTITLEMENTS}"
-rm -f "${ENTITLEMENTS}"
-
-APS="$(codesign -d --entitlements :- "${APP}" 2>/dev/null | plutil -extract aps-environment raw -o - - 2>/dev/null || true)"
-echo ""
-echo "aps-environment: ${APS:-<missing>}"
-
-if [[ "${APS}" != "production" ]]; then
-  echo "" >&2
-  echo "FAIL: TestFlight requires aps-environment=production in the signed app." >&2
-  echo "Fix: enable Push Notifications on the App ID, regenerate the App Store" >&2
-  echo "distribution profile, archive again (npm run ios:archive)." >&2
-  exit 1
+if check_app "xcarchive (pre-export — often still development-signed)" "${ARCHIVE_APP}"; then
+  echo "OK: production push entitlements present in archive."
+  exit 0
 fi
 
-echo "OK: production push entitlements present in archive."
+echo "note: xcarchive is often development-signed until export." >&2
+echo "Run npm run ios:export (or full ios:archive) and re-check the IPA." >&2
+exit 1

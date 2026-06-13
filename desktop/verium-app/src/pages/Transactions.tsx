@@ -443,7 +443,12 @@ export function Transactions() {
       description={`Enter your wallet passphrase to send or receive ${profile.symbol} and view your transaction history.`}
     >
       {mobileOnly ? (
-        <div className="mobile-page">
+        <div
+          className={cn(
+            'mobile-page',
+            (mobileView === 'send' || mobileView === 'receive') && 'mobile-page--transfer'
+          )}
+        >
           {mobileView === 'history' ? <MobileBalanceHero /> : null}
           <MobileSegmented
             value={mobileView}
@@ -453,12 +458,12 @@ export function Transactions() {
               if (view === 'send' || view === 'receive') setMode(view);
             }}
             options={[
-              { value: 'send', label: 'Send', icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
               {
                 value: 'receive',
                 label: 'Receive',
                 icon: <ArrowDownLeft className="h-3.5 w-3.5" />,
               },
+              { value: 'send', label: 'Send', icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
               { value: 'history', label: 'History' },
             ]}
           />

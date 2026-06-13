@@ -193,13 +193,28 @@
     position: sticky;
     bottom: 0;
     z-index: 10;
-    margin-top: 0.25rem;
-    padding-top: 0.75rem;
-    padding-bottom: 0.5rem;
+    margin-top: auto;
+    margin-bottom: -0.25rem;
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    padding: 0.75rem 0.75rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    background: color-mix(in srgb, var(--bg) 96%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+  }
+
+  .mobile-page--transfer {
+    min-height: calc(100dvh - 7.5rem);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-page--transfer .mobile-send-form-root {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .mobile-input {

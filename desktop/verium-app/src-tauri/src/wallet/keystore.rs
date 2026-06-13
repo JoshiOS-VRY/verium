@@ -930,10 +930,20 @@ fn decrypt_mnemonic(record: &LightWalletRecord, passphrase: &str) -> AppResult<S
         .map_err(|e| AppError::other(format!("keystore corrupt: {e}")))?;
     let nonce = hex::decode(record.nonce.trim())
         .map_err(|e| AppError::other(format!("keystore corrupt: {e}")))?;
-    let plain = crate::secret_store::decrypt_with_passphrase(&encrypted, &salt, &nonce, passphrase)?;
+    let plain = crate::secret_store::decrypt_with_passphrase(&encrypted, &salt, &nonce, passphrase)
+        .map_err(map_passphrase_decrypt_error)?;
     let phrase = String::from_utf8(plain)
         .map_err(|e| AppError::other(format!("mnemonic utf8: {e}")))?;
     Ok(phrase)
+}
+
+fn map_passphrase_decrypt_error(err: AppError) -> AppError {
+    let msg = err.to_string();
+    if msg.contains("decrypt failed") {
+        AppError::other("Incorrect wallet passphrase")
+    } else {
+        err
+    }
 }
 
 pub fn bump_receive_index(coin: CoinId) -> AppResult<u32> {

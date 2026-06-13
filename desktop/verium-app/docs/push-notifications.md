@@ -46,6 +46,20 @@ Registration runs when the wallet is unlocked (scripthashes are read from the
 keystore). Subscriptions stay active after lock or when the app is closed so
 remote push can still alert you.
 
+## Troubleshooting (no alert when app is killed)
+
+1. **Settings → Notifications** — allow iOS notifications; toggles for VRM/VRC on.
+2. **Unlock the wallet** after install — registration only runs while unlocked.
+   Settings should show “watching N VRM address(es)”.
+3. **Build must embed** `VERICONOMY_PUSH_API_SECRET` (set in `.env.local` before
+   `npm run ios:archive`). If Settings says remote push is not configured, rebuild.
+4. **Server** — `curl https://push.vericonomy.com/health` should show workers ≥ 1
+   and subscriptions increasing after you unlock.
+5. **APNs** — push service `APNS_USE_SANDBOX=false` for TestFlight; IPA must have
+   `aps-environment=production` (see ios-testflight.md).
+6. **Timing** — alert fires when Electrum sees the tx in the mempool (0-conf), not
+   only after the first block confirmation.
+
 ## Privacy
 
 The push service stores your APNs device token and scripthashes (derived from

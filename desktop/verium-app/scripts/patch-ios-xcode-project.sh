@@ -82,3 +82,36 @@ if yml_path.is_file():
         yml_path.write_text("\n".join(out) + "\n", encoding="utf-8")
         print("Patched project.yml")
 PY
+
+python3 - "${PBX}" <<'PY'
+import pathlib
+import re
+import sys
+
+pbx_path = pathlib.Path(sys.argv[1])
+content = pbx_path.read_text(encoding="utf-8")
+
+def patch_target(entitlements: str) -> None:
+    global content
+    esc = re.escape(entitlements)
+    # Remove hardcoded CODE_SIGN_IDENTITY — automatic signing picks Development vs Distribution.
+    pattern = (
+        rf'(CODE_SIGN_ENTITLEMENTS = "{esc}";\n)'
+        r'(?:\t\t\tCODE_SIGN_IDENTITY = "[^"]+";?\n)*'
+        r'(?:\t\t\tCODE_SIGN_STYLE = [^;]+;\n)?'
+    )
+    replacement = (
+        '\\1\t\t\tCODE_SIGN_STYLE = Automatic;\n'
+    )
+    updated, n = re.subn(pattern, replacement, content, count=1)
+    if n != 1:
+        print(f"warning: could not patch signing for {entitlements}", file=sys.stderr)
+        return
+    content = updated
+
+patch_target("vericonomy-wallet_iOS/vericonomy-wallet_iOS.entitlements")
+patch_target("vericonomy-wallet_iOS/vericonomy-wallet_iOS-debug.entitlements")
+
+pbx_path.write_text(content, encoding="utf-8")
+print("Patched project.pbxproj code signing (Automatic; identity chosen per build action)")
+PY

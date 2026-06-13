@@ -65,15 +65,14 @@ This runs:
 3. `xcodebuild archive` → `src-tauri/gen/apple/build/vericonomy-wallet_iOS.xcarchive`
 4. `xcodebuild -exportArchive` → `src-tauri/gen/apple/build/app-store/Vericonomy Wallet.ipa`
 
-Before uploading, verify the signed archive has **production** push entitlements:
+Before uploading, verify the **exported IPA** (not the raw xcarchive — export re-signs for App Store):
 
 ```bash
 bash scripts/verify-ios-push-entitlements.sh
 ```
 
-Must print `aps-environment: production`. If missing or `development`, the IPA will not
-get valid TestFlight push tokens. Regenerate the **App Store Connect** provisioning
-profile (Developer → Profiles) after enabling Push on the App ID, then archive again.
+Must print `aps-environment: production` on the **IPA**. The xcarchive alone may still show
+`development` until export; that is normal with automatic signing.
 
 For ad-hoc device install (no TestFlight), use `npm run ios:ship` instead.
 

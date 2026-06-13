@@ -71,6 +71,7 @@ export function CumulativeBalanceChart({
   blurClass,
   anchorBalance,
   coin,
+  embedded = false,
 }: {
   points: ChartCumulativePoint[];
   ticker: string;
@@ -81,6 +82,7 @@ export function CumulativeBalanceChart({
   /** Ensures axis domain matches the live wallet/address balance. */
   anchorBalance?: number;
   coin?: CoinId;
+  embedded?: boolean;
 }) {
   const defaultPoint = points[points.length - 1];
   const [scrubbedPoint, setScrubbedPoint] = useState<ChartCumulativePoint | null>(null);
@@ -167,6 +169,7 @@ export function CumulativeBalanceChart({
   );
 
   if (points.length === 0 || !defaultPoint) {
+    if (embedded) return null;
     return (
       <section
         className={cn(
@@ -180,22 +183,29 @@ export function CumulativeBalanceChart({
     );
   }
 
-  return (
-    <section
-      className={cn('mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4', className)}
-    >
-      <div className="flex items-center gap-2">
-        <LineChartIcon className="h-4 w-4 text-accent" aria-hidden />
-        <h3 className="text-sm font-semibold text-fg">{title}</h3>
-      </div>
-      {caption && <p className="mt-1 text-[11px] text-fg-muted">{caption}</p>}
+  const chartBody = (
+    <>
+      {!embedded && (
+        <>
+          <div className="flex items-center gap-2">
+            <LineChartIcon className="h-4 w-4 text-accent" aria-hidden />
+            <h3 className="text-sm font-semibold text-fg">{title}</h3>
+          </div>
+          {caption && <p className="mt-1 text-[11px] text-fg-muted">{caption}</p>}
+        </>
+      )}
 
-      <div className={cn('mt-3', blurClass)}>
-        <PinnedChartValue point={displayPoint} scrubbing={scrubbing} coin={coin} ticker={ticker} />
+      <div className={cn(embedded ? 'mt-3' : 'mt-3', blurClass)}>
+        {!embedded && (
+          <PinnedChartValue point={displayPoint} scrubbing={scrubbing} coin={coin} ticker={ticker} />
+        )}
 
         <div
           ref={chartAreaRef}
-          className="mt-2 h-52 w-full min-w-0 select-none touch-none"
+          className={cn(
+            'w-full min-w-0 select-none touch-none',
+            embedded ? 'mt-1 h-36' : 'mt-2 h-52'
+          )}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -272,10 +282,24 @@ export function CumulativeBalanceChart({
           </ResponsiveContainer>
         </div>
 
-        <p className="mt-1.5 text-[10px] text-fg-subtle">
-          Drag across the chart to inspect history.
-        </p>
+        {!embedded && (
+          <p className="mt-1.5 text-[10px] text-fg-subtle">
+            Drag across the chart to inspect history.
+          </p>
+        )}
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className={cn('border-t border-border/60 pt-3', className)}>{chartBody}</div>;
+  }
+
+  return (
+    <section
+      className={cn('mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4', className)}
+    >
+      {chartBody}
     </section>
   );
 }

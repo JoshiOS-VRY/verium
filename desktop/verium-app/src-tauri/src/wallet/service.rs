@@ -16,14 +16,15 @@ use crate::wallet::backend::resolve_backend;
 use crate::wallet::cache::LightWalletCache;
 use crate::wallet::hd::{
     coins_to_sats, derive_address_at, derive_change_address_at, enrich_utxo_addresses,
-    sats_to_coins, uses_core_hd_paths,
+    sats_to_coins, uses_core_hd_paths, GAP_SCAN_MAX_INDEX,
 };
 use crate::wallet::keystore;
 use crate::wallet::mode::WalletMode;
 use crate::wallet::signer;
 use crate::wallet::explorer_history::fetch_wallet_history_from_explorer;
+use futures_util::future::try_join_all;
 use crate::wallet::sync::{
-    addresses_for_history, balance_from_utxo_cache, sync_light_wallet,
+    addresses_for_history, balance_from_utxo_cache, is_utxo_cache_recent, sync_light_wallet,
 };
 use crate::wallet::utxo_selector::{
     plan_send_utxos, replan_fee_for_selected, DEFAULT_TX_FEE_COINS_PER_KB,
@@ -58,63 +59,78 @@ async fn fetch_parent_tx_bytes(
     Err(last_err.unwrap_or_else(|| AppError::other("failed to fetch parent transaction")))
 }
 
-/// Fetch each parent tx from Electrum, normalize txid/script/value, and verify the spend.
+/// Apply fetched parent tx bytes to a UTXO (normalize txid/script/value).
+fn apply_parent_tx_to_utxo(utxo: &mut Utxo, bytes: &[u8]) -> AppResult<()> {
+    let display_txid = crate::wallet::vericonomy_tx::display_txid_from_raw(bytes);
+    let wire_txid = crate::wallet::vericonomy_tx::wire_txid_from_raw(bytes);
+    let parsed = crate::wallet::vericonomy_tx::parse_display_txid(&display_txid)?;
+    if parsed != wire_txid {
+        return Err(AppError::other(format!(
+            "parent txid endian mismatch for {}",
+            utxo.txid
+        )));
+    }
+
+    let parent = crate::wallet::vericonomy_tx::decode_verium_tx(bytes)
+        .map_err(|e| AppError::other(format!("parent tx decode: {e}")))?;
+    let out = parent
+        .outputs
+        .get(utxo.vout as usize)
+        .ok_or_else(|| AppError::other(format!("parent tx missing vout {}", utxo.vout)))?;
+    let on_chain_script = hex::encode(out.script_pubkey.as_bytes());
+    let on_chain_value = out.value.to_sat() as i64;
+
+    if on_chain_value != utxo.value_sats {
+        tracing::warn!(
+            "UTXO {}:{} value stale (cache {} vs chain {}); using chain value",
+            utxo.txid,
+            utxo.vout,
+            utxo.value_sats,
+            on_chain_value
+        );
+        utxo.value_sats = on_chain_value;
+    }
+
+    if !display_txid.eq_ignore_ascii_case(&utxo.txid) {
+        tracing::info!(
+            "UTXO {}:{} txid normalized {} -> {}",
+            utxo.txid,
+            utxo.vout,
+            utxo.txid,
+            display_txid
+        );
+    }
+
+    if !crate::wallet::verify::script_pays_to(&on_chain_script, &utxo.script_hex) {
+        return Err(AppError::other(format!(
+            "UTXO {}:{} on-chain script does not match wallet script",
+            utxo.txid,
+            utxo.vout
+        )));
+    }
+
+    utxo.txid = display_txid;
+    utxo.script_hex = on_chain_script;
+    Ok(())
+}
+
+/// Fetch each parent tx from Electrum in parallel, normalize txid/script/value, and verify the spend.
 async fn prepare_utxos_for_signing(
     backend: &dyn crate::chain::ChainBackend,
     utxos: &mut [Utxo],
 ) -> AppResult<()> {
-    for utxo in utxos.iter_mut() {
-        let bytes = fetch_parent_tx_bytes(backend, &utxo.txid).await?;
-        let display_txid = crate::wallet::vericonomy_tx::display_txid_from_raw(&bytes);
-        let wire_txid = crate::wallet::vericonomy_tx::wire_txid_from_raw(&bytes);
-        let parsed = crate::wallet::vericonomy_tx::parse_display_txid(&display_txid)?;
-        if parsed != wire_txid {
-            return Err(AppError::other(format!(
-                "parent txid endian mismatch for {}",
-                utxo.txid
-            )));
-        }
-
-        let parent = crate::wallet::vericonomy_tx::decode_verium_tx(&bytes)
-            .map_err(|e| AppError::other(format!("parent tx decode: {e}")))?;
-        let out = parent
-            .outputs
-            .get(utxo.vout as usize)
-            .ok_or_else(|| AppError::other(format!("parent tx missing vout {}", utxo.vout)))?;
-        let on_chain_script = hex::encode(out.script_pubkey.as_bytes());
-        let on_chain_value = out.value.to_sat() as i64;
-
-        if on_chain_value != utxo.value_sats {
-            tracing::warn!(
-                "UTXO {}:{} value stale (cache {} vs chain {}); using chain value",
-                utxo.txid,
-                utxo.vout,
-                utxo.value_sats,
-                on_chain_value
-            );
-            utxo.value_sats = on_chain_value;
-        }
-
-        if !display_txid.eq_ignore_ascii_case(&utxo.txid) {
-            tracing::info!(
-                "UTXO {}:{} txid normalized {} -> {}",
-                utxo.txid,
-                utxo.vout,
-                utxo.txid,
-                display_txid
-            );
-        }
-
-        if !crate::wallet::verify::script_pays_to(&on_chain_script, &utxo.script_hex) {
-            return Err(AppError::other(format!(
-                "UTXO {}:{} on-chain script does not match wallet script",
-                utxo.txid,
-                utxo.vout
-            )));
-        }
-
-        utxo.txid = display_txid;
-        utxo.script_hex = on_chain_script;
+    if utxos.is_empty() {
+        return Ok(());
+    }
+    let txids: Vec<String> = utxos.iter().map(|u| u.txid.clone()).collect();
+    let parent_bytes = try_join_all(
+        txids
+            .iter()
+            .map(|id| fetch_parent_tx_bytes(backend, id)),
+    )
+    .await?;
+    for (utxo, bytes) in utxos.iter_mut().zip(parent_bytes) {
+        apply_parent_tx_to_utxo(utxo, &bytes)?;
     }
     Ok(())
 }
@@ -155,13 +171,56 @@ pub async fn fetch_utxos_with_addresses(
     Ok(utxos)
 }
 
-/// UTXO set used for signing: always sync from Electrum first so txid/script/value match chain.
+/// UTXO set used for signing: refresh from Electrum without blocking on gap scan / history.
 async fn fetch_utxos_for_send(
     state: &AppState,
     coin: CoinId,
     phrase: &str,
 ) -> AppResult<Vec<Utxo>> {
-    sync_light_wallet(state, coin).await?;
+    let backend = resolve_backend(state, coin).await?;
+    let scan_incomplete = keystore::needs_full_address_scan(coin)?;
+
+    if scan_incomplete {
+        let cached = LightWalletCache::open(coin)
+            .ok()
+            .and_then(|c| c.list_utxos().ok())
+            .unwrap_or_default();
+        if cached.is_empty() {
+            return Err(AppError::other(
+                "Wallet is still scanning addresses. Wait for balance sync to finish, then try again.",
+            ));
+        }
+    }
+
+    let cached_before = LightWalletCache::open(coin)
+        .ok()
+        .and_then(|c| c.list_utxos().ok())
+        .unwrap_or_default();
+    let should_refresh =
+        cached_before.is_empty() || scan_incomplete || !is_utxo_cache_recent(coin);
+
+    if should_refresh {
+        if let Err(e) =
+            crate::wallet::sync::refresh_light_wallet_utxos_from_network(
+                coin,
+                Some(phrase),
+                backend.as_ref(),
+            )
+            .await
+        {
+            tracing::warn!("send utxo refresh failed for {}: {e}", coin.as_str());
+        }
+    }
+
+    if scan_incomplete {
+        let sync_state = state.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = sync_light_wallet(&sync_state, coin).await {
+                tracing::debug!("background gap scan during send for {}: {e}", coin.as_str());
+            }
+        });
+    }
+
     let mut utxos = LightWalletCache::open(coin)?
         .list_utxos()
         .map_err(|e| AppError::other(format!("utxo cache read: {e}")))?;
@@ -171,6 +230,9 @@ async fn fetch_utxos_for_send(
             "could not resolve signing address for utxo {}:{} (wait for address scan to finish)",
             missing.txid, missing.vout
         )));
+    }
+    if utxos.is_empty() {
+        return Err(AppError::other("no spendable coins in wallet"));
     }
     Ok(utxos)
 }
@@ -182,6 +244,7 @@ async fn fetch_utxos_for_send(
 const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
 /// Minimum gap between gap-scan indexing slices (Electrum RPC budget per slice).
 const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
+const SEND_FLOW_TIMEOUT: Duration = Duration::from_secs(120);
 
 static LAST_STEADY_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -291,6 +354,46 @@ pub fn is_light_mode(prefs: &UserPreferences, coin: CoinId) -> bool {
     prefs::wallet_mode_for(prefs, coin).is_light()
 }
 
+/// Max precached scripts (external + internal × 81 indices).
+const LIGHT_PRECACHE_SCRIPT_MAX: f64 = 162.0;
+
+fn light_scan_phase(progress: &keystore::IndexingProgress, scan_complete: bool) -> &'static str {
+    if scan_complete {
+        return "complete";
+    }
+    if !progress.gap_external_done && progress.gap_external == 0 && progress.precache_offset < 162 {
+        return "precache";
+    }
+    if !progress.gap_external_done {
+        return "external";
+    }
+    if !progress.gap_internal_done {
+        return "internal";
+    }
+    "complete"
+}
+
+fn light_scan_progress(progress: &keystore::IndexingProgress, scan_complete: bool) -> f64 {
+    if scan_complete {
+        return 1.0;
+    }
+    let gap_max = GAP_SCAN_MAX_INDEX as f64;
+    let precache_frac = (progress.precache_offset as f64 / LIGHT_PRECACHE_SCRIPT_MAX).min(1.0);
+    let external_frac = if progress.gap_external_done {
+        1.0
+    } else {
+        (progress.gap_external as f64 / gap_max).min(1.0)
+    };
+    let internal_frac = if progress.gap_internal_done {
+        1.0
+    } else if progress.gap_external_done {
+        (progress.gap_internal as f64 / gap_max).min(1.0)
+    } else {
+        0.0
+    };
+    (0.12 * precache_frac + 0.44 * external_frac + 0.44 * internal_frac).clamp(0.0, 0.99)
+}
+
 pub async fn get_wallet_info_json(
     state: &AppState,
     coin: CoinId,
@@ -308,9 +411,17 @@ pub async fn get_wallet_info_json(
     let light_syncing = session_unlocked && !scan_complete;
     let sync_in_flight = crate::wallet::sync::is_light_wallet_sync_in_flight(coin).await;
     let probe_complete = crate::wallet::sync::is_precache_probe_complete(coin);
-    let light_balance_syncing = session_unlocked && (light_syncing || sync_in_flight);
-    let light_balance_ready =
-        session_unlocked && scan_complete && probe_complete && !sync_in_flight;
+    let indexing = keystore::indexing_progress(coin).unwrap_or_default();
+    let scan_phase = light_scan_phase(&indexing, scan_complete);
+    let scan_progress = light_scan_progress(&indexing, scan_complete);
+    // Only surface balance-sync spinner during gap scan / rescan — not routine background history sync.
+    let light_balance_syncing = session_unlocked && sync_in_flight && !scan_complete;
+    let bal = balance_from_utxo_cache(coin);
+    let available_sats = bal.confirmed_sats + bal.unconfirmed_sats;
+    let light_balance_ready = session_unlocked
+        && scan_complete
+        && !sync_in_flight
+        && (probe_complete || available_sats > 0);
     // Gap-scan syncs run from getwalletinfo while addresses are still being discovered.
     // Steady-state balance refresh is driven by the foreground balance poll (`light_wallet_refresh_balance`).
     let should_background_sync = light_syncing && indexing_sync_due(coin);
@@ -338,10 +449,6 @@ pub async fn get_wallet_info_json(
         0
     };
 
-    let bal = balance_from_utxo_cache(coin);
-    // Spendable includes 0-conf change outputs so a 1 VRM send does not drop
-    // displayed balance by the full input amount (Core splits confirmed vs pending).
-    let available_sats = bal.confirmed_sats + bal.unconfirmed_sats;
     let txcount = LightWalletCache::open(coin)
         .and_then(|c| c.tx_history_count())
         .unwrap_or(0);
@@ -363,6 +470,15 @@ pub async fn get_wallet_info_json(
         "light_syncing": light_syncing,
         "light_balance_syncing": light_balance_syncing,
         "light_balance_ready": light_balance_ready,
+        "light_scan_progress": scan_progress,
+        "light_scan_phase": scan_phase,
+        "light_indexing": {
+            "precache_offset": indexing.precache_offset,
+            "gap_external": indexing.gap_external,
+            "gap_external_done": indexing.gap_external_done,
+            "gap_internal": indexing.gap_internal,
+            "gap_internal_done": indexing.gap_internal_done,
+        },
     })))
 }
 
@@ -486,6 +602,23 @@ pub async fn send_to_address(
     fee_rate: Option<f64>,
     passphrase: &str,
 ) -> AppResult<String> {
+    let send = send_to_address_inner(state, coin, address, amount, fee_rate, passphrase);
+    match tokio::time::timeout(SEND_FLOW_TIMEOUT, send).await {
+        Ok(result) => result,
+        Err(_) => Err(AppError::other(
+            "send timed out — check your network connection and try again",
+        )),
+    }
+}
+
+async fn send_to_address_inner(
+    state: &AppState,
+    coin: CoinId,
+    address: &str,
+    amount: f64,
+    fee_rate: Option<f64>,
+    passphrase: &str,
+) -> AppResult<String> {
     let prefs = prefs::load().await?;
     if !prefs::wallet_mode_for(&prefs, coin).is_light() {
         return Err(AppError::other("not in light wallet mode"));
@@ -601,23 +734,6 @@ pub async fn send_with_inputs(
     }
     let phrase = keystore::unlocked_mnemonic(coin, passphrase)?;
     let all_utxos = fetch_utxos_for_send(state, coin, &phrase).await?;
-    let mut selected = Vec::new();
-    for input in inputs {
-        let txid = input
-            .get("txid")
-            .and_then(Value::as_str)
-            .ok_or_else(|| AppError::other("input missing txid"))?;
-        let vout = input
-            .get("vout")
-            .and_then(Value::as_u64)
-            .ok_or_else(|| AppError::other("input missing vout"))? as u32;
-        let utxo = all_utxos
-            .iter()
-            .find(|u| u.txid == txid && u.vout == vout)
-            .cloned()
-            .ok_or_else(|| AppError::other(format!("unknown input {txid}:{vout}")))?;
-        selected.push(utxo);
-    }
     let mut output_pairs = Vec::new();
     for (addr, amount_v) in outputs {
         let amount = amount_v
@@ -625,11 +741,36 @@ pub async fn send_with_inputs(
             .ok_or_else(|| AppError::other(format!("invalid amount for {addr}")))?;
         output_pairs.push((addr.clone(), coins_to_sats(amount)));
     }
+    let total_out: i64 = output_pairs.iter().map(|(_, v)| *v).sum();
     let rate = fee_rate.unwrap_or(
         prefs
             .tx_fee_rate_vrm_per_kb
             .unwrap_or(DEFAULT_TX_FEE_COINS_PER_KB),
     );
+
+    let mut selected = Vec::new();
+    if inputs.is_empty() {
+        let (planned, _initial_fee) =
+            plan_send_utxos(&all_utxos, total_out, rate, output_pairs.len())?;
+        selected = planned;
+    } else {
+        for input in inputs {
+            let txid = input
+                .get("txid")
+                .and_then(Value::as_str)
+                .ok_or_else(|| AppError::other("input missing txid"))?;
+            let vout = input
+                .get("vout")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| AppError::other("input missing vout"))? as u32;
+            let utxo = all_utxos
+                .iter()
+                .find(|u| u.txid == txid && u.vout == vout)
+                .cloned()
+                .ok_or_else(|| AppError::other(format!("unknown input {txid}:{vout}")))?;
+            selected.push(utxo);
+        }
+    }
     let change_addr = match change_address.filter(|s| !s.is_empty()) {
         Some(a) => a.to_string(),
         None => {
@@ -643,7 +784,6 @@ pub async fn send_with_inputs(
     };
     let backend = resolve_backend(state, coin).await?;
     prepare_utxos_for_signing(backend.as_ref(), &mut selected).await?;
-    let total_out: i64 = output_pairs.iter().map(|(_, v)| *v).sum();
     let fee_sats = replan_fee_for_selected(&selected, total_out, rate, output_pairs.len())?;
     let signed = signer::sign_transaction(
         coin,

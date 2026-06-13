@@ -7,7 +7,13 @@ import { rpcGetWalletInfo, rpcListTransactions } from '@/lib/rpc/client';
 import { TRANSACTIONS_LIST_CAP } from '@/lib/transactions-list';
 import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';
 
-export function WalletCumulativeBalanceChart() {
+export function WalletCumulativeBalanceChart({
+  embedded = false,
+  blurClass: blurClassProp,
+}: {
+  embedded?: boolean;
+  blurClass?: string;
+}) {
   const coin = useActiveCoin();
 
   const wallet = useQuery({
@@ -27,7 +33,7 @@ export function WalletCumulativeBalanceChart() {
     return null;
   }
 
-  const blurClass = lockedWalletBalanceClass(wallet.data);
+  const blurClass = blurClassProp ?? lockedWalletBalanceClass(wallet.data);
   const anchorBalance =
     wallet.data.balance + wallet.data.unconfirmed_balance + wallet.data.immature_balance;
   const series = buildWalletCumulativeSeries(txs.data ?? [], anchorBalance);
@@ -40,8 +46,9 @@ export function WalletCumulativeBalanceChart() {
       coin={coin}
       anchorBalance={anchorBalance}
       title="Wallet balance history"
-      caption={cumulativeSeriesCaption(series.complete, series.txCountUsed)}
+      caption={embedded ? undefined : cumulativeSeriesCaption(series.complete, series.txCountUsed)}
       blurClass={blurClass}
+      embedded={embedded}
     />
   );
 }

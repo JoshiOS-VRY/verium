@@ -245,10 +245,7 @@ export function ExplorerRecentBlocks({
 
         void blockRowFromRewardEvent('verium', event).then((row) => {
           if (!row) return;
-          setLocalBlocks((prev) => {
-            const next = prev.filter((b) => b.height !== row.height);
-            return [row, ...next].slice(0, 12);
-          });
+          setLocalBlocks((prev) => mergeRecentBlocks([row], prev, 12));
         });
       });
     }
@@ -264,10 +261,7 @@ export function ExplorerRecentBlocks({
 
       void blockRowFromRewardEvent('vericoin', event).then((row) => {
         if (!row) return;
-        setLocalBlocks((prev) => {
-          const next = prev.filter((b) => b.height !== row.height);
-          return [row, ...next].slice(0, 12);
-        });
+        setLocalBlocks((prev) => mergeRecentBlocks([row], prev, 12));
       });
     });
   }, [coin]);

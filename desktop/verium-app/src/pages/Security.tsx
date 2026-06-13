@@ -10,6 +10,7 @@ import { RestoreFromPhraseForm } from '@/components/RestoreFromPhraseForm';
 import { TwoFactorEnrollmentPanel } from '@/components/TwoFactorEnrollmentPanel';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useWalletMode } from '@/hooks/useWalletMode';
+import { MobileSettingsGroup } from '@/components/mobile/MobileSettingsGroup';
 import {
   autoLockGetConfig,
   autoLockSetConfig,
@@ -41,7 +42,7 @@ const DEFAULT_SPENDING: SpendingControlsConfig = {
 
 export function Security() {
   const coin = useActiveCoin();
-  const { isLight } = useWalletMode();
+  const { isLight, mobileOnly } = useWalletMode();
   const queryClient = useQueryClient();
   const [totpCode, setTotpCode] = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
@@ -92,6 +93,262 @@ export function Security() {
   const autoLockCfg = { ...DEFAULT_AUTO_LOCK, ...autoLock.data };
   const spendingCfg = { ...DEFAULT_SPENDING, ...spending.data };
 
+  const recoveryContent = (
+    <div className="flex flex-col gap-4">
+      {!walletIsHd && !isLight && (
+        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Non-HD wallet detected. Generate a phrase and upgrade to enable recovery.
+        </div>
+      )}
+      {(walletIsHd || isLight) && (
+        <p className="text-xs text-success">
+          HD recovery is enabled. To restore keys from a phrase, use the form below (replaces wallet
+          keys — back up wallet.dat first).
+        </p>
+      )}
+      {!walletIsHd && !isLight && !showRecovery && (
+        <Button onClick={() => setShowRecovery(true)}>Set up recovery phrase</Button>
+      )}
+      {showRecovery && !walletIsHd && !isLight && (
+        <div className="flex flex-col gap-3">
+          <input
+            type="password"
+            value={walletUnlockPass}
+            onChange={(e) => setWalletUnlockPass(e.target.value)}
+            placeholder="Wallet passphrase (required to unlock before upgrade)"
+            className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent"
+          />
+          <RecoveryPhraseWizard
+            onComplete={async (phrase) => {
+              await applyHd.mutateAsync({
+                phrase,
+                unlockPassphrase: walletUnlockPass || undefined,
+              });
+            }}
+          />
+        </div>
+      )}
+      {(walletIsHd || isLight) && (
+        <div className="flex flex-col gap-3 border-t border-border pt-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setShowExport((v) => !v);
+              if (showPhraseRestore) setShowPhraseRestore(false);
+            }}
+          >
+            {showExport ? 'Hide export' : 'Export recovery phrase'}
+          </Button>
+          {showExport && <ExportRecoveryPhrasePanel />}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setShowPhraseRestore((v) => !v);
+              if (showExport) setShowExport(false);
+            }}
+          >
+            {showPhraseRestore ? 'Hide' : 'Restore from recovery phrase'}
+          </Button>
+          {showPhraseRestore && (
+            <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+              <RestoreFromPhraseForm
+                onRestored={() => {
+                  setShowPhraseRestore(false);
+                  void queryClient.invalidateQueries({
+                    queryKey: ['wallet-is-hd', coin],
+                  });
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {applyHd.isPending && <p className="text-xs text-fg-muted">Applying HD seed…</p>}
+      {applyHd.error && <p className="text-xs text-danger">{String(applyHd.error)}</p>}
+    </div>
+  );
+
+  const twoFaContent = (
+    <div className="flex flex-col gap-3">
+      <Badge tone={twoFa.data?.enabled ? 'success' : 'neutral'}>
+        {twoFa.data?.enabled ? 'Enabled' : 'Disabled'}
+      </Badge>
+      {!twoFa.data?.enabled && <TwoFactorEnrollmentPanel showStartButton />}
+      {twoFa.data?.enabled && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="Code to disable"
+            className={totpInputClass}
+          />
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => disable2fa.mutate(totpCode)}
+            disabled={disable2fa.isPending || totpCode.length < 6}
+          >
+            Disable 2FA
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const autoLockContent = (
+    <div className="flex flex-col gap-3">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={autoLockCfg.enabled}
+          onChange={(e) => void saveAutoLock({ enabled: e.target.checked })}
+          className="accent-accent"
+        />
+        Lock wallet after idle timeout
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={autoLockCfg.lock_on_blur}
+          onChange={(e) => void saveAutoLock({ lock_on_blur: e.target.checked })}
+          className="accent-accent"
+        />
+        Lock when app loses focus
+      </label>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-fg-muted">Idle timeout (minutes):</span>
+        <input
+          type="number"
+          min={1}
+          max={1440}
+          disabled={!autoLockCfg.enabled}
+          value={Math.round(autoLockCfg.idle_seconds / 60)}
+          onChange={(e) => void saveAutoLock({ idle_seconds: Number(e.target.value) * 60 })}
+          className="h-8 w-20 rounded border border-border px-2 text-sm disabled:opacity-50"
+        />
+      </div>
+    </div>
+  );
+
+  const spendingContent = (
+    <div className="flex flex-col gap-3 text-sm">
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={spendingCfg.clipboard_guard_enabled}
+          onChange={(e) => void saveSpending({ clipboard_guard_enabled: e.target.checked })}
+          className="accent-accent"
+        />
+        Clipboard hijack detection on send
+      </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={spendingCfg.require_first_send_confirmation}
+          onChange={(e) =>
+            void saveSpending({
+              require_first_send_confirmation: e.target.checked,
+            })
+          }
+          className="accent-accent"
+        />
+        Extra confirmation for first send to new address
+      </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={spendingCfg.allowlist_only}
+          onChange={(e) => void saveSpending({ allowlist_only: e.target.checked })}
+          className="accent-accent"
+        />
+        Allowlist-only sends (address book send entries only)
+      </label>
+      <div className="flex items-center gap-2">
+        <span className="text-fg-muted">Daily cap (VRM):</span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={spendingCfg.daily_spend_cap_vrm ?? ''}
+          onChange={(e) =>
+            void saveSpending({
+              daily_spend_cap_vrm: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+          className="h-8 w-28 rounded border border-border px-2"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-fg-muted">Daily cap (VRC):</span>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={spendingCfg.daily_spend_cap_vrc ?? ''}
+          onChange={(e) =>
+            void saveSpending({
+              daily_spend_cap_vrc: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+          className="h-8 w-28 rounded border border-border px-2"
+        />
+      </div>
+    </div>
+  );
+
+  if (mobileOnly) {
+    return (
+      <div className="mobile-page">
+        <p className="px-1 text-sm text-fg-muted">
+          Recovery phrase, 2FA, spending controls, and auto-lock.
+          {isLight
+            ? ' Light wallets use an encrypted keystore — export your recovery phrase regularly.'
+            : ' wallet.dat backups are in Settings.'}
+        </p>
+
+        <MobileSettingsGroup
+          title="Recovery phrase"
+          description={
+            walletIsHd || isLight
+              ? 'Export, restore, or rotate access using your recovery phrase.'
+              : 'Upgrade to HD to generate a recovery phrase.'
+          }
+          defaultOpen
+        >
+          {recoveryContent}
+        </MobileSettingsGroup>
+
+        <MobileSettingsGroup
+          title="Two-factor authentication"
+          description="When enabled, sends and sensitive actions require a TOTP code."
+        >
+          {twoFaContent}
+        </MobileSettingsGroup>
+
+        <MobileSettingsGroup
+          title="Auto-lock"
+          description="Locks the wallet after idle timeout or when the app loses focus."
+        >
+          {autoLockContent}
+        </MobileSettingsGroup>
+
+        <MobileSettingsGroup
+          title="Spending controls"
+          description="Applied when you confirm a send from Activity."
+        >
+          {spendingContent}
+        </MobileSettingsGroup>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -115,81 +372,7 @@ export function Security() {
               : 'Upgrade to HD to generate a recovery phrase.'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {!walletIsHd && !isLight && (
-            <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Non-HD wallet detected. Generate a phrase and upgrade to enable recovery.
-            </div>
-          )}
-          {(walletIsHd || isLight) && (
-            <p className="text-xs text-success">
-              HD recovery is enabled. To restore keys from a phrase, use the form below (replaces
-              wallet keys — back up wallet.dat first).
-            </p>
-          )}
-          {!walletIsHd && !isLight && !showRecovery && (
-            <Button onClick={() => setShowRecovery(true)}>Set up recovery phrase</Button>
-          )}
-          {showRecovery && !walletIsHd && !isLight && (
-            <div className="flex flex-col gap-3">
-              <input
-                type="password"
-                value={walletUnlockPass}
-                onChange={(e) => setWalletUnlockPass(e.target.value)}
-                placeholder="Wallet passphrase (required to unlock before upgrade)"
-                className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent"
-              />
-              <RecoveryPhraseWizard
-                onComplete={async (phrase) => {
-                  await applyHd.mutateAsync({
-                    phrase,
-                    unlockPassphrase: walletUnlockPass || undefined,
-                  });
-                }}
-              />
-            </div>
-          )}
-          {(walletIsHd || isLight) && (
-            <div className="flex flex-col gap-3 border-t border-border pt-3">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  setShowExport((v) => !v);
-                  if (showPhraseRestore) setShowPhraseRestore(false);
-                }}
-              >
-                {showExport ? 'Hide export' : 'Export recovery phrase'}
-              </Button>
-              {showExport && <ExportRecoveryPhrasePanel />}
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  setShowPhraseRestore((v) => !v);
-                  if (showExport) setShowExport(false);
-                }}
-              >
-                {showPhraseRestore ? 'Hide' : 'Restore from recovery phrase'}
-              </Button>
-              {showPhraseRestore && (
-                <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
-                  <RestoreFromPhraseForm
-                    onRestored={() => {
-                      setShowPhraseRestore(false);
-                      void queryClient.invalidateQueries({
-                        queryKey: ['wallet-is-hd', coin],
-                      });
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-          {applyHd.isPending && <p className="text-xs text-fg-muted">Applying HD seed…</p>}
-          {applyHd.error && <p className="text-xs text-danger">{String(applyHd.error)}</p>}
-        </CardContent>
+        <CardContent className="flex flex-col gap-4">{recoveryContent}</CardContent>
       </Card>
 
       <Card>
@@ -201,34 +384,7 @@ export function Security() {
             When enabled, sends and sensitive actions require a TOTP code.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Badge tone={twoFa.data?.enabled ? 'success' : 'neutral'}>
-            {twoFa.data?.enabled ? 'Enabled' : 'Disabled'}
-          </Badge>
-          {!twoFa.data?.enabled && <TwoFactorEnrollmentPanel showStartButton />}
-          {twoFa.data?.enabled && (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="Code to disable"
-                className={totpInputClass}
-              />
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={() => disable2fa.mutate(totpCode)}
-                disabled={disable2fa.isPending || totpCode.length < 6}
-              >
-                Disable 2FA
-              </Button>
-            </div>
-          )}
-        </CardContent>
+        <CardContent className="flex flex-col gap-3">{twoFaContent}</CardContent>
       </Card>
 
       <Card>
@@ -240,38 +396,7 @@ export function Security() {
             Locks the chain wallet via RPC (passphrase required to unlock again).
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={autoLockCfg.enabled}
-              onChange={(e) => void saveAutoLock({ enabled: e.target.checked })}
-              className="accent-accent"
-            />
-            Lock wallet after idle timeout
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={autoLockCfg.lock_on_blur}
-              onChange={(e) => void saveAutoLock({ lock_on_blur: e.target.checked })}
-              className="accent-accent"
-            />
-            Lock when app loses focus
-          </label>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-fg-muted">Idle timeout (minutes):</span>
-            <input
-              type="number"
-              min={1}
-              max={1440}
-              disabled={!autoLockCfg.enabled}
-              value={Math.round(autoLockCfg.idle_seconds / 60)}
-              onChange={(e) => void saveAutoLock({ idle_seconds: Number(e.target.value) * 60 })}
-              className="h-8 w-20 rounded border border-border px-2 text-sm disabled:opacity-50"
-            />
-          </div>
-        </CardContent>
+        <CardContent className="flex flex-col gap-3">{autoLockContent}</CardContent>
       </Card>
 
       <Card>
@@ -281,69 +406,7 @@ export function Security() {
             Applied when you confirm a send from the Transactions page.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={spendingCfg.clipboard_guard_enabled}
-              onChange={(e) => void saveSpending({ clipboard_guard_enabled: e.target.checked })}
-              className="accent-accent"
-            />
-            Clipboard hijack detection on send
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={spendingCfg.require_first_send_confirmation}
-              onChange={(e) =>
-                void saveSpending({
-                  require_first_send_confirmation: e.target.checked,
-                })
-              }
-              className="accent-accent"
-            />
-            Extra confirmation for first send to new address
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={spendingCfg.allowlist_only}
-              onChange={(e) => void saveSpending({ allowlist_only: e.target.checked })}
-              className="accent-accent"
-            />
-            Allowlist-only sends (address book send entries only)
-          </label>
-          <div className="flex items-center gap-2">
-            <span className="text-fg-muted">Daily cap (VRM):</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={spendingCfg.daily_spend_cap_vrm ?? ''}
-              onChange={(e) =>
-                void saveSpending({
-                  daily_spend_cap_vrm: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              className="h-8 w-28 rounded border border-border px-2"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-fg-muted">Daily cap (VRC):</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={spendingCfg.daily_spend_cap_vrc ?? ''}
-              onChange={(e) =>
-                void saveSpending({
-                  daily_spend_cap_vrc: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-              className="h-8 w-28 rounded border border-border px-2"
-            />
-          </div>
-        </CardContent>
+        <CardContent className="flex flex-col gap-3 text-sm">{spendingContent}</CardContent>
       </Card>
     </div>
   );
