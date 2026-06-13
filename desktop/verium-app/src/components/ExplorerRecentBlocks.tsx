@@ -36,6 +36,7 @@ import {
   buildPendingBlocksAbove,
   enrichBlocksFromExplorer,
   enrichBlocksFromRpc,
+  isPlaceholderBlockHash,
   MAX_PENDING_BLOCKS_ABOVE,
   mergeRecentBlocks,
 } from '@/lib/local-recent-block';
@@ -233,6 +234,21 @@ export function ExplorerRecentBlocks({
   ]);
 
   useEffect(() => {
+    const indexed = blocks.data ?? [];
+    if (indexed.length === 0) return;
+    setLocalBlocks((prev) => {
+      const next = prev.filter((local) => {
+        const explorerRow = indexed.find((row) => row.height === local.height);
+        if (!explorerRow) return true;
+        return !(
+          isPlaceholderBlockHash(local.hash) && !isPlaceholderBlockHash(explorerRow.hash)
+        );
+      });
+      return next.length === prev.length ? prev : next;
+    });
+  }, [blocks.data]);
+
+  useEffect(() => {
     if (coin === 'verium') {
       return subscribeBlockMined((event) => {
         setCelebration({
@@ -319,15 +335,10 @@ export function ExplorerRecentBlocks({
     );
   }, [explorerBlocks, liveAndLocal, localTipHash, localTipHeight, localTipTime]);
 
-  const blockRows = useMemo(
-    () =>
-      mergeRecentBlocks(
-        mergeRecentBlocks(explorerBlocks, pendingLocal, feedLimit + 4),
-        liveAndLocal,
-        feedLimit
-      ),
-    [explorerBlocks, feedLimit, liveAndLocal, pendingLocal]
-  );
+  const blockRows = useMemo(() => {
+    const merged = mergeRecentBlocks(explorerBlocks, pendingLocal, feedLimit + 8);
+    return mergeRecentBlocks(merged, liveAndLocal, feedLimit);
+  }, [explorerBlocks, feedLimit, liveAndLocal, pendingLocal]);
 
   /** Same tip source as the dashboard hero. */
   const tipHeight = localTipHeight ?? blockRows[0]?.height;
@@ -428,7 +439,7 @@ export function ExplorerRecentBlocks({
               {!loading &&
                 blockRows.map((block) => (
                   <RecentBlockCard
-                    key={block.hash || String(block.height)}
+                    key={`block-${block.height}`}
                     coin={coin}
                     model={buildRecentBlockRowModel(block, rowContext)}
                     isDashboard={isDashboard}
@@ -482,7 +493,7 @@ export function ExplorerRecentBlocks({
                 {!loading &&
                   blockRows.map((block) => (
                     <RecentBlockTableRow
-                      key={block.hash || String(block.height)}
+                      key={`block-${block.height}`}
                       coin={coin}
                       model={buildRecentBlockRowModel(block, rowContext)}
                       isDashboard={isDashboard}

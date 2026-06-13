@@ -51,6 +51,9 @@ export const lightWalletCopy = {
   rescanDescription:
     'Re-discovers receive and change addresses on Vericonomy servers and rebuilds your local balance cache. Use this if balance looks too low compared to a full-node wallet with the same recovery phrase.',
   rescanUnlockHint: 'Unlock the wallet on that chain before rescanning.',
+  rescanInProgressHint: 'Address scan in progress — wait for it to finish.',
+  rescanCooldownHint: (minutes: number) =>
+    `Rescan available in about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
   rescanSuccess: 'Address rescan started. Balance may update over the next few minutes.',
   mobileOnboardingRestoreHint:
     'We found wallet data on this device that could not be unlocked. Import your recovery phrase to restore access.',

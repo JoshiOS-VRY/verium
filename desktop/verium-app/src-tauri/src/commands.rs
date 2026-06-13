@@ -46,6 +46,7 @@ use crate::indexer_api::{
     fetch_indexer_address_cumulative_series as indexer_fetch_address_cumulative,
     fetch_indexer_block as indexer_fetch_block,
     fetch_indexer_transaction as indexer_fetch_transaction,
+    fetch_wallet_cumulative_series as indexer_fetch_wallet_cumulative,
     CumulativeBalanceSeries,
     IndexerAddressDetail,
     IndexerBlockDetail,
@@ -3380,6 +3381,16 @@ pub async fn fetch_indexer_address_cumulative_series(
 ) -> AppResult<CumulativeBalanceSeries> {
     let coin = parse_coin_id(&coin)?;
     indexer_fetch_address_cumulative(coin, &address, max_txs).await
+}
+
+#[tauri::command]
+pub async fn fetch_indexer_wallet_cumulative_series(
+    coin: String,
+    anchor_balance_coins: Option<f64>,
+    max_txs_per_addr: Option<u32>,
+) -> AppResult<CumulativeBalanceSeries> {
+    let coin = parse_coin_id(&coin)?;
+    indexer_fetch_wallet_cumulative(coin, anchor_balance_coins, max_txs_per_addr).await
 }
 
 #[tauri::command]

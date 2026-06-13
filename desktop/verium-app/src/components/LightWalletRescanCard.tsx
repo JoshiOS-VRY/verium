@@ -10,7 +10,7 @@ import { coinQueryKey, getCoinProfile, type CoinId } from '@/lib/coin/profile';
 import { invalidateLightWalletQueries } from '@/lib/invalidate-wallet-queries';
 import { lightWalletCopy } from '@/lib/light-wallet/copy';
 import { lightWalletRescan } from '@/lib/light-wallet/client';
-import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import { rpcGetWalletInfo, type WalletInfo } from '@/lib/rpc/client';
 
 function useLightWalletUnlocked(coin: CoinId, enabled: boolean) {
   return useQuery({
@@ -18,7 +18,38 @@ function useLightWalletUnlocked(coin: CoinId, enabled: boolean) {
     queryFn: () => rpcGetWalletInfo(coin),
     enabled,
     staleTime: 10_000,
+    refetchInterval: (query) => {
+      const cooldown = query.state.data?.rescan_cooldown_remaining_secs ?? 0;
+      return cooldown > 0 ? 30_000 : false;
+    },
   });
+}
+
+function rescanCooldownMinutes(wallet: WalletInfo | undefined): number {
+  const secs = wallet?.rescan_cooldown_remaining_secs ?? 0;
+  if (secs <= 0) return 0;
+  return Math.ceil(secs / 60);
+}
+
+function rescanBlockedReason(
+  wallet: WalletInfo | null | undefined,
+  unlocked: boolean
+): string | null {
+  if (!unlocked) return lightWalletCopy.rescanUnlockHint;
+  if (!wallet) return null;
+  if (wallet.light_syncing || wallet.light_balance_syncing) {
+    return lightWalletCopy.rescanInProgressHint;
+  }
+  const cooldownMinutes = rescanCooldownMinutes(wallet);
+  if (cooldownMinutes > 0) return lightWalletCopy.rescanCooldownHint(cooldownMinutes);
+  return null;
+}
+
+function rescanAvailable(
+  wallet: WalletInfo | null | undefined,
+  unlocked: boolean
+): boolean {
+  return unlocked && rescanBlockedReason(wallet, unlocked) == null;
 }
 
 export function LightWalletRescanCard({ mobileLayout = false }: { mobileLayout?: boolean }) {
@@ -46,6 +77,9 @@ export function LightWalletRescanCard({ mobileLayout = false }: { mobileLayout?:
         queryKey: coinQueryKey(coin, 'wallet-cumulative-txs'),
       });
       await queryClient.invalidateQueries({
+        queryKey: coinQueryKey(coin, 'wallet-cumulative-indexer'),
+      });
+      await queryClient.invalidateQueries({
         predicate: (q) =>
           Array.isArray(q.queryKey) &&
           q.queryKey[0] === coin &&
@@ -69,8 +103,11 @@ export function LightWalletRescanCard({ mobileLayout = false }: { mobileLayout?:
     <div className="flex flex-col gap-3">
       {lightCoins.map((coin) => {
         const profile = getCoinProfile(coin);
+        const wallet = walletForCoin(coin);
         const unlocked = unlockedForCoin(coin);
         const pending = rescan.isPending && rescan.variables === coin;
+        const blockedReason = rescanBlockedReason(wallet, unlocked);
+        const available = rescanAvailable(wallet, unlocked);
 
         return (
           <div
@@ -83,15 +120,15 @@ export function LightWalletRescanCard({ mobileLayout = false }: { mobileLayout?:
           >
             <div className="min-w-0">
               <p className="text-sm font-medium text-fg">{profile.displayName}</p>
-              {!unlocked && (
-                <p className="text-xs text-fg-muted">{lightWalletCopy.rescanUnlockHint}</p>
+              {blockedReason && (
+                <p className="text-xs text-fg-muted">{blockedReason}</p>
               )}
             </div>
             <Button
               size={mobileLayout ? 'md' : 'sm'}
               variant="secondary"
               className={mobileLayout ? 'h-11 w-full rounded-xl' : ''}
-              disabled={!unlocked || rescan.isPending}
+              disabled={!available || rescan.isPending}
               onClick={() => rescan.mutate(coin)}
             >
               {pending ? (

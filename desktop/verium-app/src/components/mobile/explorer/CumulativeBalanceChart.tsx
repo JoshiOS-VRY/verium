@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart as LineChartIcon } from 'lucide-react';
 import {
   Area,
@@ -23,16 +23,16 @@ import { cn } from '@/lib/utils';
 
 const CHART_MARGIN = { top: 8, right: 12, left: 0, bottom: 0 };
 
+function formatPinnedBalance(balance: number, coin: CoinId | undefined, ticker: string): string {
+  if (coin != null) return formatCoinAmount(balance, coin, 4);
+  return `${formatChartAxisBalance(balance)} ${ticker}`;
+}
+
 function estimateYAxisWidth(domain: [number, number]): number {
   const hiLabel = formatChartAxisBalance(domain[1]);
   const loLabel = formatChartAxisBalance(domain[0]);
   const chars = Math.max(hiLabel.length, loLabel.length);
   return Math.min(56, Math.max(36, chars * 6 + 10));
-}
-
-function formatPinnedBalance(balance: number, coin: CoinId | undefined, ticker: string): string {
-  if (coin != null) return formatCoinAmount(balance, coin, 4);
-  return `${formatChartAxisBalance(balance)} ${ticker}`;
 }
 
 function PinnedChartValue({
@@ -62,6 +62,58 @@ function PinnedChartValue({
   );
 }
 
+export function CumulativeBalanceChartSkeleton({
+  embedded = false,
+  className,
+}: {
+  embedded?: boolean;
+  className?: string;
+}) {
+  const body = (
+    <div className={cn('animate-pulse', embedded ? 'mt-3' : 'mt-3')}>
+      {!embedded && (
+        <div className="rounded-lg border border-border/60 bg-bg-subtle/70 px-3 py-2.5">
+          <div className="h-2.5 w-24 rounded bg-bg-subtle" />
+          <div className="mt-2 h-7 w-32 rounded bg-bg-subtle" />
+          <div className="mt-2 h-3 w-28 rounded bg-bg-subtle" />
+        </div>
+      )}
+      <div
+        className={cn(
+          'relative overflow-hidden rounded-lg bg-bg-subtle/50',
+          embedded ? 'mt-1 h-36' : 'mt-2 h-52'
+        )}
+        aria-hidden
+      >
+        <div className="absolute inset-x-0 bottom-8 h-px bg-border/80" />
+        <div className="absolute bottom-8 left-[12%] right-[8%] top-[35%] rounded-t-lg bg-accent/10" />
+        <div className="absolute bottom-8 left-[12%] h-[45%] w-[55%] rounded-tl-lg bg-accent/15" />
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className={cn('border-t border-border/60 pt-3', className)} aria-busy="true">
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <section
+      className={cn('mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4', className)}
+      aria-busy="true"
+    >
+      <div className="flex items-center gap-2">
+        <LineChartIcon className="h-4 w-4 text-accent/40" aria-hidden />
+        <div className="h-4 w-36 animate-pulse rounded bg-bg-subtle" />
+      </div>
+      {body}
+    </section>
+  );
+}
+
 export function CumulativeBalanceChart({
   points,
   ticker,
@@ -72,6 +124,7 @@ export function CumulativeBalanceChart({
   anchorBalance,
   coin,
   embedded = false,
+  onScrubChange,
 }: {
   points: ChartCumulativePoint[];
   ticker: string;
@@ -83,6 +136,8 @@ export function CumulativeBalanceChart({
   anchorBalance?: number;
   coin?: CoinId;
   embedded?: boolean;
+  /** Fired when the user scrubs the chart (embedded hero balance). */
+  onScrubChange?: (point: ChartCumulativePoint | null, scrubbing: boolean) => void;
 }) {
   const defaultPoint = points[points.length - 1];
   const [scrubbedPoint, setScrubbedPoint] = useState<ChartCumulativePoint | null>(null);
@@ -106,6 +161,19 @@ export function CumulativeBalanceChart({
   }, [points]);
 
   const displayPoint = scrubbedPoint ?? defaultPoint;
+
+  useEffect(() => {
+    if (!onScrubChange) return;
+    if (scrubbing) {
+      onScrubChange(scrubbedPoint ?? defaultPoint, true);
+    } else {
+      onScrubChange(null, false);
+    }
+  }, [scrubbing, scrubbedPoint, defaultPoint, onScrubChange]);
+
+  const isolateTouch = useCallback((event: React.TouchEvent) => {
+    event.stopPropagation();
+  }, []);
 
   const scrubFromClientX = useCallback(
     (clientX: number) => {
@@ -142,6 +210,7 @@ export function CumulativeBalanceChart({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       scrubFromClientX(event.clientX);
     },
@@ -202,10 +271,14 @@ export function CumulativeBalanceChart({
 
         <div
           ref={chartAreaRef}
+          data-chart-scrub
           className={cn(
             'w-full min-w-0 select-none touch-none',
             embedded ? 'mt-1 h-36' : 'mt-2 h-52'
           )}
+          style={{ touchAction: 'none' }}
+          onTouchStart={isolateTouch}
+          onTouchMove={isolateTouch}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}

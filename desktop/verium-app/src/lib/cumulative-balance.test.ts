@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  balanceAtOrBefore,
+  balanceDayOverDayChange,
   buildWalletCumulativeSeries,
   computeChartBalanceDomain,
   downsampleCumulativePoints,
   formatChartAxisBalance,
+  indexerWalletSeriesToChart,
   netTxBalanceEffectForGroup,
 } from './cumulative-balance';
+import type { CumulativeBalanceSeries } from './indexer-api';
 import type { TransactionItem } from '@/lib/rpc/client';
 
 describe('cumulative balance chart', () => {
@@ -36,6 +40,7 @@ describe('cumulative balance chart', () => {
   });
 
   it('formats axis labels for large balances', () => {
+    expect(formatChartAxisBalance(0)).toBe('0');
     expect(formatChartAxisBalance(300)).toBe('300');
     expect(formatChartAxisBalance(1234)).toBe('1.2k');
     expect(formatChartAxisBalance(9.4)).toBe('9.4');
@@ -155,5 +160,57 @@ describe('cumulative balance chart', () => {
     expect(sampled.some((p) => p.balance === 500)).toBe(true);
     expect(sampled[0]?.balance).toBe(0);
     expect(sampled[sampled.length - 1]?.balance).toBe(99);
+  });
+
+  it('aggregates indexer wallet series into daily totals ending at anchor', () => {
+    const day1 = 1_600_000_000;
+    const day2 = day1 + 86_400;
+    const series: CumulativeBalanceSeries = {
+      points: [
+        {
+          time: day1,
+          blockHeight: 100,
+          balance: { amount: '10.00000000', ticker: 'VRM', decimalPlaces: 8 },
+        },
+        {
+          time: day2,
+          blockHeight: 200,
+          balance: { amount: '25.00000000', ticker: 'VRM', decimalPlaces: 8 },
+        },
+      ],
+      currentBalance: { amount: '30.00000000', ticker: 'VRM', decimalPlaces: 8 },
+      txCountUsed: 2,
+      txCountTotal: 2,
+      complete: true,
+    };
+
+    const chart = indexerWalletSeriesToChart(series, 30);
+    expect(chart.points[0]?.balance).toBe(0);
+    expect(chart.points[chart.points.length - 1]?.balance).toBe(30);
+    expect(chart.points.some((p) => p.balance === 25)).toBe(true);
+  });
+
+  it('computes day-over-day balance change from chart points', () => {
+    const now = 1_700_000_000;
+    const yesterday = now - 86_400;
+    const points = [
+      { id: 'a', time: yesterday - 3600, balance: 10, label: 'old' },
+      { id: 'b', time: yesterday, balance: 12, label: 'yesterday' },
+      { id: 'c', time: now, balance: 15, label: 'now' },
+    ];
+    expect(balanceAtOrBefore(points, yesterday)).toBe(12);
+    const up = balanceDayOverDayChange(points, 15, now);
+    expect(up?.delta).toBe(3);
+    expect(up?.tone).toBe('up');
+    const flat = balanceDayOverDayChange(
+      [
+        { id: 'y', time: yesterday, balance: 12, label: 'yesterday' },
+        { id: 'n', time: now, balance: 12, label: 'now' },
+      ],
+      12,
+      now
+    );
+    expect(flat?.delta).toBe(0);
+    expect(flat?.tone).toBe('flat');
   });
 });

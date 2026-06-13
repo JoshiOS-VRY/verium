@@ -249,13 +249,8 @@ pub async fn light_wallet_rescan(
     coin: String,
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
-    if !keystore::is_unlocked(coin)? {
-        return Err(crate::error::AppError::other(
-            "unlock your light wallet before rescanning addresses",
-        ));
-    }
-    keystore::mark_address_scan_incomplete(coin)?;
-    crate::wallet::sync::reset_balance_probe_state(coin)?;
+    crate::wallet::sync::assert_manual_rescan_allowed(coin).await?;
+    crate::wallet::sync::begin_manual_rescan(coin)?;
     crate::wallet::sync::sync_light_wallet(&state, coin).await
 }
 

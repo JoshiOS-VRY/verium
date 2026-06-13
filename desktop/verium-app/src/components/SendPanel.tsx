@@ -31,10 +31,12 @@ import { useUserPreferences } from '@/lib/user-preferences';
 import { coinSymbol, formatCoinAmount } from '@/lib/units';
 import { MobileSendForm } from '@/components/mobile/MobileSendForm';
 import { useWalletMode } from '@/hooks/useWalletMode';
+import { walletTransactionsKeyPrefix } from '@/lib/wallet-transactions-query';
 import { cn } from '@/lib/utils';
 import { estimateSendFee } from '@/lib/send-fee-estimate';
 import { listAddressBookEntries, upsertAddressBookEntry } from '@/lib/address-book';
 import { validateSendAddress } from '@/lib/address-validation';
+import { formatDisplayError } from '@/lib/errors/format-display-error';
 import {
   auditLogRecord,
   spendingControlsCheckAllowlist,
@@ -513,10 +515,13 @@ export function SendPanel({
           coin
         );
       }
-      // Light wallet: balance is updated locally in Rust after broadcast; an immediate
-      // Electrum refresh can wipe the optimistic change UTXO before it is indexed.
+      // Light wallet: balance and history are updated locally in Rust after broadcast.
+      // Avoid an immediate Electrum balance refresh — it can wipe the optimistic change UTXO.
       await queryClient.refetchQueries({ queryKey: coinQueryKey(coin, 'getwalletinfo') });
-      queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'listtransactions') });
+      await queryClient.refetchQueries({
+        queryKey: walletTransactionsKeyPrefix(coin),
+        type: 'active',
+      });
       queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'listunspent') });
       queryClient.invalidateQueries({ queryKey: coinQueryKey(coin, 'address-book') });
       queryClient.invalidateQueries({ queryKey: ['spending-controls'] });
@@ -538,11 +543,6 @@ export function SendPanel({
     sendPassphraseRef.current = '';
     if (gated) {
       setTwoFaOpen(true);
-      return;
-    }
-    // Light wallet already unlocked — signing session has the seed; no re-prompt.
-    if (isLight && wallet.data?.private_keys_enabled === true) {
-      executeSend();
       return;
     }
     setPassphrasePromptOpen(true);
@@ -756,7 +756,7 @@ export function SendPanel({
               ? `Insufficient balance: need ${formatCoinAmount(totalDebit, coin, 4)} (${formatCoinAmount(sendAmount, coin, 4)} + ${formatCoinAmount(feeEstimate.totalFee, coin, 4)} fee).`
               : null)
           }
-          sendError={send.error ? String(send.error) : null}
+          sendError={send.error ? formatDisplayError(send.error) : null}
           lastSend={lastSend}
           onDismissSuccess={() => setLastSend(null)}
         />
@@ -988,7 +988,9 @@ export function SendPanel({
               {spendWarning}
             </div>
           )}
-          {send.error && <div className="mt-3 text-xs text-danger">{String(send.error)}</div>}
+          {send.error && (
+            <div className="mt-3 text-xs text-danger">{formatDisplayError(send.error)}</div>
+          )}
           {lastSend && (
             <SendSuccessBanner result={lastSend} coin={coin} onDismiss={() => setLastSend(null)} />
           )}

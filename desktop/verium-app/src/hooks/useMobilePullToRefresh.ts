@@ -4,6 +4,10 @@ import { useMobileScrollContainer } from '@/contexts/MobileScrollContext';
 const PULL_THRESHOLD = 72;
 const MAX_PULL = 110;
 
+function touchInChartScrub(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[data-chart-scrub]') != null;
+}
+
 export function useMobilePullToRefresh(onRefresh: () => Promise<void>, enabled = true) {
   const scrollRef = useMobileScrollContainer();
   const [pullDistance, setPullDistance] = useState(0);
@@ -32,6 +36,10 @@ export function useMobilePullToRefresh(onRefresh: () => Promise<void>, enabled =
 
     const onTouchStart = (e: TouchEvent) => {
       if (refreshing) return;
+      if (touchInChartScrub(e.target)) {
+        canPull.current = false;
+        return;
+      }
       if (el.scrollTop <= 0) {
         canPull.current = true;
         startY.current = e.touches[0].clientY;
@@ -42,6 +50,7 @@ export function useMobilePullToRefresh(onRefresh: () => Promise<void>, enabled =
 
     const onTouchMove = (e: TouchEvent) => {
       if (!canPull.current || refreshing) return;
+      if (touchInChartScrub(e.target)) return;
       const y = e.touches[0].clientY;
       const delta = y - startY.current;
       if (delta > 0 && el.scrollTop <= 0) {

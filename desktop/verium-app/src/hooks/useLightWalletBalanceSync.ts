@@ -29,6 +29,12 @@ export function useLightWalletBalanceSync() {
           queryKey: coinQueryKey(coin, 'getwalletinfo'),
           type: 'active',
         });
+        await queryClient.invalidateQueries({
+          queryKey: coinQueryKey(coin, 'wallet-cumulative-indexer'),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: coinQueryKey(coin, 'wallet-cumulative-txs'),
+        });
       } catch {
         // Steady sync / foreground hooks still refresh in the background.
       }

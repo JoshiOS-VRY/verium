@@ -78,7 +78,7 @@ export function useWalletInfoPollCoordinator(): void {
 
   const interval = (data: WalletInfo | undefined, isLight: boolean) => {
     if (!visible) return false;
-    if (data?.light_syncing) return WALLET_SCAN_POLL_MS;
+    if (data?.light_syncing || data?.light_setup_syncing) return WALLET_SCAN_POLL_MS;
     if (walletScanProgress(data?.scanning)) return WALLET_SCAN_POLL_MS;
     return isLight ? LIGHT_WALLET_INFO_POLL_MS : WALLET_INFO_POLL_MS;
   };

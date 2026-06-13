@@ -1,5 +1,5 @@
 import type { TransactionItem } from '@/lib/rpc/client';
-import type { CumulativeBalancePoint } from '@/lib/indexer-api';
+import type { CumulativeBalancePoint, CumulativeBalanceSeries } from '@/lib/indexer-api';
 import { parseIndexerAmountCoins } from '@/lib/indexer-amount';
 import { TRANSACTIONS_LIST_CAP } from '@/lib/transactions-list';
 
@@ -16,6 +16,7 @@ export function cumulativePointBalance(point: CumulativeBalancePoint): number {
 
 export function formatChartAxisBalance(value: number): string {
   if (!Number.isFinite(value)) return '—';
+  if (value === 0) return '0';
   const abs = Math.abs(value);
   if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (abs >= 10_000) return `${(value / 1_000).toFixed(0)}k`;
@@ -58,6 +59,41 @@ export function formatChartPointDate(time: number, withTime = false): string {
     });
   }
   return when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+const SECONDS_PER_DAY = 86_400;
+
+/** Balance at or before `unixSeconds` on a time-sorted cumulative series. */
+export function balanceAtOrBefore(
+  points: ChartCumulativePoint[],
+  unixSeconds: number
+): number | null {
+  if (points.length === 0) return null;
+  let last: ChartCumulativePoint | null = null;
+  for (const point of points) {
+    if (point.time <= unixSeconds) {
+      last = point;
+    } else {
+      break;
+    }
+  }
+  return last?.balance ?? null;
+}
+
+export type BalanceDayChangeTone = 'up' | 'down' | 'flat';
+
+export function balanceDayOverDayChange(
+  points: ChartCumulativePoint[],
+  currentBalance: number,
+  referenceUnixSeconds: number
+): { delta: number; priorBalance: number | null; tone: BalanceDayChangeTone } | null {
+  if (points.length === 0 || !Number.isFinite(currentBalance)) return null;
+  const priorBalance = balanceAtOrBefore(points, referenceUnixSeconds - SECONDS_PER_DAY);
+  if (priorBalance == null) return null;
+  const delta = currentBalance - priorBalance;
+  const tone: BalanceDayChangeTone =
+    delta > 1e-8 ? 'up' : delta < -1e-8 ? 'down' : 'flat';
+  return { delta, priorBalance, tone };
 }
 
 export function downsampleCumulativePoints(
@@ -332,20 +368,87 @@ export function buildWalletCumulativeSeries(
   return { points, complete, txCountUsed: txs.length };
 }
 
+/** Indexer wallet series → daily chart points (aggregate across all addresses). */
+export function indexerWalletSeriesToChart(
+  series: CumulativeBalanceSeries,
+  anchorBalanceCoins: number,
+  maxPoints = 48
+): { points: ChartCumulativePoint[]; complete: boolean; txCountUsed: number } {
+  let raw: ChartCumulativePoint[] = series.points
+    .filter((p) => p.time != null)
+    .map((p, index) => {
+      const time = p.time ?? 0;
+      return {
+        id: `${time}-${p.blockHeight ?? index}`,
+        time,
+        balance: cumulativePointBalance(p),
+        label: formatChartPointDate(time),
+      };
+    })
+    .sort((a, b) => a.time - b.time);
+
+  if (series.complete && raw.length > 0) {
+    const firstDay = utcDayStart(raw[0].time);
+    raw = [
+      {
+        id: 'origin',
+        time: firstDay - 86_400,
+        balance: 0,
+        label: formatChartPointDate(firstDay - 86_400),
+      },
+      ...raw,
+    ];
+  }
+
+  const daily = bucketDailyPoints(raw);
+  const withAnchor = appendAnchorPoint(daily, anchorBalanceCoins);
+  const sampled = downsampleCumulativePoints(withAnchor, maxPoints);
+  const points = series.complete
+    ? sampled
+    : clampWalletCumulativePoints(sampled, anchorBalanceCoins);
+
+  return {
+    points,
+    complete: series.complete,
+    txCountUsed: series.txCountUsed,
+  };
+}
+
 export function cumulativeSeriesCaption(
   complete: boolean,
   txCountUsed: number,
-  txCountTotal?: number | null
+  txCountTotal?: number | null,
+  walletAggregate = false,
+  addressMeta?: { truncated?: boolean; used?: number; total?: number }
 ): string {
-  if (complete && txCountTotal != null && txCountTotal > 0) {
-    return `Daily wallet balance since inception (${txCountTotal.toLocaleString()} transactions).`;
+  let caption: string;
+  if (walletAggregate) {
+    if (complete && txCountTotal != null && txCountTotal > 0) {
+      caption = `Daily total balance across all wallet addresses since inception (${txCountTotal.toLocaleString()} indexed movements).`;
+    } else if (complete) {
+      caption = `Daily total balance across all wallet addresses since inception (${txCountUsed.toLocaleString()} indexed movements).`;
+    } else {
+      const totalLabel =
+        txCountTotal != null && txCountTotal > txCountUsed
+          ? ` of ${txCountTotal.toLocaleString()} indexed`
+          : '';
+      caption = `Daily total balance over the latest ${txCountUsed.toLocaleString()} indexed movements${totalLabel} (earlier history not shown).`;
+    }
+  } else if (complete && txCountTotal != null && txCountTotal > 0) {
+    caption = `Daily wallet balance since inception (${txCountTotal.toLocaleString()} transactions).`;
+  } else if (complete) {
+    caption = `Daily wallet balance since inception (${txCountUsed.toLocaleString()} transactions).`;
+  } else {
+    const totalLabel =
+      txCountTotal != null && txCountTotal > txCountUsed
+        ? ` of ${txCountTotal.toLocaleString()} indexed`
+        : '';
+    caption = `Daily balance over the latest ${txCountUsed.toLocaleString()} transactions${totalLabel} (earlier history not shown).`;
   }
-  if (complete) {
-    return `Daily wallet balance since inception (${txCountUsed.toLocaleString()} transactions).`;
+
+  if (addressMeta?.truncated && addressMeta.used != null && addressMeta.total != null) {
+    caption += ` Includes ${addressMeta.used.toLocaleString()} of ${addressMeta.total.toLocaleString()} wallet addresses (cap 1,000).`;
   }
-  const totalLabel =
-    txCountTotal != null && txCountTotal > txCountUsed
-      ? ` of ${txCountTotal.toLocaleString()} indexed`
-      : '';
-  return `Daily balance over the latest ${txCountUsed.toLocaleString()} transactions${totalLabel} (earlier history not shown).`;
+
+  return caption;
 }

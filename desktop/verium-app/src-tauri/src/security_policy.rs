@@ -59,9 +59,6 @@ async fn verify_wallet_passphrase_for_send(
 
     let prefs = crate::prefs::load().await?;
     if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
-        if crate::wallet::keystore::signing_session_active(coin) {
-            return Ok(());
-        }
         crate::wallet::keystore::verify_passphrase(coin, pass)?;
         return Ok(());
     }

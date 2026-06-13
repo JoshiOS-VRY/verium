@@ -368,11 +368,22 @@ pub fn is_light_mode(prefs: &UserPreferences, coin: CoinId) -> bool {
 /// Max precached scripts (external + internal × 81 indices).
 const LIGHT_PRECACHE_SCRIPT_MAX: f64 = 162.0;
 
-fn light_scan_phase(progress: &keystore::IndexingProgress, scan_complete: bool) -> &'static str {
+fn light_scan_phase(
+    coin: CoinId,
+    progress: &keystore::IndexingProgress,
+    scan_complete: bool,
+) -> &'static str {
     if scan_complete {
         return "complete";
     }
-    if !progress.gap_external_done && progress.gap_external == 0 && progress.precache_offset < 162 {
+    let precache_total = keystore::cached_script_hexes(coin)
+        .map(|scripts| scripts.len())
+        .unwrap_or(0);
+    let precache_active = precache_total > 0
+        && !progress.gap_external_done
+        && progress.gap_external == 0
+        && (progress.precache_offset as usize) < precache_total;
+    if precache_active {
         return "precache";
     }
     if !progress.gap_external_done {
@@ -402,7 +413,17 @@ fn light_scan_progress(progress: &keystore::IndexingProgress, scan_complete: boo
     } else {
         0.0
     };
-    (0.12 * precache_frac + 0.44 * external_frac + 0.44 * internal_frac).clamp(0.0, 0.99)
+    let raw = 0.12 * precache_frac + 0.44 * external_frac + 0.44 * internal_frac;
+    let floor = if precache_frac > 0.0 && external_frac == 0.0 && internal_frac == 0.0 {
+        0.03
+    } else if external_frac > 0.0 && !progress.gap_external_done {
+        0.12 + (external_frac * 0.44).max(0.02)
+    } else if progress.gap_external_done && !progress.gap_internal_done {
+        0.56 + (internal_frac * 0.44).max(0.02)
+    } else {
+        0.02
+    };
+    raw.max(floor).clamp(0.02, 0.99)
 }
 
 pub async fn get_wallet_info_json(
@@ -423,19 +444,33 @@ pub async fn get_wallet_info_json(
     let sync_in_flight = crate::wallet::sync::is_light_wallet_sync_in_flight(coin).await;
     let probe_complete = crate::wallet::sync::is_precache_probe_complete(coin);
     let indexing = keystore::indexing_progress(coin).unwrap_or_default();
-    let scan_phase = light_scan_phase(&indexing, scan_complete);
+    let scan_phase = light_scan_phase(coin, &indexing, scan_complete);
     let scan_progress = light_scan_progress(&indexing, scan_complete);
-    // Only surface balance-sync spinner during gap scan / rescan — not routine background history sync.
-    let light_balance_syncing = session_unlocked && sync_in_flight && !scan_complete;
     let bal = balance_from_utxo_cache(coin);
     let available_sats = bal.confirmed_sats + bal.unconfirmed_sats;
+    let balance_probe_done = probe_complete || available_sats > 0;
+    // Gap scan, post-scan UTXO refresh, or balance probe until first usable balance.
+    let light_balance_syncing = session_unlocked
+        && sync_in_flight
+        && (!scan_complete || !balance_probe_done);
     let light_balance_ready = session_unlocked
         && scan_complete
         && !sync_in_flight
-        && (probe_complete || available_sats > 0);
+        && balance_probe_done;
+    let light_setup_syncing = session_unlocked && !light_balance_ready;
     // Gap-scan syncs run from getwalletinfo while addresses are still being discovered.
     // Steady-state balance refresh is driven by the foreground balance poll (`light_wallet_refresh_balance`).
     let should_background_sync = light_syncing && indexing_sync_due(coin);
+
+    if scan_complete && session_unlocked && !balance_probe_done && !sync_in_flight {
+        let refresh_state = state.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = crate::wallet::sync::refresh_light_wallet_balance(&refresh_state, coin).await
+            {
+                tracing::debug!("post-scan balance refresh for {}: {e}", coin.as_str());
+            }
+        });
+    }
 
     if should_background_sync {
         let sync_state = state.clone();
@@ -463,6 +498,7 @@ pub async fn get_wallet_info_json(
     let txcount = LightWalletCache::open(coin)
         .and_then(|c| c.tx_history_count())
         .unwrap_or(0);
+    let rescan_cooldown_remaining_secs = crate::wallet::sync::manual_rescan_cooldown_remaining_secs(coin);
 
     Ok(Some(json!({
         "walletname": format!("{}-light", coin.as_str()),
@@ -481,6 +517,7 @@ pub async fn get_wallet_info_json(
         "light_syncing": light_syncing,
         "light_balance_syncing": light_balance_syncing,
         "light_balance_ready": light_balance_ready,
+        "light_setup_syncing": light_setup_syncing,
         "light_scan_progress": scan_progress,
         "light_scan_phase": scan_phase,
         "light_indexing": {
@@ -490,6 +527,7 @@ pub async fn get_wallet_info_json(
             "gap_internal": indexing.gap_internal,
             "gap_internal_done": indexing.gap_internal_done,
         },
+        "rescan_cooldown_remaining_secs": rescan_cooldown_remaining_secs,
     })))
 }
 

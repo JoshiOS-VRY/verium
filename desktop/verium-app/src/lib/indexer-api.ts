@@ -123,6 +123,9 @@ export interface CumulativeBalanceSeries {
   txCountUsed: number;
   txCountTotal?: number;
   complete: boolean;
+  addressCountUsed?: number;
+  addressCountTotal?: number;
+  addressesTruncated?: boolean;
 }
 
 export interface IndexerAddressDetail {
@@ -191,5 +194,18 @@ export function fetchIndexerAddressCumulativeSeries(
     coin,
     address,
     maxTxs,
+  });
+}
+
+/** Daily wallet balance across all owned addresses (indexer net deltas summed by time). */
+export function fetchIndexerWalletCumulativeSeries(
+  coin: CoinId,
+  anchorBalanceCoins?: number,
+  maxTxsPerAddr?: number
+): Promise<CumulativeBalanceSeries> {
+  return invoke<CumulativeBalanceSeries>('fetch_indexer_wallet_cumulative_series', {
+    coin,
+    anchorBalanceCoins: anchorBalanceCoins ?? null,
+    maxTxsPerAddr: maxTxsPerAddr ?? null,
   });
 }

@@ -292,9 +292,6 @@ impl LightWalletCache {
         Ok(changed)
     }
 
-    /// Replace the cached transaction history with `txs` (full set, newest first
-    /// determined by `time`). Serialized as JSON per row so the read path is a
-    /// pure local SQLite query — no Electrum `get_history` calls.
     pub fn replace_tx_history(&self, txs: &[WalletTx]) -> AppResult<()> {
         let tx = self
             .conn

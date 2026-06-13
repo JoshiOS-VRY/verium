@@ -11,7 +11,7 @@ use crate::chain::electrum::indexing::{RPC_BUDGET_PER_SYNC, SCRIPTS_PER_BATCH};
 use crate::chain::types::WalletBalance;
 use crate::chain::ChainBackend;
 use crate::coin_profile::CoinId;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use async_trait::async_trait;
 
@@ -116,7 +116,10 @@ pub fn apply_local_send_cache_update(
     change_sats: i64,
     change_address: &str,
 ) -> AppResult<()> {
+    use std::collections::HashSet;
+
     use crate::wallet::hd::address_to_script_pubkey;
+    use crate::wallet::listtransactions_rows::rows_from_decoded_tx;
     use crate::wallet::utxo_selector::DUST_CHANGE_SATS;
     use crate::wallet::vericonomy_tx::decode_verium_tx;
 
@@ -142,6 +145,59 @@ pub fn apply_local_send_cache_update(
             confirmations: 0,
         })?;
     }
+
+    let mut wallet_addresses: HashSet<String> = spent
+        .iter()
+        .map(|u| u.address.clone())
+        .filter(|a| !a.is_empty())
+        .collect();
+    if !change_address.is_empty() {
+        wallet_addresses.insert(change_address.to_string());
+    }
+
+    let mut wallet_scripts: HashSet<Vec<u8>> = HashSet::new();
+    for utxo in spent {
+        if let Ok(bytes) = hex::decode(utxo.script_hex.trim()) {
+            wallet_scripts.insert(bytes);
+        }
+    }
+    if change_sats > DUST_CHANGE_SATS {
+        if let Ok(script) = address_to_script_pubkey(coin, change_address) {
+            wallet_scripts.insert(script);
+        }
+    }
+
+    let mut prev_output_is_ours = HashSet::new();
+    for utxo in spent {
+        prev_output_is_ours.insert((utxo.txid.clone(), utxo.vout));
+    }
+
+    let history_rows = rows_from_decoded_tx(
+        coin,
+        broadcast_txid,
+        &tx,
+        0,
+        None,
+        &wallet_scripts,
+        &wallet_addresses,
+        &prev_output_is_ours,
+    );
+    append_local_tx_history_rows(coin, &history_rows)?;
+
+    Ok(())
+}
+
+/// Merge freshly broadcast rows into cached history so sends appear immediately.
+pub fn append_local_tx_history_rows(coin: CoinId, rows: &[crate::chain::types::WalletTx]) -> AppResult<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let cache = LightWalletCache::open(coin)?;
+    let existing = cache
+        .list_tx_history(TX_HISTORY_CACHE_LIMIT)
+        .unwrap_or_default();
+    let merged = merge_tx_history(existing, rows);
+    cache.replace_tx_history(&merged)?;
     Ok(())
 }
 
@@ -226,6 +282,87 @@ async fn sync_light_wallet_inner(state: &AppState, coin: CoinId) -> AppResult<()
 /// Whether a `sync_light_wallet` call is in progress for this coin.
 pub async fn is_light_wallet_sync_in_flight(coin: CoinId) -> bool {
     SYNC_IN_FLIGHT.lock().await.contains(coin.as_str())
+}
+
+/// Minimum wait between manual address rescans from Settings.
+pub const MANUAL_RESCAN_COOLDOWN_SECS: u64 = 3600;
+const LAST_MANUAL_RESCAN_META: &str = "last_manual_rescan_at";
+
+fn unix_now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn cooldown_remaining_secs(last_at: u64, now: u64, cooldown_secs: u64) -> u64 {
+    if now <= last_at {
+        return cooldown_secs;
+    }
+    let elapsed = now - last_at;
+    if elapsed >= cooldown_secs {
+        0
+    } else {
+        cooldown_secs - elapsed
+    }
+}
+
+pub fn manual_rescan_cooldown_remaining_secs(coin: CoinId) -> u64 {
+    let Ok(cache) = LightWalletCache::open(coin) else {
+        return 0;
+    };
+    let Ok(Some(ts)) = cache.get_meta(LAST_MANUAL_RESCAN_META) else {
+        return 0;
+    };
+    let Ok(last_at) = ts.parse::<u64>() else {
+        return 0;
+    };
+    cooldown_remaining_secs(last_at, unix_now_secs(), MANUAL_RESCAN_COOLDOWN_SECS)
+}
+
+fn had_manual_rescan(coin: CoinId) -> bool {
+    LightWalletCache::open(coin)
+        .ok()
+        .and_then(|c| c.get_meta(LAST_MANUAL_RESCAN_META).ok().flatten())
+        .is_some()
+}
+
+/// Guards manual rescan from Settings (cooldown, in-flight sync, initial scan).
+pub async fn assert_manual_rescan_allowed(coin: CoinId) -> AppResult<()> {
+    if !keystore::is_unlocked(coin)? {
+        return Err(AppError::other(
+            "unlock your light wallet before rescanning addresses",
+        ));
+    }
+    if is_light_wallet_sync_in_flight(coin).await {
+        return Err(AppError::other(
+            "address rescan is already running — wait for it to finish",
+        ));
+    }
+    let scan_incomplete = keystore::needs_full_address_scan(coin)?;
+    if scan_incomplete && !had_manual_rescan(coin) {
+        return Err(AppError::other(
+            "initial address scan is still in progress — wait for it to finish",
+        ));
+    }
+    let remaining = manual_rescan_cooldown_remaining_secs(coin);
+    if remaining > 0 {
+        let minutes = (remaining + 59) / 60;
+        return Err(AppError::other(format!(
+            "rescan was used recently — try again in about {minutes} minute{}",
+            if minutes == 1 { "" } else { "s" }
+        )));
+    }
+    Ok(())
+}
+
+/// Record cooldown and reset scan state before starting a manual rescan.
+pub fn begin_manual_rescan(coin: CoinId) -> AppResult<()> {
+    let cache = LightWalletCache::open(coin)?;
+    cache.set_meta(LAST_MANUAL_RESCAN_META, &unix_now_secs().to_string())?;
+    keystore::mark_address_scan_incomplete(coin)?;
+    reset_balance_probe_state(coin)?;
+    Ok(())
 }
 
 const PRECACHE_PROBE_COMPLETE_META: &str = "precache_probe_complete";
@@ -423,7 +560,18 @@ async fn write_tx_history_cache(coin: CoinId, rows: &[crate::chain::types::Walle
         return;
     }
     if let Ok(cache) = LightWalletCache::open(coin) {
-        if let Err(e) = cache.replace_tx_history(rows) {
+        let pending_local: Vec<_> = cache
+            .list_tx_history(TX_HISTORY_CACHE_LIMIT)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|t| t.height <= 0)
+            .collect();
+        let merged = if pending_local.is_empty() {
+            rows.to_vec()
+        } else {
+            merge_tx_history(rows.to_vec(), &pending_local)
+        };
+        if let Err(e) = cache.replace_tx_history(&merged) {
             tracing::debug!("history cache write failed for {}: {e}", coin.as_str());
         }
     }
@@ -865,4 +1013,16 @@ pub fn addresses_for_history(coin: CoinId) -> AppResult<Vec<String>> {
     rest.sort();
     priority.extend(rest);
     Ok(priority)
+}
+
+#[cfg(test)]
+mod rescan_cooldown_tests {
+    use super::cooldown_remaining_secs;
+
+    #[test]
+    fn cooldown_counts_down_from_last_rescan() {
+        assert_eq!(cooldown_remaining_secs(1000, 1000, 3600), 3600);
+        assert_eq!(cooldown_remaining_secs(1000, 4600, 3600), 0);
+        assert_eq!(cooldown_remaining_secs(1000, 2800, 3600), 1800);
+    }
 }

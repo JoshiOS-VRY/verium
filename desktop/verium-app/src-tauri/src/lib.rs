@@ -102,7 +102,13 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_plugin_biometric::init());
         builder = builder.plugin(tauri_plugin_notification::init());
-        builder = builder.plugin(tauri_plugin_mobile_push::init());
+        builder = builder.plugin(
+            tauri_plugin_mobile_push::Builder::new()
+                .ios_foreground_presentation(
+                    tauri_plugin_mobile_push::ForegroundPresentationOptions::none(),
+                )
+                .build(),
+        );
     }
     let app = builder
         .on_window_event(|window, event| {
@@ -229,6 +235,7 @@ pub fn run() {
             commands::fetch_indexer_block,
             commands::fetch_indexer_address,
             commands::fetch_indexer_address_cumulative_series,
+            commands::fetch_indexer_wallet_cumulative_series,
             commands::is_pool_api_enabled_cmd,
             commands::fetch_pool_stats_cmd,
             commands::fetch_miner_overview_cmd,

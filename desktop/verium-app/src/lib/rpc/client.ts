@@ -109,10 +109,14 @@ export interface WalletInfo {
   light_balance_syncing?: boolean;
   /** All HD addresses probed and last balance refresh finished. */
   light_balance_ready?: boolean;
+  /** True until gap scan and first balance probe finish after unlock. */
+  light_setup_syncing?: boolean;
   /** Gap-scan progress 0–1 while `light_syncing`. */
   light_scan_progress?: number;
   /** Gap-scan phase: precache | external | internal | complete */
   light_scan_phase?: 'precache' | 'external' | 'internal' | 'complete';
+  /** Seconds until manual address rescan is allowed again (light wallet). */
+  rescan_cooldown_remaining_secs?: number;
   light_indexing?: {
     precache_offset: number;
     gap_external: number;

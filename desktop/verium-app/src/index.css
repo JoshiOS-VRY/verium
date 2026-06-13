@@ -110,6 +110,10 @@
     overscroll-behavior-y: contain;
   }
 
+  .mobile-main:has(.mobile-page--transfer) {
+    padding-bottom: 0;
+  }
+
   .mobile-pull-refresh {
     min-width: 0;
     max-width: 100%;
@@ -194,10 +198,9 @@
     bottom: 0;
     z-index: 10;
     margin-top: auto;
-    margin-bottom: -0.25rem;
     margin-left: -0.75rem;
     margin-right: -0.75rem;
-    padding: 0.75rem 0.75rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.75rem;
     border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
     background: color-mix(in srgb, var(--bg) 96%, transparent);
     backdrop-filter: blur(12px);
@@ -208,6 +211,7 @@
     min-height: calc(100dvh - 7.5rem);
     display: flex;
     flex-direction: column;
+    padding-bottom: 0;
   }
 
   .mobile-page--transfer .mobile-send-form-root {
@@ -473,6 +477,67 @@
 
 .toast-enter-mobile {
   animation: toast-enter-mobile 0.25s ease-out;
+}
+
+@keyframes scan-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scan-success-circle-draw {
+  from {
+    stroke-dashoffset: 176;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes scan-success-check-draw {
+  from {
+    stroke-dashoffset: 36;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.scan-success-toast {
+  animation: scan-success-pop 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scan-success-circle {
+  stroke-dasharray: 176;
+  stroke-dashoffset: 176;
+  animation: scan-success-circle-draw 0.45s ease-out 0.08s forwards;
+}
+
+.scan-success-check {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: scan-success-check-draw 0.32s ease-out 0.38s forwards;
+}
+
+@keyframes light-sync-progress-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.light-sync-progress-indeterminate {
+  animation: light-sync-progress-indeterminate 1.35s ease-in-out infinite;
 }
 
 /* iOS / mobile shell — sit above tab bar + home indicator */

@@ -8,6 +8,48 @@ import { rpcRaw } from '@/lib/rpc/client';
 
 export type WalletRewardEvent = BlockMinedEvent | StakeRewardEvent;
 
+function normalizeBlockHeight(block: ExplorerBlock): number {
+  const height = Number(block.height);
+  return Number.isFinite(height) ? height : 0;
+}
+
+export function isPlaceholderBlockHash(hash: string | undefined): boolean {
+  return isPlaceholderTipHash(hash);
+}
+
+function mergeBlockAtHeight(existing: ExplorerBlock, incoming: ExplorerBlock): ExplorerBlock {
+  const existingPlaceholder = isPlaceholderBlockHash(existing.hash);
+  const incomingPlaceholder = isPlaceholderBlockHash(incoming.hash);
+  const primary =
+    existingPlaceholder && !incomingPlaceholder
+      ? incoming
+      : incomingPlaceholder && !existingPlaceholder
+        ? existing
+        : existing;
+  const secondary = primary === existing ? incoming : existing;
+  const mergedTime = Math.max(primary.time ?? 0, secondary.time ?? 0);
+  const hash =
+    isPlaceholderBlockHash(primary.hash) && !isPlaceholderBlockHash(secondary.hash)
+      ? secondary.hash
+      : primary.hash;
+
+  return {
+    ...primary,
+    ...secondary,
+    id: primary.id ?? secondary.id,
+    hash,
+    height: normalizeBlockHeight(primary),
+    miner_address: secondary.miner_address ?? primary.miner_address,
+    output_total: secondary.output_total ?? primary.output_total,
+    mint: secondary.mint ?? primary.mint,
+    output_count: secondary.output_count ?? primary.output_count,
+    size: secondary.size ?? primary.size,
+    difficulty: secondary.difficulty ?? primary.difficulty,
+    n_tx: secondary.n_tx ?? primary.n_tx,
+    time: mergedTime > 0 ? mergedTime : primary.time || secondary.time,
+  };
+}
+
 /** Merge explorer feed with blocks learned from the local node (shown immediately after mining). */
 export function mergeRecentBlocks(
   explorer: ExplorerBlock[],
@@ -16,26 +58,23 @@ export function mergeRecentBlocks(
 ): ExplorerBlock[] {
   const byHeight = new Map<number, ExplorerBlock>();
   for (const block of explorer) {
-    byHeight.set(block.height, block);
+    const height = normalizeBlockHeight(block);
+    if (height <= 0) continue;
+    const existing = byHeight.get(height);
+    byHeight.set(
+      height,
+      existing ? mergeBlockAtHeight(existing, { ...block, height }) : { ...block, height }
+    );
   }
   for (const block of local) {
-    const existing = byHeight.get(block.height);
+    const height = normalizeBlockHeight(block);
+    if (height <= 0) continue;
+    const existing = byHeight.get(height);
     if (!existing) {
-      byHeight.set(block.height, block);
+      byHeight.set(height, { ...block, height });
       continue;
     }
-    byHeight.set(block.height, {
-      ...existing,
-      ...block,
-      miner_address: block.miner_address ?? existing.miner_address,
-      output_total: block.output_total ?? existing.output_total,
-      mint: block.mint ?? existing.mint,
-      output_count: block.output_count ?? existing.output_count,
-      size: block.size ?? existing.size,
-      difficulty: block.difficulty ?? existing.difficulty,
-      n_tx: block.n_tx ?? existing.n_tx,
-      time: block.time || existing.time,
-    });
+    byHeight.set(height, mergeBlockAtHeight(existing, { ...block, height }));
   }
   return [...byHeight.values()]
     .sort((a, b) => b.height - a.height || (b.time ?? 0) - (a.time ?? 0))
@@ -125,10 +164,6 @@ export function parseRpcBlock(
     output_count: count > 0 ? count : undefined,
     miner_address: minerAddress,
   };
-}
-
-function isPlaceholderBlockHash(hash: string | undefined): boolean {
-  return isPlaceholderTipHash(hash);
 }
 
 export function blockNeedsRpcEnrichment(block: ExplorerBlock, coin: CoinId): boolean {

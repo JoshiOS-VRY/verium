@@ -1,9 +1,7 @@
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Coins, Loader2, TrendingUp, Users, Wallet } from 'lucide-react';
-import { BlockAgeLabel } from '@/components/BlockAgeLabel';
 import { ExplorerLink } from '@/components/ExplorerLink';
-import { AnimatedBlockNumber } from '@/components/AnimatedBlockNumber';
 import { MiningPickaxeAnimation } from '@/components/MiningPickaxeAnimation';
 import { MinerBootBadge } from '@/components/MinerBootIndicator';
 import { getCoinProfile, type CoinId, type CoinProfile } from '@/lib/coin/profile';
@@ -125,62 +123,6 @@ function HeroSection({
   return <div className={cn('h-full min-w-0', className)}>{body}</div>;
 }
 
-/** Block height: large when stacked full-width; scales down in the narrow xl column. */
-const HERO_BLOCK_NUMBER_CLASS = cn(
-  'font-bold tabular-nums leading-none tracking-tight',
-  'text-[clamp(1.75rem,4.5vw+0.35rem,2.875rem)]',
-  'sm:text-[clamp(2rem,3.5vw+0.5rem,3rem)]',
-  'xl:text-[clamp(1.375rem,0.5rem+0.9vw,2.125rem)]',
-  '2xl:text-[clamp(1.5rem,0.55rem+0.75vw,2.375rem)]'
-);
-
-function HeroBlockHeight({
-  coin,
-  localBlocks,
-  blockHashOrHeight,
-  activityLoading,
-  connected,
-}: {
-  coin: CoinId;
-  localBlocks?: number;
-  blockHashOrHeight?: string | number;
-  activityLoading: boolean;
-  connected: boolean;
-}) {
-  const showPlaceholder = activityLoading && localBlocks == null;
-  const canLink = connected && localBlocks != null && blockHashOrHeight != null;
-
-  return (
-    <div
-      className={cn(
-        'min-w-0 max-w-full',
-        HERO_BLOCK_NUMBER_CLASS,
-        showPlaceholder ? 'text-fg-muted' : 'text-fg'
-      )}
-    >
-      {showPlaceholder ? (
-        <Loader2 className="h-[1em] w-[1em] animate-spin text-accent/80" aria-hidden />
-      ) : canLink ? (
-        <ExplorerLink
-          coin={coin}
-          target={{ kind: 'block', hashOrHeight: blockHashOrHeight }}
-          label={<AnimatedBlockNumber value={localBlocks} className={HERO_BLOCK_NUMBER_CLASS} />}
-          showIcon={false}
-          title="View block on explorer"
-          className={cn(
-            HERO_BLOCK_NUMBER_CLASS,
-            'inline-flex max-w-full rounded-sm text-fg no-underline transition-colors hover:text-accent hover:underline'
-          )}
-        />
-      ) : connected && localBlocks != null ? (
-        <AnimatedBlockNumber value={localBlocks} className={HERO_BLOCK_NUMBER_CLASS} />
-      ) : (
-        '—'
-      )}
-    </div>
-  );
-}
-
 function SyncProgressBar({
   localBlocks,
   syncTarget,
@@ -235,30 +177,20 @@ function NetworkMetric({ label, value }: { label: string; value: string }) {
 }
 
 function HeroPanel({
-  coin,
   profile,
   statusRow,
-  tipHeight,
-  tipHash,
   localBlocks,
-  tipTime,
   activity,
-  connected,
   synced,
   syncTarget,
   behind,
   detailColumns,
   networkMetrics,
 }: {
-  coin: CoinId;
   profile: CoinProfile;
   statusRow: ReactNode;
-  tipHeight?: number;
-  tipHash?: string;
   localBlocks?: number;
-  tipTime?: number | null;
   activity: DashboardData['activity'];
-  connected: boolean;
   synced: boolean;
   syncTarget?: number;
   behind?: number | null;
@@ -285,54 +217,18 @@ function HeroPanel({
       <div className="relative min-w-0 p-5 sm:p-6 xl:p-6">
         <header className="flex min-w-0 flex-wrap items-center gap-2.5">{statusRow}</header>
 
-        {/*
-          Phone / tablet / laptop: stack block, then detail panels (1 col → 2 col).
-          XL+ desktop: block column beside three detail panels.
-        */}
-        <div className="mt-5 grid min-w-0 gap-5 md:gap-4 xl:mt-6 xl:grid-cols-12 xl:items-stretch xl:gap-6">
-          <div className="flex min-h-full min-w-0 flex-col rounded-xl bg-bg-subtle/25 p-4 ring-1 ring-inset ring-border/40 sm:p-5 xl:col-span-3 xl:p-4">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-subtle">
-                Latest block
-              </span>
-              {synced && connected && (
-                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-                  <span className="truncate">Synced</span>
-                </span>
-              )}
-            </div>
+        {activity.kind !== 'ready' && (
+          <p className="mt-3 text-xs leading-relaxed text-fg-muted">{activity.title}</p>
+        )}
 
-            <div className="mt-3 min-w-0 xl:mt-2">
-              <HeroBlockHeight
-                coin={coin}
-                localBlocks={tipHeight}
-                blockHashOrHeight={tipHash ?? tipHeight}
-                activityLoading={activity.showSpinner}
-                connected={connected}
-              />
-            </div>
-
-            <BlockAgeLabel tipTime={tipTime} />
-
-            {activity.kind !== 'ready' && (
-              <p className="mt-2 text-xs leading-relaxed text-fg-muted">{activity.title}</p>
-            )}
-
-            {showSyncProgress && (
-              <div className="mt-auto pt-4 xl:pt-3">
-                <SyncProgressBar
-                  localBlocks={localBlocks}
-                  syncTarget={syncTarget}
-                  behind={behind}
-                />
-              </div>
-            )}
+        {showSyncProgress && (
+          <div className="mt-4">
+            <SyncProgressBar localBlocks={localBlocks} syncTarget={syncTarget} behind={behind} />
           </div>
+        )}
 
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-3 xl:col-span-9 xl:grid-cols-3 xl:gap-4">
-            {detailColumns}
-          </div>
+        <div className="mt-5 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-3 xl:mt-6 xl:grid-cols-3 xl:gap-4">
+          {detailColumns}
         </div>
 
         <footer className="mt-6 border-t border-border/50 pt-5 xl:mt-6 xl:pt-5">
@@ -717,15 +613,10 @@ export function DashboardHero({ coin }: { coin: CoinId }) {
 
   return (
     <HeroPanel
-      coin={coin}
       profile={profile}
       statusRow={buildHeroStatusRow(data)}
-      tipHeight={data.tipHeight}
-      tipHash={data.tipHash}
       localBlocks={data.localBlocks}
-      tipTime={data.tipTime}
       activity={data.activity}
-      connected={data.connected}
       synced={data.synced}
       syncTarget={data.syncTarget}
       behind={data.behind}

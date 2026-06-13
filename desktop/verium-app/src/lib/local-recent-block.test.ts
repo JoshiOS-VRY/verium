@@ -28,6 +28,36 @@ describe('mergeRecentBlocks', () => {
     expect(merged[0]?.miner_address).toBe('Vyours');
   });
 
+  it('merges placeholder and indexed rows at the same height', () => {
+    const stub = {
+      id: 1103326,
+      hash: 'light-pending-1103326',
+      height: 1103326,
+      time: 1_700_000_000,
+    };
+    const indexed = {
+      id: 1103326,
+      hash: 'abc123realhash',
+      height: 1103326,
+      time: 1_700_001_000,
+      miner_address: 'VMiner',
+      output_total: '1.5',
+      n_tx: 2,
+    };
+    const merged = mergeRecentBlocks([stub], [indexed], 10);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.hash).toBe('abc123realhash');
+    expect(merged[0]?.miner_address).toBe('VMiner');
+    expect(merged[0]?.time).toBe(1_700_001_000);
+  });
+
+  it('dedupes when height is numeric in one feed and string-like in another', () => {
+    const explorer = [{ ...block(100, 'a'), height: 100 as number }];
+    const local = [{ ...block(100, 'b'), height: '100' as unknown as number }];
+    const merged = mergeRecentBlocks(explorer, local, 10);
+    expect(merged).toHaveLength(1);
+  });
+
   it('parses coinbase reward and miner from getblock verbosity 2', () => {
     const row = parseRpcBlock('verium', 100, 'abc', {
       height: 100,

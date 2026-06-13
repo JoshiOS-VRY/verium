@@ -1,5 +1,6 @@
 //! Indexer V2 JSON API (`/api/indexer/:chainId/...`) for in-app explorer detail screens.
 
+use futures_util::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -11,6 +12,9 @@ use crate::wallet::hd::{coins_to_sats, sats_to_coins};
 
 const ADDRESS_PAGE_LIMIT: u32 = 100;
 const ADDRESS_CUMULATIVE_MAX_TXS: u32 = 5000;
+const WALLET_CHART_MAX_ADDRESSES: usize = 1000;
+const WALLET_CHART_DEFAULT_TXS_PER_ADDR: u32 = 500;
+const WALLET_CHART_FETCH_CONCURRENCY: usize = 12;
 
 const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
 const HTTP_USER_AGENT: &str = "vericonomy-desktop-app/0.1";
@@ -311,6 +315,12 @@ pub struct CumulativeBalanceSeries {
     #[serde(default)]
     pub tx_count_total: Option<u64>,
     pub complete: bool,
+    #[serde(default)]
+    pub address_count_used: u64,
+    #[serde(default)]
+    pub address_count_total: u64,
+    #[serde(default)]
+    pub addresses_truncated: bool,
 }
 
 fn net_delta_sats(tx: &IndexerAddressTransaction) -> i64 {
@@ -437,6 +447,123 @@ async fn fetch_address_transactions_for_chart(
     Ok((first, all, complete))
 }
 
+/// Aggregate cumulative balance across every wallet-owned address (sum of per-address
+/// indexer `netDelta` rows, ordered by time).
+pub async fn fetch_wallet_cumulative_series(
+    coin: CoinId,
+    anchor_balance_coins: Option<f64>,
+    max_txs_per_addr: Option<u32>,
+) -> AppResult<CumulativeBalanceSeries> {
+    if !EXPLORER_API_ENABLED {
+        return Err(AppError::other("explorer api disabled"));
+    }
+
+    let addresses = crate::wallet::sync::addresses_for_history(coin)?;
+    let ticker = coin.symbol().to_string();
+    let address_count_total = addresses.len() as u64;
+    let addresses_truncated = addresses.len() > WALLET_CHART_MAX_ADDRESSES;
+    if addresses.is_empty() {
+        let anchor_sats = anchor_balance_coins
+            .filter(|v| v.is_finite() && *v >= 0.0)
+            .map(coins_to_sats)
+            .unwrap_or(0);
+        return Ok(CumulativeBalanceSeries {
+            points: vec![],
+            current_balance: amount_from_sats(anchor_sats, &ticker),
+            tx_count_used: 0,
+            tx_count_total: Some(0),
+            complete: true,
+            address_count_used: 0,
+            address_count_total: 0,
+            addresses_truncated: false,
+        });
+    }
+
+    let per_addr_cap = max_txs_per_addr
+        .unwrap_or(WALLET_CHART_DEFAULT_TXS_PER_ADDR)
+        .min(ADDRESS_CUMULATIVE_MAX_TXS);
+
+    let targets: Vec<String> = addresses
+        .iter()
+        .take(WALLET_CHART_MAX_ADDRESSES)
+        .cloned()
+        .collect();
+    let address_count_used = targets.len() as u64;
+
+    let mut wallet_complete = !addresses_truncated;
+    let mut tx_count_total: u64 = 0;
+    let mut all_txs: Vec<IndexerAddressTransaction> = Vec::new();
+
+    let results = stream::iter(targets)
+        .map(|addr| {
+            let per_addr_cap = per_addr_cap;
+            async move {
+                fetch_address_transactions_for_chart(coin, &addr, per_addr_cap)
+                    .await
+                    .map(|bundle| (addr, bundle))
+            }
+        })
+        .buffer_unordered(WALLET_CHART_FETCH_CONCURRENCY)
+        .collect::<Vec<_>>()
+        .await;
+
+    for result in results {
+        match result {
+            Ok((_, (detail, txs, complete))) => {
+                if !complete {
+                    wallet_complete = false;
+                }
+                if let Some(total) = detail
+                    .paging
+                    .as_ref()
+                    .map(|p| p.total)
+                    .or_else(|| detail.balance.as_ref().and_then(|b| b.tx_count))
+                {
+                    tx_count_total = tx_count_total.saturating_add(total);
+                }
+                all_txs.extend(txs);
+            }
+            Err(e) => {
+                tracing::debug!("wallet cumulative: address fetch failed: {e}");
+                wallet_complete = false;
+            }
+        }
+    }
+
+    all_txs.sort_by_key(|tx| tx_sort_key(tx));
+
+    let anchor_sats = anchor_balance_coins
+        .filter(|v| v.is_finite() && *v >= 0.0)
+        .map(coins_to_sats)
+        .unwrap_or_else(|| {
+            let bal = crate::wallet::sync::balance_from_utxo_cache(coin);
+            bal.confirmed_sats + bal.unconfirmed_sats + bal.immature_sats
+        });
+
+    let points = if all_txs.is_empty() {
+        Vec::new()
+    } else if wallet_complete {
+        build_cumulative_forward(&all_txs, &ticker)
+    } else {
+        build_cumulative_backward(&all_txs, anchor_sats, &ticker)
+    };
+
+    Ok(CumulativeBalanceSeries {
+        points,
+        current_balance: amount_from_sats(anchor_sats, &ticker),
+        tx_count_used: all_txs.len() as u64,
+        tx_count_total: if tx_count_total > 0 {
+            Some(tx_count_total)
+        } else {
+            None
+        },
+        complete: wallet_complete && !all_txs.is_empty(),
+        address_count_used,
+        address_count_total,
+        addresses_truncated,
+    })
+}
+
 pub async fn fetch_indexer_address_cumulative_series(
     coin: CoinId,
     address: &str,
@@ -481,6 +608,9 @@ pub async fn fetch_indexer_address_cumulative_series(
         tx_count_used: txs.len() as u64,
         tx_count_total,
         complete,
+        address_count_used: 1,
+        address_count_total: 1,
+        addresses_truncated: false,
     })
 }
 

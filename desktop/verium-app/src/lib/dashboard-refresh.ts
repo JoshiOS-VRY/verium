@@ -40,6 +40,9 @@ export async function refreshMobileDashboard(
       queryKey: coinQueryKey(coin, 'wallet-cumulative-txs'),
     }),
     queryClient.invalidateQueries({
+      queryKey: coinQueryKey(coin, 'wallet-cumulative-indexer'),
+    }),
+    queryClient.invalidateQueries({
       queryKey: walletTransactionsKeyPrefix(coin),
     }),
   ];

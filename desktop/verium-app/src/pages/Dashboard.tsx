@@ -8,7 +8,6 @@ import {
   MobileBalanceHero,
   useMobileBalanceRefreshing,
 } from '@/components/mobile/MobileBalanceHero';
-import { MobileDashboardHero } from '@/components/mobile/MobileDashboardHero';
 import { MobileQuickActions } from '@/components/mobile/MobileQuickActions';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useIsTestNetwork } from '@/lib/network-mode';
@@ -45,7 +44,6 @@ export function Dashboard() {
         {!mobileOnly && isLight && <LightWalletSyncBanner />}
         <MobileBalanceHero showChart refreshing={refreshing} />
         <MobileQuickActions />
-        <MobileDashboardHero coin={coin} />
         {!isTestNetwork && <ExplorerRecentBlocks coin={coin} variant="dashboard" />}
       </div>
     );

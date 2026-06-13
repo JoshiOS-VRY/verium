@@ -16,9 +16,9 @@ export function NotificationSettingsCard({ mobileLayout = false }: { mobileLayou
 
   const permissionHint = notif.available
     ? notif.granted
-      ? 'Banner and lock screen alerts are enabled.'
-      : 'Allow notifications so incoming VRM and VRC appear on your lock screen and as banners.'
-    : 'In-app alerts are shown while the app is open.';
+      ? 'Lock screen alerts when the app is in the background. In-app toasts while open.'
+      : 'Allow notifications so incoming VRM and VRC appear on your lock screen when the app is not active.'
+    : 'In-app toasts are shown while the app is open.';
 
   const content = (
     <div className="flex flex-col gap-3">
@@ -73,7 +73,7 @@ export function NotificationSettingsCard({ mobileLayout = false }: { mobileLayou
               disabled={notif.loading}
               onClick={() => void notif.request()}
             >
-              Allow lock screen & banner alerts
+              Allow lock screen alerts
             </Button>
           )}
         </div>

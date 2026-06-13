@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { useActiveCoin, useCoinProfile } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
+import {
+  balanceDayOverDayChange,
+  formatChartPointDate,
+  type ChartCumulativePoint,
+} from '@/lib/cumulative-balance';
 import { rpcGetWalletInfo } from '@/lib/rpc/client';
 import { formatCoinAmount } from '@/lib/units';
 import { cn } from '@/lib/utils';
@@ -10,6 +16,46 @@ import { lockedWalletBalanceClass } from '@/lib/wallet-unlock';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { LightWalletSyncStatus } from '@/components/mobile/LightWalletSyncStatus';
 import { WalletCumulativeBalanceChart } from '@/components/mobile/WalletCumulativeBalanceChart';
+
+function BalanceDayChange({
+  points,
+  currentBalance,
+  referenceUnixSeconds,
+  coin,
+  className,
+}: {
+  points: ChartCumulativePoint[];
+  currentBalance: number;
+  referenceUnixSeconds: number;
+  coin: ReturnType<typeof useActiveCoin>;
+  className?: string;
+}) {
+  const change = useMemo(
+    () => balanceDayOverDayChange(points, currentBalance, referenceUnixSeconds),
+    [points, currentBalance, referenceUnixSeconds]
+  );
+
+  if (!change) return null;
+
+  const { delta, tone } = change;
+  const sign = tone === 'up' ? '+' : tone === 'down' ? '' : '';
+  const label = `${sign}${formatCoinAmount(delta, coin, 1)}`;
+
+  return (
+    <p
+      className={cn(
+        'text-[10px] font-semibold tabular-nums leading-none',
+        tone === 'up' && 'text-emerald-600 dark:text-emerald-400',
+        tone === 'down' && 'text-red-600 dark:text-red-400',
+        tone === 'flat' && 'text-fg-muted',
+        className
+      )}
+      title="Change vs. 24 hours ago"
+    >
+      {label}
+    </p>
+  );
+}
 
 export function MobileBalanceHero({
   showChart = false,
@@ -27,6 +73,22 @@ export function MobileBalanceHero({
     refetchInterval: false,
   });
 
+  const [chartPoints, setChartPoints] = useState<ChartCumulativePoint[]>([]);
+  const [scrubPoint, setScrubPoint] = useState<ChartCumulativePoint | null>(null);
+  const [scrubbing, setScrubbing] = useState(false);
+
+  const handleScrubChange = useCallback(
+    (point: ChartCumulativePoint | null, active: boolean) => {
+      setScrubbing(active);
+      setScrubPoint(active ? point : null);
+    },
+    []
+  );
+
+  const handlePointsChange = useCallback((points: ChartCumulativePoint[]) => {
+    setChartPoints(points);
+  }, []);
+
   if (wallet.isLoading) {
     return (
       <div className="mobile-balance-hero flex items-center justify-center py-10">
@@ -43,9 +105,16 @@ export function MobileBalanceHero({
   const immature = wallet.data.immature_balance;
   const total = isLight ? available + immature : available + unconfirmed + immature;
   const blurClass = lockedWalletBalanceClass(wallet.data);
-  const lightSyncing = wallet.data.light_syncing === true;
   const unlocked = wallet.data.private_keys_enabled === true;
   const hasPending = unconfirmed > 0 || immature > 0;
+
+  const displayBalance = scrubbing && scrubPoint ? scrubPoint.balance : total;
+  const referenceTime =
+    scrubbing && scrubPoint
+      ? scrubPoint.time
+      : chartPoints.length > 0
+        ? chartPoints[chartPoints.length - 1].time
+        : Math.floor(Date.now() / 1000);
 
   return (
     <section className="mobile-balance-hero rounded-2xl border border-border bg-gradient-to-br from-bg-panel to-bg-subtle/60 p-5 shadow-sm">
@@ -57,19 +126,50 @@ export function MobileBalanceHero({
         className="mb-2"
       />
 
-      <p className="text-center text-xs font-medium uppercase tracking-wide text-fg-subtle">
-        {profile.displayName} balance
-      </p>
-      <p
-        className={cn(
-          'mt-2 text-center text-3xl font-bold tabular-nums tracking-tight text-fg',
-          blurClass
+      <div className="relative min-h-[4.5rem]">
+        {showChart && chartPoints.length > 0 && (
+          <BalanceDayChange
+            points={chartPoints}
+            currentBalance={displayBalance}
+            referenceUnixSeconds={referenceTime}
+            coin={coin}
+            className="absolute right-0 top-0"
+          />
         )}
-      >
-        {formatCoinAmount(total, coin, 4)}
-      </p>
 
-      {showChart && <WalletCumulativeBalanceChart embedded blurClass={blurClass} />}
+        <p className="text-center text-xs font-medium uppercase tracking-wide text-fg-subtle">
+          {scrubbing ? 'Balance at point' : `${profile.displayName} balance`}
+        </p>
+        <p
+          className={cn(
+            'mt-2 text-center text-3xl font-bold tabular-nums tracking-tight text-fg',
+            blurClass
+          )}
+        >
+          <AnimatedNumber
+            value={displayBalance}
+            fractionDigits={4}
+            showTrendColor={!scrubbing}
+            format={(value, digits) => formatCoinAmount(value, coin, digits)}
+            tension={scrubbing ? 220 : 120}
+            friction={scrubbing ? 26 : 14}
+          />
+        </p>
+        {scrubbing && scrubPoint && (
+          <p className="mt-1 text-center text-[11px] text-fg-muted">
+            {formatChartPointDate(scrubPoint.time, true)}
+          </p>
+        )}
+      </div>
+
+      {showChart && (
+        <WalletCumulativeBalanceChart
+          embedded
+          blurClass={blurClass}
+          onScrubChange={handleScrubChange}
+          onPointsChange={handlePointsChange}
+        />
+      )}
 
       <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-border/60 pt-4 text-center">
         <div>
@@ -108,13 +208,6 @@ export function MobileBalanceHero({
           </dd>
         </div>
       </dl>
-
-      {lightSyncing && wallet.data.light_scan_progress == null && (
-        <p className="mt-3 flex items-center justify-center gap-2 text-xs text-warning">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Scanning addresses for indexed balance…
-        </p>
-      )}
     </section>
   );
 }

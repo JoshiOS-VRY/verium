@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { subscribeIncomingVrc, type IncomingVrcBatch } from '@/hooks/useIncomingVrcWatcher';
-import { useWalletMode } from '@/hooks/useWalletMode';
 import { playReceivedVrmSound } from '@/lib/received-vrm-sound';
 import { showReceiveNotification } from '@/lib/notifications/receive';
 import { useUserPreferences } from '@/lib/user-preferences';
@@ -29,7 +28,6 @@ function formatBatchMessage(batch: IncomingVrcBatch): {
 /** Shows toast + plays chime when incoming VRC is detected (if enabled). */
 export function useIncomingVrcNotifications(): void {
   const enabled = useUserPreferences((s) => s.prefs.notify_on_vrc_received !== false);
-  const { mobileOnly } = useWalletMode();
 
   useEffect(() => {
     if (!enabled) return;
@@ -39,9 +37,8 @@ export function useIncomingVrcNotifications(): void {
       void showReceiveNotification({
         title,
         description: description || undefined,
-        native: mobileOnly,
       });
       void playReceivedVrmSound();
     });
-  }, [enabled, mobileOnly]);
+  }, [enabled]);
 }
