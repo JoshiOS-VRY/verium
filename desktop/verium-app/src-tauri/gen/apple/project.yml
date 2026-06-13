@@ -59,6 +59,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: Vericonomy Wallet uses the camera to scan payment QR codes when you send Verium or Vericoin.
         NSFaceIDUsageDescription: Vericonomy uses Face ID to unlock your wallet without typing your passphrase each time.
+        UIBackgroundModes:
+          - remote-notification
         CFBundleURLTypes:
           - CFBundleURLName: com.vericonomy.wallet.verium
             CFBundleURLSchemes:
