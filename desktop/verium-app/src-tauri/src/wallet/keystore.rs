@@ -396,11 +396,20 @@ fn keystore_backing_exists() -> bool {
 /// Remove stale manifest / orphaned encrypted blobs left by a crashed or partial install.
 #[cfg(mobile)]
 pub fn cleanup_stale_mobile_wallet_artifacts() -> AppResult<()> {
+    if let Ok(store) = load_keystore() {
+        if !store.wallets.is_empty() {
+            let coins: Vec<&str> = store.wallets.keys().map(String::as_str).collect();
+            prune_orphan_light_wallet_artifacts(&coins);
+        }
+    }
     if !keystore_backing_exists() {
         let path = manifest_path();
         if path.exists() {
             let _ = std::fs::remove_file(&path);
             tracing::info!("mobile: removed stale light-wallet manifest without keystore");
+        }
+        for coin in CoinId::all() {
+            let _ = crate::wallet::cache::clear_coin_cache(*coin);
         }
     }
     if crate::secret_store::encrypted_data_orphaned() && !keystore_backing_exists() {
@@ -418,11 +427,75 @@ pub fn cleanup_stale_mobile_wallet_artifacts() -> AppResult<()> {
     Ok(())
 }
 
+fn prune_orphan_light_wallet_artifacts(known_coins: &[&str]) {
+    let known: std::collections::HashSet<&str> = known_coins.iter().copied().collect();
+    let path = manifest_path();
+    if path.exists() {
+        if let Ok(raw) = std::fs::read_to_string(&path) {
+            if let Ok(mut manifest) = serde_json::from_str::<LightKeystoreManifest>(&raw) {
+                let before = manifest.wallets.len();
+                manifest.wallets.retain(|coin, _| known.contains(coin.as_str()));
+                if manifest.wallets.len() != before {
+                    let _ = write_manifest_from_map(&manifest.wallets);
+                    tracing::info!(
+                        "pruned stale light-wallet manifest entries (kept: {:?})",
+                        manifest.wallets.keys().collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
+    }
+    for coin in CoinId::all() {
+        if !known.contains(coin.as_str()) && light_wallet_cache_exists(*coin) {
+            if let Err(e) = crate::wallet::cache::clear_coin_cache(*coin) {
+                tracing::warn!(
+                    "could not remove orphan light cache for {}: {e}",
+                    coin.as_str()
+                );
+            } else {
+                tracing::info!(
+                    "removed orphan light-cache for {} (no keystore entry)",
+                    coin.as_str()
+                );
+            }
+        }
+    }
+}
+
+fn write_manifest_from_map(wallets: &HashMap<String, u64>) -> AppResult<()> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let manifest = LightKeystoreManifest {
+        wallets: wallets.clone(),
+        updated_at: now,
+    };
+    let path = manifest_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let tmp = path.with_extension("json.new");
+    std::fs::write(&tmp, serde_json::to_string_pretty(&manifest)?)?;
+    std::fs::rename(&tmp, &path)?;
+    Ok(())
+}
+
+fn coin_has_light_artifacts(coin: CoinId) -> bool {
+    manifest_lists_coin(coin) || light_wallet_cache_exists(coin)
+}
+
+/// True when this chain has a persisted light wallet. When the keystore JSON can be
+/// read, that is authoritative; manifest/cache are only used when the backing file
+/// exists but the store cannot be decrypted yet.
 pub fn light_wallet_on_disk(coin: CoinId) -> bool {
     if !keystore_backing_exists() {
         return false;
     }
-    manifest_lists_coin(coin) || light_wallet_cache_exists(coin)
+    match load_keystore() {
+        Ok(store) if !store.wallets.is_empty() => store.wallets.contains_key(coin.as_str()),
+        Ok(_) | Err(_) => coin_has_light_artifacts(coin),
+    }
 }
 
 pub fn manifest_lists_coin_for_diagnostics(coin: CoinId) -> bool {
@@ -460,12 +533,23 @@ pub fn light_keystore_health(coin: CoinId) -> LightKeystoreHealth {
     if !keystore_backing_exists() {
         return LightKeystoreHealth::Missing;
     }
-    if !manifest_lists_coin(coin) && !light_wallet_cache_exists(coin) {
-        return LightKeystoreHealth::Missing;
-    }
     match load_keystore() {
         Ok(store) if store.wallets.contains_key(coin.as_str()) => LightKeystoreHealth::Ok,
-        Ok(_) | Err(_) => LightKeystoreHealth::Unreadable,
+        Ok(store) if !store.wallets.is_empty() => LightKeystoreHealth::Missing,
+        Ok(_) => {
+            if coin_has_light_artifacts(coin) {
+                LightKeystoreHealth::Unreadable
+            } else {
+                LightKeystoreHealth::Missing
+            }
+        }
+        Err(_) => {
+            if coin_has_light_artifacts(coin) {
+                LightKeystoreHealth::Unreadable
+            } else {
+                LightKeystoreHealth::Missing
+            }
+        }
     }
 }
 
@@ -479,6 +563,8 @@ pub fn sync_manifest_from_keystore() {
     invalidate_keystore_cache();
     if let Ok(store) = load_keystore() {
         if !store.wallets.is_empty() {
+            let coins: Vec<&str> = store.wallets.keys().map(String::as_str).collect();
+            prune_orphan_light_wallet_artifacts(&coins);
             let _ = write_manifest(&store);
             return;
         }
@@ -609,7 +695,7 @@ fn set_cached_script_hexes_with_scan_flag(
     save_keystore(&store)
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct IndexingProgress {
     pub precache_offset: u32,
     pub gap_external: u32,
@@ -997,8 +1083,15 @@ mod presence_tests {
         let _ = fs::remove_file(manifest_path());
     }
 
+    fn cleanup_keystore() {
+        let _ = fs::remove_file(keystore_path());
+        invalidate_keystore_cache();
+    }
+
     #[test]
     fn manifest_without_keystore_backing_is_not_on_disk() {
+        cleanup_keystore();
+        cleanup_manifest();
         write_manifest(&["verium"]);
         assert!(manifest_lists_coin(CoinId::Verium));
         assert!(!light_wallet_on_disk(CoinId::Verium));
@@ -1011,6 +1104,8 @@ mod presence_tests {
 
     #[test]
     fn light_keystore_health_ok_from_json_without_cm() {
+        cleanup_keystore();
+        cleanup_manifest();
         write_manifest(&["verium"]);
         let store = LightKeystore {
             wallets: HashMap::from([(
@@ -1035,13 +1130,59 @@ mod presence_tests {
             )]),
             unlocked_until_by_coin: HashMap::new(),
         };
+        if let Some(parent) = keystore_path().parent() {
+            let _ = fs::create_dir_all(parent);
+        }
         save_keystore_to_json(&store).unwrap();
         invalidate_keystore_cache();
         assert_eq!(
             light_keystore_health(CoinId::Verium),
             LightKeystoreHealth::Ok
         );
-        let _ = fs::remove_file(keystore_path());
+        cleanup_keystore();
+        cleanup_manifest();
+    }
+
+    #[test]
+    fn vericoin_not_on_disk_when_only_verium_wallet_exists() {
+        cleanup_keystore();
+        cleanup_manifest();
+        write_manifest(&["verium", "vericoin"]);
+        let store = LightKeystore {
+            wallets: HashMap::from([(
+                "verium".to_string(),
+                LightWalletRecord {
+                    coin: "verium".to_string(),
+                    encrypted_mnemonic: "deadbeef".into(),
+                    salt: "00".into(),
+                    nonce: "00".into(),
+                    created_at: 1,
+                    next_receive_index: 0,
+                    label: String::new(),
+                    cached_script_hexes: vec![],
+                    addresses_scan_complete: false,
+                    funded_script_hexes: vec![],
+                    index_precache_offset: 0,
+                    index_gap_external: 0,
+                    index_gap_external_done: false,
+                    index_gap_internal: 0,
+                    index_gap_internal_done: false,
+                },
+            )]),
+            unlocked_until_by_coin: HashMap::new(),
+        };
+        if let Some(parent) = keystore_path().parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        save_keystore_to_json(&store).unwrap();
+        invalidate_keystore_cache();
+        assert!(light_wallet_on_disk(CoinId::Verium));
+        assert!(!light_wallet_on_disk(CoinId::Vericoin));
+        assert_eq!(
+            light_keystore_health(CoinId::Vericoin),
+            LightKeystoreHealth::Missing
+        );
+        cleanup_keystore();
         cleanup_manifest();
     }
 }

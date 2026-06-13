@@ -167,28 +167,35 @@ export function MobileSetupHub({
     vericoin: vericoinProfile,
   } as const;
 
-  const anyReady = options.some((coin) => {
+  const readyCount = options.filter((coin) => {
     const profile = profileByCoin[coin].data;
-    return profile && isProfileOpenable(profile) && profile.ready;
-  });
+    return (
+      !!profile &&
+      profile.ready &&
+      isProfileOpenable(profile) &&
+      !needsLightWalletRecovery(profile, 'light')
+    );
+  }).length;
+
+  const showOtherChainHint = options.length > 1 && readyCount < options.length;
 
   return (
-    <div className="mobile-setup-hub flex min-w-0 flex-col gap-5">
+    <div className="mobile-setup-hub flex min-w-0 flex-col gap-4">
       <header className="mobile-setup-hero rounded-2xl border border-border/80 bg-gradient-to-br from-accent/10 via-bg-panel to-bg-subtle/60 px-4 py-5 text-center shadow-sm">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 text-accent">
-          <Wallet className="h-6 w-6" aria-hidden />
+        <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/15 text-accent">
+          <Wallet className="h-5 w-5" aria-hidden />
         </span>
-        <h1 className="mt-3 text-xl font-bold tracking-tight text-fg">Vericonomy Wallet</h1>
+        <h1 className="mt-3 text-lg font-bold tracking-tight text-fg">Vericonomy Wallet</h1>
         <p className="mt-2 text-sm leading-relaxed text-fg-muted">
           {lightWalletCopy.mobileOnboardingWelcome}
         </p>
       </header>
 
-      <p className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-3 text-xs leading-relaxed text-fg-muted">
+      <p className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5 text-xs leading-relaxed text-fg-muted">
         {lightWalletCopy.mobileFundsDisclaimer}
       </p>
 
-      <div className="grid min-w-0 gap-4">
+      <div className="grid min-w-0 gap-3">
         {options.map((coin) => {
           const query = profileByCoin[coin];
           const profile = query.data;
@@ -215,8 +222,8 @@ export function MobileSetupHub({
         })}
       </div>
 
-      {anyReady && (
-        <p className="border-t border-border pt-4 text-center text-xs text-fg-subtle">
+      {showOtherChainHint && (
+        <p className="border-t border-border/60 pt-3 text-center text-xs text-fg-subtle">
           You can set up the other chain whenever you are ready.
         </p>
       )}

@@ -8,7 +8,7 @@ use tauri::State;
 
 use crate::coin_profile::{assert_verium, CoinId};
 use crate::cpuminer_topo::{
-    cpuminer_recommended_threads, cpuminer_scratchpad_mib, probe_topo,
+    cpuminer_recommended_threads, cpuminer_scratchpad_mib,
 };
 use crate::daemon::{binary_supports_native_pool_mining, resolve_daemon_binary};
 use crate::error::{AppError, AppResult};
@@ -89,7 +89,7 @@ struct RpcPoolMinerDetect {
 }
 
 /// Logical CPUs left for OS, WebView, veriumd, and Tauri while mining.
-const UI_RESERVE_LOGICAL_CPUS: u32 = 2;
+const MINING_UI_RESERVE_CORES: u32 = 1;
 
 fn logical_cpu_count() -> u32 {
     std::thread::available_parallelism()
@@ -98,14 +98,9 @@ fn logical_cpu_count() -> u32 {
         .max(1)
 }
 
-fn ui_reserve_logical_cpus(logical: u32) -> u32 {
-    UI_RESERVE_LOGICAL_CPUS.max((logical / 10).min(4))
-}
-
 fn pool_cpu_thread_ceiling() -> u32 {
-    let logical = logical_cpu_count();
-    logical
-        .saturating_sub(ui_reserve_logical_cpus(logical))
+    logical_cpu_count()
+        .saturating_sub(MINING_UI_RESERVE_CORES)
         .max(1)
 }
 
@@ -292,15 +287,8 @@ pub async fn pool_miner_memory_limits_rpc(_state: &AppState) -> AppResult<PoolMi
         let max_safe_threads = apply_ui_thread_reserve(
             cpuminer_recommended_threads_async(binary).await,
         );
-        let topo = probe_topo();
-        let max_manual_threads = apply_ui_thread_reserve(
-            if topo.performance_cpus > 0 {
-                topo.performance_cpus
-            } else {
-                pool_cpu_thread_ceiling()
-            }
-            .max(max_safe_threads),
-        );
+        let cpu_ceiling = pool_cpu_thread_ceiling();
+        let max_manual_threads = cpu_ceiling.max(max_safe_threads);
         return Ok(PoolMinerMemoryLimits {
             max_safe_threads,
             max_manual_threads,
@@ -380,15 +368,7 @@ pub async fn pool_miner_start(
         let recommended = apply_ui_thread_reserve(
             cpuminer_recommended_threads_async(Some(binary)).await,
         );
-        let topo = probe_topo();
-        let manual = apply_ui_thread_reserve(
-            if topo.performance_cpus > 0 {
-                topo.performance_cpus
-            } else {
-                pool_cpu_thread_ceiling()
-            }
-            .max(recommended),
-        );
+        let manual = pool_cpu_thread_ceiling().max(recommended);
         (recommended, manual)
     } else {
         let cap = pool_cpu_thread_ceiling();

@@ -33,29 +33,29 @@ export function QrScanModal({ open, onClose, onScan }: QrScanModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   const handledRef = useRef(false);
+  const onScanRef = useRef(onScan);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  onScanRef.current = onScan;
 
   const finishSuccess = useCallback(() => {
     setShowSuccess(false);
     onClose();
   }, [onClose]);
 
-  const handleScanResult = useCallback(
-    (address: string, amount?: number) => {
-      if (handledRef.current) return;
-      handledRef.current = true;
+  const handleScanResult = useCallback((address: string, amount?: number) => {
+    if (handledRef.current) return;
+    handledRef.current = true;
 
-      if (scannerRef.current) {
-        void scannerRef.current.stop();
-      }
+    if (scannerRef.current) {
+      void scannerRef.current.stop();
+    }
 
-      onScan(address, amount);
-      setShowSuccess(true);
-    },
-    [onScan]
-  );
+    onScanRef.current(address, amount);
+    setShowSuccess(true);
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -136,7 +136,7 @@ export function QrScanModal({ open, onClose, onScan }: QrScanModalProps) {
       }
       scannerRef.current = null;
     };
-  }, [open, handleScanResult]);
+  }, [open]);
 
   if (!open && !showSuccess) return null;
 

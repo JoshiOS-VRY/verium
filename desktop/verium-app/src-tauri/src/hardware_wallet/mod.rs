@@ -140,10 +140,11 @@ pub async fn finalize_and_broadcast(
     psbt::finalize_and_send(client, psbt_base64).await
 }
 
+/// SLIP-44 coin type (unhardened index; path strings add the `'` hardened marker).
 pub fn coin_type_for(coin: CoinId) -> u32 {
     match coin {
-        CoinId::Verium => 0x800001ce, // unregistered — use custom
-        CoinId::Vericoin => 0x800001cf,
+        CoinId::Verium => 462,   // 0x1ce — custom Verium registration
+        CoinId::Vericoin => 463, // 0x1cf
     }
 }
 

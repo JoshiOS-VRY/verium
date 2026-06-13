@@ -19,8 +19,15 @@ export function MobileReceiveForm({
   onMessageChange,
   onClearForm,
   onCreate,
+  onCreateAddressOnly,
   creating,
+  creatingAddress,
   createError,
+  plainAddress,
+  showPlainQr,
+  onShowPlainQr,
+  onHidePlainQr,
+  onDismissPlainAddress,
   requests,
   selected,
   onSelectRequest,
@@ -42,8 +49,15 @@ export function MobileReceiveForm({
   onMessageChange: (value: string) => void;
   onClearForm: () => void;
   onCreate: () => void;
+  onCreateAddressOnly: () => void;
   creating: boolean;
+  creatingAddress: boolean;
   createError: string | null;
+  plainAddress: string | null;
+  showPlainQr: boolean;
+  onShowPlainQr: () => void;
+  onHidePlainQr: () => void;
+  onDismissPlainAddress: () => void;
   selected: ReceiveRequest | null;
   requests: ReceiveRequest[];
   onSelectRequest: (id: string) => void;
@@ -59,6 +73,7 @@ export function MobileReceiveForm({
   const [showWarnings, setShowWarnings] = useState(false);
 
   const active = selected;
+  const busy = creating || creatingAddress;
 
   return (
     <div className="mobile-send-form-root flex flex-col gap-4">
@@ -184,16 +199,77 @@ export function MobileReceiveForm({
               Remove request
             </Button>
           </>
+        ) : plainAddress ? (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                Receive address
+              </p>
+              <button
+                type="button"
+                onClick={onDismissPlainAddress}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-fg-muted active:bg-bg-subtle"
+                aria-label="Dismiss address"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {showPlainQr && (
+              <div className="mt-4 flex justify-center">
+                <QrCodeDisplay coin={coin} address={plainAddress} size={240} />
+              </div>
+            )}
+
+            <div
+              className={cn(
+                'mt-4 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors',
+                addressCopied ? 'border-success/40 bg-success/5' : 'border-border bg-bg-subtle'
+              )}
+            >
+              <span className="min-w-0 flex-1 break-all font-mono text-xs">{plainAddress}</span>
+              <button
+                type="button"
+                aria-label={addressCopied ? 'Address copied' : 'Copy address'}
+                onClick={() => onCopyAddress(plainAddress)}
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors',
+                  addressCopied ? 'text-success' : 'text-fg-muted active:bg-bg-panel'
+                )}
+              >
+                {addressCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-10 min-h-[40px] rounded-xl"
+                onClick={showPlainQr ? onHidePlainQr : onShowPlainQr}
+              >
+                <QrCode className="h-4 w-4" />
+                {showPlainQr ? 'Hide QR code' : 'Show QR code'}
+              </Button>
+              <ExplorerLink
+                coin={coin}
+                target={{ kind: 'address', address: plainAddress }}
+                label="View on explorer"
+                className="text-xs text-accent"
+              />
+            </div>
+          </>
         ) : (
           <div className="py-6 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-accent">
               <QrCode className="h-8 w-8" />
             </div>
             <p className="mt-4 text-sm font-medium text-fg">
-              Show a QR code to receive {profile.symbol}
+              Receive {profile.symbol}
             </p>
             <p className="mt-1 text-xs text-fg-muted">
-              Generate an address below or pick a recent request.
+              Get an address to copy, or create a QR payment request below.
             </p>
           </div>
         )}
@@ -310,12 +386,32 @@ export function MobileReceiveForm({
         </div>
       )}
 
-      <div className="mobile-send-sticky-bar">
+      <div className="mobile-send-sticky-bar flex flex-col gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          className="h-12 min-h-[48px] w-full rounded-xl text-base font-semibold"
+          disabled={busy}
+          onClick={onCreateAddressOnly}
+        >
+          {creatingAddress ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              Generating…
+            </>
+          ) : (
+            <>
+              <Copy className="h-5 w-5" />
+              Get address only
+            </>
+          )}
+        </Button>
         <Button
           type="button"
           size="lg"
           className="h-12 min-h-[48px] w-full rounded-xl text-base font-semibold"
-          disabled={creating}
+          disabled={busy}
           onClick={onCreate}
         >
           {creating ? (

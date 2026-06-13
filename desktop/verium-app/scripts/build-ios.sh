@@ -52,6 +52,9 @@ run_rust_ios_compile() {
 echo "==> [1/4] Building frontend (no Prettier — use npm run build for a formatted CI build)…"
 npm run build:app
 
+echo "==> Syncing iOS app icons (logo scale ${IOS_LOGO_SCALE:-0.68})…"
+bash "${ROOT}/scripts/sync-ios-icons.sh"
+
 CURRENT_FP="$(frontend_fingerprint || echo missing)"
 CURRENT_STAMP="${CURRENT_FP} ${IOS_BUILD_MODE}"
 PREVIOUS_STAMP="$(cat "${STAMP_FILE}" 2>/dev/null || echo "")"
@@ -84,6 +87,7 @@ elif [[ ! -f "${LIBAPP}" ]]; then
   exit 1
 fi
 
+# Icons were synced above; ensure Xcode asset catalog has the latest PNGs.
 if [[ -d "${ROOT}/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset" ]]; then
   ICON_SRC="${ROOT}/src-tauri/icons/ios"
   ICON_DST="${ROOT}/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset"

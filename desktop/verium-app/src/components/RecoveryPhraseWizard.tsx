@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Copy, Eye, EyeOff } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Copy, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   recoveryGenerateMnemonic,
   recoveryVerificationIndices,
-  recoveryVerifyWords,
 } from '@/lib/security/client';
+import {
+  formatNumberedRecoveryPhraseForCopy,
+  verifyRecoveryWordsAtIndices,
+} from '@/lib/recovery-phrase';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
 
@@ -29,6 +33,7 @@ export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizar
   const [indices, setIndices] = useState<number[]>([]);
   const [answers, setAnswers] = useState<string[]>(['', '', '']);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const { copied, copy } = useCopyToClipboard();
 
   const generate = useMutation({
     mutationFn: recoveryGenerateMnemonic,
@@ -111,12 +116,15 @@ export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizar
               size="sm"
               variant="secondary"
               onClick={() => {
-                void navigator.clipboard.writeText(phrase);
-                window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
+                void copy(formatNumberedRecoveryPhraseForCopy(phrase)).then((ok) => {
+                  if (ok) {
+                    window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
+                  }
+                });
               }}
             >
-              <Copy className="h-3.5 w-3.5" />
-              Copy (clears in 30s)
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? 'Copied successfully' : 'Copy (clears in 30s)'}
             </Button>
           )}
           <label className="flex cursor-pointer items-start gap-2 text-xs text-fg-muted">
@@ -128,7 +136,11 @@ export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizar
             />
             I have written down my recovery phrase and stored it securely offline.
           </label>
-          <Button disabled={!acknowledged} onClick={() => setStep('verify')}>
+          <Button disabled={!acknowledged} onClick={() => {
+            setAnswers(['', '', '']);
+            setVerifyError(null);
+            setStep('verify');
+          }}>
             Continue to verification
           </Button>
         </div>
@@ -150,12 +162,15 @@ export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizar
               <input
                 type="text"
                 autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
                 spellCheck={false}
                 value={answers[i]}
                 onChange={(e) => {
                   const next = [...answers];
                   next[i] = e.target.value;
                   setAnswers(next);
+                  if (verifyError) setVerifyError(null);
                 }}
                 className="h-9 rounded-md border border-border bg-bg-subtle px-3 text-sm outline-none focus:border-accent"
               />
@@ -169,7 +184,7 @@ export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizar
           )}
           <Button
             onClick={async () => {
-              const ok = await recoveryVerifyWords(phrase, indices, answers);
+              const ok = verifyRecoveryWordsAtIndices(phrase, indices, answers);
               if (!ok) {
                 setVerifyError('Words do not match. Check your written copy.');
                 return;

@@ -49,6 +49,7 @@ import { LIGHT_WALLET_ENABLED } from '@/lib/features';
 import { walletModeSet, walletModeSetForCoin } from '@/lib/light-wallet/client';
 import { LightWalletSetupForm } from '@/components/LightWalletSetupForm';
 import { MobileSetupHub } from '@/components/MobileSetupHub';
+import { MobileSetupLayout } from '@/components/mobile/MobileSetupLayout';
 import { SetupWalletHub } from '@/components/SetupWalletHub';
 import { useInvalidateWalletMode, useWalletMode } from '@/hooks/useWalletMode';
 import { lightWalletCopy } from '@/lib/light-wallet/copy';
@@ -61,6 +62,7 @@ import { profileWalletPresence, useSetupHubProfile } from '@/hooks/useSetupHubPr
 import { FeatureTile } from '@/components/onboarding/FeatureTile';
 import { SetupStepIndicator } from '@/components/onboarding/SetupStepIndicator';
 import { LegacyUpgradeWizard } from '@/components/onboarding/LegacyUpgradeWizard';
+import { cn } from '@/lib/utils';
 
 type Step =
   | 'hub'
@@ -634,30 +636,32 @@ export function Setup() {
     navigate('/dashboard', { replace: true });
   };
 
-  return (
-    <div
+  const showSetupHeader = !(mobileOnly && step === 'hub');
+
+  const setupCard = (
+    <Card
       className={
         mobileOnly
-          ? 'mobile-setup flex min-h-screen w-full max-w-full flex-col overflow-x-hidden bg-bg text-fg'
-          : 'flex min-h-screen items-center justify-center bg-bg p-8 text-fg'
+          ? 'mobile-setup-card w-full max-w-none rounded-none border-0 bg-transparent shadow-none'
+          : 'w-full max-w-2xl'
       }
     >
-      <Card
-        className={
-          mobileOnly
-            ? 'mobile-setup-card min-h-screen w-full max-w-none rounded-none border-0 shadow-none'
-            : 'w-full max-w-2xl'
-        }
-      >
-        <CardHeader>
-          <CardTitle className="!normal-case !tracking-normal !text-base">
+      {showSetupHeader && (
+        <CardHeader className={mobileOnly ? 'px-0 pt-0' : undefined}>
+          <CardTitle
+            className={
+              mobileOnly
+                ? '!normal-case !tracking-tight !text-xl !font-bold !text-fg'
+                : '!normal-case !tracking-normal !text-base'
+            }
+          >
             {step === 'hub'
               ? mobileOnly
                 ? 'Welcome to Vericonomy'
                 : 'Vericonomy wallets'
               : `Set up ${profile.displayName}`}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className={mobileOnly ? 'text-fg-muted' : undefined}>
             {step === 'hub'
               ? mobileOnly
                 ? lightWalletCopy.setupHubMobileOnly
@@ -667,7 +671,13 @@ export function Setup() {
                 : `Start the bundled ${profile.binaryName} node, set up your ${profile.symbol} wallet and recovery phrase, enable app-wide 2FA, then optionally import a chain bootstrap.`}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex min-w-0 max-w-full flex-col gap-5">
+      )}
+      <CardContent
+        className={cn(
+          'flex min-w-0 max-w-full flex-col gap-5',
+          mobileOnly && (step === 'hub' ? 'p-0' : 'px-0 pb-0')
+        )}
+      >
           {step === 'hub' && mobileOnly && (
             <MobileSetupHub
               onCreateWallet={(coin) => startMobileWalletFlow(coin, 'create')}
@@ -1359,6 +1369,15 @@ export function Setup() {
           )}
         </CardContent>
       </Card>
+  );
+
+  if (mobileOnly) {
+    return <MobileSetupLayout>{setupCard}</MobileSetupLayout>;
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-bg p-8 text-fg">
+      {setupCard}
     </div>
   );
 }

@@ -1146,12 +1146,24 @@ pub fn resolve_legacy_wallet_outside_cfg(coin: CoinId, cfg: &DaemonConfig) -> Op
         if root == *datadir || root == active {
             continue;
         }
-        let mut bases = vec![root.clone()];
+        let mut bases = Vec::new();
         if coin == CoinId::Vericoin {
-            let sub = root.join("vericoin");
-            if sub != active {
-                bases.push(sub);
+            // Unified Vericonomy installs keep Verium at the root; only scan `vericoin/`
+            // for VRC wallet.dat so a Verium-only machine is not misclassified.
+            let unified_root = root
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.eq_ignore_ascii_case("Vericonomy") || n == ".vericonomy");
+            if unified_root {
+                let sub = root.join("vericoin");
+                if sub != active {
+                    bases.push(sub);
+                }
+            } else {
+                bases.push(root.clone());
             }
+        } else {
+            bases.push(root.clone());
         }
         for base in bases {
             if base == active {

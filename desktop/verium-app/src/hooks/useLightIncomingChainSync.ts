@@ -9,28 +9,23 @@ import {
 } from '@/lib/light-wallet/poll';
 import { walletTransactionsKeyPrefix } from '@/lib/wallet-transactions-query';
 import { useCoinWalletMode } from '@/hooks/useWalletMode';
-import { useUserPreferences } from '@/lib/user-preferences';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 
 /**
- * Light wallets: poll Electrum tip and merge 0-conf / new-block txs into the local
- * history cache so incoming-payment notifications are not stuck on explorer lag.
+ * Light wallets: poll Electrum tip and merge pending / newly confirmed txs into the
+ * local history cache so activity and confirmations are not stuck on explorer lag.
  */
 export function useLightIncomingChainSync(): void {
   const enabledCoins = useEnabledCoins();
-  const prefs = useUserPreferences((s) => s.prefs);
   const veriumMode = useCoinWalletMode('verium');
   const vericoinMode = useCoinWalletMode('vericoin');
   const visible = useWindowVisible();
   const queryClient = useQueryClient();
   const lastTip = useRef<Record<string, number>>({});
 
-  const notifyVrm = prefs.notify_on_vrm_received !== false;
-  const notifyVrc = prefs.notify_on_vrc_received !== false;
-
   const coins: CoinId[] = enabledCoins.filter((coin) => {
-    if (coin === 'verium') return veriumMode.isLight && notifyVrm;
-    if (coin === 'vericoin') return vericoinMode.isLight && notifyVrc;
+    if (coin === 'verium') return veriumMode.isLight;
+    if (coin === 'vericoin') return vericoinMode.isLight;
     return false;
   });
 
@@ -77,5 +72,5 @@ export function useLightIncomingChainSync(): void {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [coins, notifyVrm, notifyVrc, queryClient, visible]);
+  }, [coins, queryClient, visible]);
 }

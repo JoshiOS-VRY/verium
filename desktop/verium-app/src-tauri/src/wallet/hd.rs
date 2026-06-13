@@ -110,6 +110,33 @@ pub fn normalize_hd_master_secret(secret: &str) -> String {
         .collect()
 }
 
+fn is_numbered_prefix_token(token: &str) -> bool {
+    let t = token.trim_end_matches('.');
+    !t.is_empty() && t.chars().all(|c| c.is_ascii_digit())
+}
+
+/// Collapse whitespace for BIP39 phrases; strips numbered-list prefixes from copy/paste.
+pub fn normalize_mnemonic_phrase(phrase: &str) -> String {
+    phrase
+        .split_whitespace()
+        .filter(|w| !is_numbered_prefix_token(w))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Normalize user-provided seed material: phrases keep spaced words; HD keys strip whitespace.
+pub fn normalize_light_wallet_seed(secret: &str) -> String {
+    let trimmed = secret.trim();
+    if trimmed.starts_with("xprv") {
+        return normalize_hd_master_secret(trimmed);
+    }
+    if trimmed.contains(char::is_whitespace) {
+        normalize_mnemonic_phrase(trimmed)
+    } else {
+        normalize_hd_master_secret(trimmed)
+    }
+}
+
 /// True when `secret` is a BIP32 master key (Bitcoin xprv or Vericonomy export).
 pub fn is_hd_master_secret(coin: CoinId, secret: &str) -> bool {
     let trimmed = normalize_hd_master_secret(secret);
@@ -593,6 +620,38 @@ mod tests {
         let wif = secret_bytes_to_wif(coin, &secret);
         let decoded = bs58::decode(&wif).with_check(None).into_vec().unwrap();
         assert_eq!(decoded[0], secret_key_prefix(coin));
+    }
+
+    #[test]
+    fn normalize_light_wallet_seed_preserves_mnemonic_words() {
+        let phrase = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+        let normalized = normalize_light_wallet_seed(phrase);
+        assert_eq!(normalized, phrase);
+        assert!(crate::recovery::validate_mnemonic(&normalized).unwrap());
+    }
+
+    #[test]
+    fn normalize_light_wallet_seed_strips_numbered_copy_prefixes() {
+        let numbered = "1. legal\n2. winner\n3. thank";
+        let normalized = normalize_light_wallet_seed(numbered);
+        assert_eq!(normalized, "legal winner thank");
+    }
+
+    #[test]
+    fn normalize_hd_master_secret_still_strips_xprv_whitespace() {
+        let key = "  xprv9s21ZrQH143K   3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRN4VIcWnJYtb5AF2Q2AT9aMu  ";
+        let normalized = normalize_light_wallet_seed(key);
+        assert!(!normalized.contains(' '));
+        assert!(normalized.starts_with("xprv"));
+    }
+
+    #[test]
+    fn bip44_path_uses_slip44_coin_type_not_hardened_encoding() {
+        let phrase = "legal winner thank year wave sausage worth useful legal winner thank yellow";
+        let path = derivation_path_for(CoinId::Verium, phrase, HdChain::External, 0).unwrap();
+        assert_eq!(format!("m/{path}"), "m/44'/462'/0'/0/0");
+        let vrc = derivation_path_for(CoinId::Vericoin, phrase, HdChain::External, 5).unwrap();
+        assert_eq!(format!("m/{vrc}"), "m/44'/463'/0'/0/5");
     }
 
     #[test]

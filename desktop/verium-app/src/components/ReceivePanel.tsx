@@ -37,6 +37,8 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const [message, setMessage] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [plainAddress, setPlainAddress] = useState<string | null>(null);
+  const [showPlainQr, setShowPlainQr] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const {
     copied: addressCopied,
@@ -50,6 +52,16 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   });
 
   const requests = requestsQuery.data ?? [];
+
+  const createAddressOnly = useMutation({
+    mutationFn: () => rpcGetNewAddress(coin, label.trim() || undefined),
+    onSuccess: (address) => {
+      setPlainAddress(address);
+      setShowPlainQr(false);
+      setShowDetail(false);
+      setSelectedId(null);
+    },
+  });
 
   const create = useMutation({
     mutationFn: async () => {
@@ -66,6 +78,8 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
       });
     },
     onSuccess: (entry) => {
+      setPlainAddress(null);
+      setShowPlainQr(false);
       queryClient.setQueryData(
         coinQueryKey(coin, 'receive-requests'),
         (prev: typeof requestsQuery.data) => {
@@ -102,7 +116,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
 
   useEffect(() => {
     resetAddressCopyFeedback();
-  }, [selected?.address, resetAddressCopyFeedback]);
+  }, [selected?.address, plainAddress, resetAddressCopyFeedback]);
 
   const networkReceiveBlocked =
     !isLight &&
@@ -157,11 +171,29 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
           onMessageChange={setMessage}
           onClearForm={clearForm}
           onCreate={() => create.mutate()}
+          onCreateAddressOnly={() => createAddressOnly.mutate()}
           creating={create.isPending}
-          createError={create.error ? String(create.error) : null}
+          creatingAddress={createAddressOnly.isPending}
+          createError={
+            create.error
+              ? String(create.error)
+              : createAddressOnly.error
+                ? String(createAddressOnly.error)
+                : null
+          }
+          plainAddress={plainAddress}
+          showPlainQr={showPlainQr}
+          onShowPlainQr={() => setShowPlainQr(true)}
+          onHidePlainQr={() => setShowPlainQr(false)}
+          onDismissPlainAddress={() => {
+            setPlainAddress(null);
+            setShowPlainQr(false);
+          }}
           requests={requests}
           selected={showDetail ? selected : null}
           onSelectRequest={(id) => {
+            setPlainAddress(null);
+            setShowPlainQr(false);
             setSelectedId(id);
             setShowDetail(true);
           }}
@@ -286,12 +318,22 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
         <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-end">
           <Button
             type="button"
+            variant="secondary"
+            onClick={() => createAddressOnly.mutate()}
+            disabled={createAddressOnly.isPending || create.isPending}
+            className="w-full min-w-0 sm:min-w-[12rem] sm:w-auto"
+          >
+            <Copy className="h-4 w-4" />
+            {createAddressOnly.isPending ? 'Generating…' : 'Get address only'}
+          </Button>
+          <Button
+            type="button"
             onClick={() => create.mutate()}
-            disabled={create.isPending}
+            disabled={create.isPending || createAddressOnly.isPending}
             className="w-full min-w-0 sm:min-w-[12rem] sm:w-auto"
           >
             <QrCode className="h-4 w-4" />
-            {create.isPending ? 'Creating…' : 'Create new receiving address'}
+            {create.isPending ? 'Creating…' : 'Create with QR code'}
           </Button>
           <Button type="button" variant="danger" onClick={clearForm}>
             <X className="h-4 w-4" />
@@ -299,8 +341,77 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
           </Button>
         </div>
 
-        {create.error && <div className="mt-3 text-xs text-danger">{String(create.error)}</div>}
+        {(create.error || createAddressOnly.error) && (
+          <div className="mt-3 text-xs text-danger">
+            {String(create.error ?? createAddressOnly.error)}
+          </div>
+        )}
       </div>
+
+      {plainAddress && !showDetail && (
+        <div className="rounded-lg border border-border bg-bg-panel/60 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <h4 className="text-sm font-semibold">Receive address</h4>
+            <button
+              type="button"
+              onClick={() => {
+                setPlainAddress(null);
+                setShowPlainQr(false);
+              }}
+              className="text-fg-subtle hover:text-fg"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {showPlainQr ? (
+            <QrCodeDisplay coin={coin} address={plainAddress} size={220} />
+          ) : null}
+          <div
+            className={cn(
+              'mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors',
+              addressCopied ? 'border-success/40 bg-success/5' : 'border-border bg-bg-panel'
+            )}
+          >
+            <span className="min-w-0 flex-1 break-all font-mono">{plainAddress}</span>
+            <button
+              type="button"
+              aria-label={addressCopied ? 'Address copied' : 'Copy address'}
+              onClick={() => void copyAddress(plainAddress)}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-medium transition-colors',
+                addressCopied ? 'text-success' : 'text-fg-muted hover:text-fg'
+              )}
+            >
+              {addressCopied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  <span>Copied</span>
+                </>
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowPlainQr((v) => !v)}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              {showPlainQr ? 'Hide QR code' : 'Show QR code'}
+            </Button>
+            <ExplorerLink
+              coin={coin}
+              target={{ kind: 'address', address: plainAddress }}
+              label="View on explorer"
+              className="self-center text-xs text-accent"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-bg-panel/40">
         <div className="border-b border-border px-4 py-2.5">

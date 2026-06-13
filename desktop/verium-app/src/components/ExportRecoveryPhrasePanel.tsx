@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { AlertTriangle, Copy, Eye, EyeOff, Lock } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Eye, EyeOff, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { recoveryExportSeed, type RecoveryExportResult } from '@/lib/security/client';
+import { formatNumberedRecoveryPhraseForCopy } from '@/lib/recovery-phrase';
 
 export function ExportRecoveryPhrasePanel() {
   const coin = useActiveCoin();
@@ -16,6 +18,7 @@ export function ExportRecoveryPhrasePanel() {
   const [revealed, setRevealed] = useState(false);
   const [exported, setExported] = useState<RecoveryExportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { copied, copy } = useCopyToClipboard();
 
   const exportSeed = useMutation({
     mutationFn: (totpCode?: string) => recoveryExportSeed(coin, passphrase, totpCode),
@@ -133,12 +136,15 @@ export function ExportRecoveryPhrasePanel() {
                 size="sm"
                 variant="secondary"
                 onClick={() => {
-                  void navigator.clipboard.writeText(secretText);
-                  window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
+                  void copy(formatNumberedRecoveryPhraseForCopy(secretText)).then((ok) => {
+                    if (ok) {
+                      window.setTimeout(() => void navigator.clipboard.writeText(''), 30_000);
+                    }
+                  });
                 }}
               >
-                <Copy className="h-3.5 w-3.5" />
-                Copy phrase (clears in 30s)
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? 'Copied successfully' : 'Copy phrase (clears in 30s)'}
               </Button>
             )}
           </div>

@@ -20,6 +20,7 @@ use crate::wallet::gap_scan_hook::GapScanHook;
 use crate::wallet::explorer_history::fetch_wallet_history_from_explorer;
 use crate::wallet::hd::{
     discover_script_hexes, enrich_utxo_addresses, resolve_addresses_for_script_hexes,
+    uses_core_hd_paths,
 };
 use crate::wallet::keystore;
 
@@ -383,6 +384,17 @@ pub fn reset_balance_probe_state(coin: CoinId) -> AppResult<()> {
     Ok(())
 }
 
+/// Brand-new BIP39 light wallets have no on-chain history — skip the multi-minute gap scan.
+pub fn mark_new_wallet_setup_ready(coin: CoinId) -> AppResult<()> {
+    keystore::mark_address_scan_complete(coin)?;
+    mark_precache_probe_complete(coin);
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        let _ = cache.replace_utxos(&[]);
+        let _ = cache.set_meta("utxo_funded_count", "0");
+    }
+    Ok(())
+}
+
 fn mark_precache_probe_complete(coin: CoinId) {
     if let Ok(cache) = LightWalletCache::open(coin) {
         let _ = cache.set_meta(PRECACHE_PROBE_COMPLETE_META, "1");
@@ -498,6 +510,11 @@ impl crate::chain::electrum::history::HistoryTxFetcher for ElectrumHistoryFetche
     }
 }
 
+fn tx_history_confirmed(tx: &crate::chain::types::WalletTx) -> bool {
+    tx.height > 0 || tx.blockheight.is_some()
+}
+
+/// Prefer confirmed rows over stale optimistic 0-conf copies for the same key.
 fn merge_tx_history(base: Vec<crate::chain::types::WalletTx>, pending: &[crate::chain::types::WalletTx]) -> Vec<crate::chain::types::WalletTx> {
     use std::collections::HashMap;
 
@@ -506,12 +523,13 @@ fn merge_tx_history(base: Vec<crate::chain::types::WalletTx>, pending: &[crate::
         .map(|tx| (crate::wallet::listtransactions_rows::wallet_tx_row_key(&tx), tx))
         .collect();
     for tx in pending {
-        if tx.height <= 0 {
-            map.insert(
-                crate::wallet::listtransactions_rows::wallet_tx_row_key(tx),
-                tx.clone(),
-            );
+        let key = crate::wallet::listtransactions_rows::wallet_tx_row_key(tx);
+        if let Some(existing) = map.get(&key) {
+            if tx_history_confirmed(existing) && !tx_history_confirmed(tx) {
+                continue;
+            }
         }
+        map.insert(key, tx.clone());
     }
     let mut rows: Vec<_> = map.into_values().collect();
     rows.sort_by(|a, b| {
@@ -529,21 +547,28 @@ async fn merge_pending_history_from_electrum(
     backend: &dyn ChainBackend,
     base: Vec<crate::chain::types::WalletTx>,
 ) -> Option<Vec<crate::chain::types::WalletTx>> {
-    let mut pending = backend
+    use std::collections::HashSet;
+
+    let mut history = backend
         .get_history_for_scripts(funded, PENDING_HISTORY_FETCH_LIMIT)
         .await
         .ok()?;
-    pending.retain(|tx| tx.height <= 0);
-    if pending.is_empty() {
+    let stale_txids: HashSet<String> = base
+        .iter()
+        .filter(|tx| tx.height <= 0 && !tx.txid.is_empty())
+        .map(|tx| tx.txid.clone())
+        .collect();
+    history.retain(|tx| tx.height <= 0 || stale_txids.contains(&tx.txid));
+    if history.is_empty() {
         return Some(base);
     }
-    let enrich_limit = pending.len().min(PENDING_HISTORY_ENRICH_LIMIT);
+    let enrich_limit = history.len().min(PENDING_HISTORY_ENRICH_LIMIT);
     let tip = backend.get_tip().await.ok().map(|t| t.height);
     let fetcher = ElectrumHistoryFetcher(backend);
     let expanded = crate::chain::electrum::history::expand_wallet_history_rows(
         coin,
         funded,
-        &pending,
+        &history,
         &fetcher,
         Some(enrich_limit),
         tip,
@@ -576,6 +601,12 @@ async fn write_tx_history_cache(coin: CoinId, rows: &[crate::chain::types::Walle
 }
 
 async fn refresh_pending_tx_history_only(coin: CoinId, funded: &[String], backend: &dyn ChainBackend) {
+    let tip = backend.get_tip().await.ok().map(|t| t.height);
+    if let Ok(cache) = LightWalletCache::open(coin) {
+        if let Some(height) = tip {
+            let _ = cache.set_meta("tip_height", &height.to_string());
+        }
+    }
     let base = LightWalletCache::open(coin)
         .ok()
         .and_then(|cache| cache.list_tx_history(TX_HISTORY_CACHE_LIMIT).ok())
@@ -644,11 +675,22 @@ async fn persist_funded_scripts(
 
 async fn bootstrap_precache_slice(
     coin: CoinId,
-    _phrase: &str,
+    phrase: &str,
     backend: &dyn ChainBackend,
     progress: &mut keystore::IndexingProgress,
     funded_so_far: &mut Vec<String>,
 ) -> AppResult<bool> {
+    // BIP44 mnemonics: gap scan covers receive addresses; precache Electrum probe is redundant.
+    if !uses_core_hd_paths(coin, phrase) {
+        let precached = keystore::cached_script_hexes(coin)?;
+        let end = precached.len() as u32;
+        if progress.precache_offset < end {
+            progress.precache_offset = end;
+            keystore::set_indexing_progress(coin, *progress)?;
+        }
+        return Ok(true);
+    }
+
     let precached = keystore::cached_script_hexes(coin)?;
     if precached.is_empty() {
         return Ok(true);
@@ -747,9 +789,6 @@ async fn run_gap_scan_and_persist_inner(
     }
 
     maybe_refresh_utxos_from_funded(coin, phrase, &funded_so_far, backend).await?;
-    backend
-        .set_initial_indexing_limits(RPC_BUDGET_PER_SYNC, SCRIPTS_PER_BATCH)
-        .await;
 
     let hook = GapScanPersist {
         coin,
@@ -757,31 +796,58 @@ async fn run_gap_scan_and_persist_inner(
         backend,
     };
 
-    let (_discovered, scan_complete) = discover_script_hexes(
-        coin,
-        phrase,
-        None,
-        GAP_LIMIT,
-        &mut progress,
-        backend,
-        &mut funded_so_far,
-        Some(&hook),
-        false,
-    )
-    .await?;
+    const MAX_GAP_SLICES_PER_SYNC: usize = 12;
+    let mut scan_complete = false;
+    for slice in 0..MAX_GAP_SLICES_PER_SYNC {
+        backend
+            .set_initial_indexing_limits(RPC_BUDGET_PER_SYNC, SCRIPTS_PER_BATCH)
+            .await;
 
-    keystore::set_indexing_progress(coin, progress)?;
+        let progress_before = progress.clone();
+        let (_discovered, done) = discover_script_hexes(
+            coin,
+            phrase,
+            None,
+            GAP_LIMIT,
+            &mut progress,
+            backend,
+            &mut funded_so_far,
+            Some(&hook),
+            false,
+        )
+        .await?;
+
+        keystore::set_indexing_progress(coin, progress)?;
+        scan_complete = done;
+        maybe_refresh_utxos_from_funded(coin, phrase, &funded_so_far, backend).await?;
+
+        if scan_complete {
+            break;
+        }
+        if progress == progress_before {
+            tracing::info!(
+                "light wallet {}: gap scan paused (external={}{}, internal={}{})",
+                coin.as_str(),
+                progress.gap_external,
+                if progress.gap_external_done { " done" } else { "" },
+                progress.gap_internal,
+                if progress.gap_internal_done { " done" } else { "" },
+            );
+            break;
+        }
+        if slice + 1 == MAX_GAP_SLICES_PER_SYNC {
+            tracing::info!(
+                "light wallet {}: gap scan slice budget reached (external={}{}, internal={}{})",
+                coin.as_str(),
+                progress.gap_external,
+                if progress.gap_external_done { " done" } else { "" },
+                progress.gap_internal,
+                if progress.gap_internal_done { " done" } else { "" },
+            );
+        }
+    }
 
     if !scan_complete {
-        tracing::info!(
-            "light wallet {}: gap scan indexing slice complete (external={}{}, internal={}{})",
-            coin.as_str(),
-            progress.gap_external,
-            if progress.gap_external_done { " done" } else { "" },
-            progress.gap_internal,
-            if progress.gap_internal_done { " done" } else { "" },
-        );
-        maybe_refresh_utxos_from_funded(coin, phrase, &funded_so_far, backend).await?;
         return Ok(());
     }
 
@@ -1025,5 +1091,45 @@ mod rescan_cooldown_tests {
         assert_eq!(cooldown_remaining_secs(1000, 1000, 3600), 3600);
         assert_eq!(cooldown_remaining_secs(1000, 4600, 3600), 0);
         assert_eq!(cooldown_remaining_secs(1000, 2800, 3600), 1800);
+    }
+}
+
+#[cfg(test)]
+mod merge_tx_history_tests {
+    use super::merge_tx_history;
+    use crate::chain::types::WalletTx;
+
+    fn row(txid: &str, height: i32, blockheight: Option<u32>, category: &str) -> WalletTx {
+        WalletTx {
+            txid: txid.into(),
+            height,
+            fee_sats: None,
+            category: category.into(),
+            amount: -1.0,
+            address: Some("addr".into()),
+            confirmations: if height > 0 { 1 } else { 0 },
+            time: Some(100),
+            blockhash: None,
+            blockheight,
+        }
+    }
+
+    #[test]
+    fn confirmed_base_is_not_overwritten_by_stale_pending() {
+        let base = vec![row("abc", 500, Some(500), "send")];
+        let pending = vec![row("abc", 0, None, "send")];
+        let merged = merge_tx_history(base, &pending);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].height, 500);
+        assert_eq!(merged[0].blockheight, Some(500));
+    }
+
+    #[test]
+    fn pending_upgrades_to_confirmed_from_electrum() {
+        let base = vec![row("abc", 0, None, "send")];
+        let confirmed = vec![row("abc", 500, Some(500), "send")];
+        let merged = merge_tx_history(base, &confirmed);
+        assert_eq!(merged[0].height, 500);
+        assert_eq!(merged[0].blockheight, Some(500));
     }
 }

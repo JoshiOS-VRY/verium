@@ -23,7 +23,6 @@ describe('formatReceiveBatchMessage', () => {
       [
         {
           txid: 'abc123def4567890abcdef1234567890abcdef1234567890abcdef123456',
-          amount: 48.291,
           confirmations: 1,
           address: 'VM1abcExampleAddress123456789',
         },

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { subscribeIncomingVrm, type IncomingVrmBatch } from '@/hooks/useIncomingVrmWatcher';
+import { subscribeIncomingVrm } from '@/hooks/useIncomingVrmWatcher';
 import { playReceivedVrmSound } from '@/lib/received-vrm-sound';
 import { showReceiveNotification } from '@/lib/notifications/receive';
 import { formatReceiveBatchMessage } from '@/lib/notifications/receive-batch-message';

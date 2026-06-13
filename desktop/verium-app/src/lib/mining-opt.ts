@@ -74,14 +74,9 @@ export async function isOnAcPower(): Promise<boolean> {
 export const MINING_THREADS_MIN = 1;
 
 /**
- * Logical CPUs kept free for the OS, WebView, veriumd, and Tauri IPC while mining.
- * Scales slightly on high-core hosts (e.g. 32-thread desktop reserves 4).
+ * Logical CPUs kept free for the OS, WebView, veriumd, and Tauri while mining.
  */
-export const UI_RESERVE_LOGICAL_CORES = 2;
-
-function uiReserveLogicalCpus(detected: number): number {
-  return Math.max(UI_RESERVE_LOGICAL_CORES, Math.min(4, Math.floor(detected * 0.1)));
-}
+export const MINING_UI_RESERVE_CORES = 1;
 
 /** Logical CPUs reported by the OS / topology probe (for display). */
 export function detectedLogicalCpus(topology: CpuTopology | undefined): number {
@@ -94,10 +89,10 @@ export function detectedLogicalCpus(topology: CpuTopology | undefined): number {
   return 2;
 }
 
-/** Maximum mining threads — leaves a UI/OS reserve so the wallet stays responsive. */
+/** Maximum mining threads — one logical CPU left for the wallet and OS. */
 export function maxMiningThreads(topology: CpuTopology | undefined): number {
   const detected = detectedLogicalCpus(topology);
-  return Math.max(MINING_THREADS_MIN, detected - uiReserveLogicalCpus(detected));
+  return Math.max(MINING_THREADS_MIN, detected - MINING_UI_RESERVE_CORES);
 }
 
 /** User chose to mine on every logical CPU (not allowed). */
@@ -125,9 +120,9 @@ export function optimizedMiningThreads(topology: CpuTopology | undefined): numbe
   return clampMiningThreads(n, max);
 }
 
-/** Max threads for auto-adjust — topology-tuned, never the full logical count. */
+/** Max threads for auto-adjust — logical CPUs minus one. */
 export function adaptiveMiningCeiling(topology: CpuTopology | undefined): number {
-  return optimizedMiningThreads(topology);
+  return maxMiningThreads(topology);
 }
 
 export type AdaptiveLoadSignal = 'high' | 'low' | 'neutral';

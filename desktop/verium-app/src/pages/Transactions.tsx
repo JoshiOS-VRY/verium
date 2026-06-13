@@ -26,6 +26,7 @@ import { MobileTransactionHistory } from '@/components/mobile/MobileTransactionH
 import { WalletBalanceSummary } from '@/components/WalletBalanceSummary';
 import { WalletUnlockGate } from '@/components/WalletUnlockGate';
 import { rpcGetWalletInfo, rpcListTransactions, type TransactionItem } from '@/lib/rpc/client';
+import { fetchWalletTransactions } from '@/lib/wallet-transactions-query';
 import {
   listTransactionsFetchParams,
   paginateTransactions,
@@ -178,7 +179,9 @@ export function Transactions() {
     queryKey: coinQueryKey(coin, 'listtransactions', 'history', isLight ? 'light' : walletTxCount),
     queryFn: async () => {
       if (historyFetchCount <= 0) return [];
-      const rows = await rpcListTransactions(coin, historyFetchCount, historyFetchSkip);
+      const rows = isLight
+        ? await fetchWalletTransactions(coin, { lightRefreshPending: true })
+        : await rpcListTransactions(coin, historyFetchCount, historyFetchSkip);
       return sortTransactionsNewestFirst(rows);
     },
     enabled: wallet.isSuccess,

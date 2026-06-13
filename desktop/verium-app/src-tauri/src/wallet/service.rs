@@ -456,8 +456,9 @@ pub async fn get_wallet_info_json(
     let light_balance_ready = session_unlocked && scan_complete && balance_probe_done;
     let light_setup_syncing = session_unlocked && (!scan_complete || !balance_probe_done);
     // Gap-scan syncs run from getwalletinfo while addresses are still being discovered.
-    // Steady-state balance refresh is driven by the foreground balance poll (`light_wallet_refresh_balance`).
-    let should_background_sync = light_syncing && indexing_sync_due(coin);
+    let wallet_unlocked = keystore::is_unlocked(coin).unwrap_or(false);
+    let should_background_sync =
+        !scan_complete && indexing_sync_due(coin) && wallet_unlocked && signing_ready;
 
     if scan_complete && session_unlocked && !balance_probe_done && !sync_in_flight {
         let refresh_state = state.clone();
@@ -732,6 +733,7 @@ async fn send_to_address_inner(
     }
     reset_steady_sync_throttle(coin);
     crate::wallet::sync::reset_balance_refresh_throttle(coin);
+    crate::wallet::sync::reset_pending_refresh_throttle(coin);
     Ok(txid)
 }
 
@@ -871,6 +873,7 @@ pub async fn send_with_inputs(
     }
     reset_steady_sync_throttle(coin);
     crate::wallet::sync::reset_balance_refresh_throttle(coin);
+    crate::wallet::sync::reset_pending_refresh_throttle(coin);
     Ok(txid)
 }
 

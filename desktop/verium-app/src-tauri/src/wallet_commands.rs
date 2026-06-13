@@ -149,7 +149,7 @@ pub async fn light_wallet_create(
     label: Option<String>,
 ) -> AppResult<()> {
     let coin = parse_coin_id(&coin)?;
-    let trimmed = crate::wallet::hd::normalize_hd_master_secret(&mnemonic);
+    let trimmed = crate::wallet::hd::normalize_light_wallet_seed(&mnemonic);
     if crate::wallet::hd::is_hd_master_secret(coin, &trimmed) {
         crate::wallet::hd::parse_root_xpriv(coin, &trimmed)?;
     } else if !recovery::validate_mnemonic(&trimmed)? {
@@ -163,8 +163,13 @@ pub async fn light_wallet_create(
     prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
     prefs::save(&prefs).await?;
     prefs::invalidate_prefs_cache();
-    keystore::mark_address_scan_incomplete(coin)?;
-    crate::wallet::sync::reset_balance_probe_state(coin)?;
+    if crate::wallet::hd::is_hd_master_secret(coin, &trimmed) {
+        keystore::mark_address_scan_incomplete(coin)?;
+        crate::wallet::sync::reset_balance_probe_state(coin)?;
+    } else {
+        crate::wallet::sync::mark_new_wallet_setup_ready(coin)?;
+    }
+    crate::wallet::service::reset_steady_sync_throttle(coin);
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {
@@ -199,7 +204,7 @@ pub async fn light_wallet_import(
     if light_wallet_import_requires_2fa(coin)? {
         crate::security_policy::require_gated_action("restore_wallet", totp_code.as_deref())?;
     }
-    let trimmed = crate::wallet::hd::normalize_hd_master_secret(&mnemonic);
+    let trimmed = crate::wallet::hd::normalize_light_wallet_seed(&mnemonic);
     if crate::wallet::hd::is_hd_master_secret(coin, &trimmed) {
         crate::wallet::hd::parse_root_xpriv(coin, &trimmed)?;
     } else if !recovery::validate_mnemonic(&trimmed)? {
@@ -215,6 +220,7 @@ pub async fn light_wallet_import(
     prefs::invalidate_prefs_cache();
     keystore::mark_address_scan_incomplete(coin)?;
     crate::wallet::sync::reset_balance_probe_state(coin)?;
+    crate::wallet::service::reset_steady_sync_throttle(coin);
     let app = state.inner().clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = crate::wallet::sync::sync_light_wallet(&app, coin).await {
