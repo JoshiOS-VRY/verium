@@ -11,6 +11,8 @@ export interface IncomingVrmEvent {
   amount: number;
   address?: string;
   confirmations: number;
+  time?: number;
+  blockheight?: number;
 }
 
 export interface IncomingVrmBatch {
@@ -77,6 +79,8 @@ function mergeReceiveEvent(map: Map<string, IncomingVrmEvent>, tx: TransactionIt
     existing.amount += tx.amount;
     if (!existing.address && tx.address) existing.address = tx.address;
     existing.confirmations = Math.max(existing.confirmations, tx.confirmations);
+    if (!existing.time && tx.time) existing.time = tx.time;
+    if (!existing.blockheight && tx.blockheight) existing.blockheight = tx.blockheight;
     return;
   }
 
@@ -85,6 +89,8 @@ function mergeReceiveEvent(map: Map<string, IncomingVrmEvent>, tx: TransactionIt
     amount: tx.amount,
     address: tx.address,
     confirmations: tx.confirmations,
+    time: tx.time,
+    blockheight: tx.blockheight,
   });
 }
 

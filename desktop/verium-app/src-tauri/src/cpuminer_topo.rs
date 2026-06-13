@@ -47,25 +47,17 @@ fn probe_p_logical_linux() -> u32 {
     0
 }
 
-fn arm_bandwidth_limited_sbc(topo: &TopoSnapshot, scratchpad_bytes: u64) -> bool {
-    #[cfg(target_arch = "aarch64")]
-    {
-        if topo.logical_cpus != topo.physical_cpus || topo.physical_cpus > 8 {
-            return false;
-        }
-        if scratchpad_bytes <= 200 * 1024 * 1024 {
-            return false;
-        }
-        if topo.l3_bytes >= 32 * 1024 * 1024 {
-            return false;
-        }
-        return true;
+fn recommended_cpu_threads(topo: &TopoSnapshot) -> u32 {
+    let logical = topo.logical_cpus.max(1);
+    let physical = topo.physical_cpus.max(1);
+
+    if logical > physical {
+        return physical;
     }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        let _ = (topo, scratchpad_bytes);
-        false
+    if physical > 1 {
+        return physical - 1;
     }
+    1
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -178,7 +170,7 @@ pub fn probe_topo() -> TopoSnapshot {
 
 /// Port of veriumMiner `topo_recommended_threads(scratchpad_bytes)`.
 pub fn recommended_threads(scratchpad_bytes: u64, topo: &TopoSnapshot) -> u32 {
-    let exec = topo.logical_cpus.max(1);
+    let by_cpu = recommended_cpu_threads(topo);
     let reserve = os_reserve_bytes(topo.total_ram_bytes);
 
     let mut ram_for_miner = topo.avail_ram_bytes;
@@ -192,16 +184,12 @@ pub fn recommended_threads(scratchpad_bytes: u64, topo: &TopoSnapshot) -> u32 {
         ram_for_miner = 0;
     }
 
-    let mut by_ram = exec;
+    let mut by_ram = by_cpu;
     if scratchpad_bytes > 0 && ram_for_miner > 0 {
         by_ram = (ram_for_miner / scratchpad_bytes).max(1) as u32;
     }
 
-    let mut rec = exec.min(by_ram);
-    if arm_bandwidth_limited_sbc(topo, scratchpad_bytes) && rec > 1 {
-        rec = 1;
-    }
-    rec.max(1)
+    by_cpu.min(by_ram).max(1)
 }
 
 struct TuneCacheEntry {
@@ -320,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn recommends_logical_cpus_when_ram_allows() {
+    fn recommends_physical_cpus_when_logical_exceeds_physical() {
         let topo = TopoSnapshot {
             logical_cpus: 24,
             physical_cpus: 16,
@@ -330,20 +318,36 @@ mod tests {
             avail_ram_bytes: 48 * 1024 * 1024 * 1024,
         };
         let sp = cpuminer_scratchpad_bytes(true);
-        assert_eq!(recommended_threads(sp, &topo), 24);
+        assert_eq!(recommended_threads(sp, &topo), 16);
     }
 
     #[test]
-    fn hybrid_intel_uses_logical_when_ram_allows() {
+    fn homogeneous_cpu_leaves_one_core_for_os() {
         let topo = TopoSnapshot {
-            logical_cpus: 24,
-            physical_cpus: 16,
-            performance_cpus: 16,
+            logical_cpus: 8,
+            physical_cpus: 8,
+            performance_cpus: 0,
             l3_bytes: 0,
-            total_ram_bytes: 64 * 1024 * 1024 * 1024,
-            avail_ram_bytes: 48 * 1024 * 1024 * 1024,
+            total_ram_bytes: 16 * 1024 * 1024 * 1024,
+            avail_ram_bytes: 12 * 1024 * 1024 * 1024,
         };
+        let sp = cpuminer_scratchpad_bytes(false);
+        assert_eq!(recommended_threads(sp, &topo), 7);
+    }
+
+    #[test]
+    fn ram_caps_recommendation() {
         let sp = cpuminer_scratchpad_bytes(true);
-        assert_eq!(recommended_threads(sp, &topo), 24);
+        let total = 16 * 1024 * 1024 * 1024_u64;
+        let reserve = os_reserve_bytes(total);
+        let topo = TopoSnapshot {
+            logical_cpus: 8,
+            physical_cpus: 8,
+            performance_cpus: 0,
+            l3_bytes: 0,
+            total_ram_bytes: total,
+            avail_ram_bytes: 3 * sp + reserve,
+        };
+        assert_eq!(recommended_threads(sp, &topo), 3);
     }
 }

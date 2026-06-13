@@ -397,7 +397,7 @@ pub async fn pool_miner_start(
     let threads = config.threads.max(1).min(manual_ceiling);
     if threads > auto_ceiling {
         tracing::info!(
-            "pool miner: {} threads exceeds auto recommendation {} (cpuminer may warn about bandwidth)",
+            "pool miner: {} threads exceeds auto recommendation {} (cpuminer may warn about CPU/RAM budget)",
             threads,
             auto_ceiling
         );
