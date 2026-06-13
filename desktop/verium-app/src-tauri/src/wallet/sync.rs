@@ -456,11 +456,9 @@ pub async fn refresh_light_wallet_balance(state: &AppState, coin: CoinId) -> App
         refresh_light_wallet_utxos_from_network(coin, phrase.as_deref(), backend.as_ref()).await
     {
         tracing::debug!("balance utxo refresh failed for {}: {e}", coin.as_str());
-    } else if !keystore::needs_full_address_scan(coin)? {
-        let b = balance_from_utxo_cache(coin);
-        if b.confirmed_sats + b.unconfirmed_sats > 0 {
-            mark_precache_probe_complete(coin);
-        }
+    } else if !keystore::needs_full_address_scan(coin)? && !is_precache_probe_complete(coin) {
+        // Zero-balance wallets: gap scan already finished; no need to keep probing forever.
+        mark_precache_probe_complete(coin);
     }
     Ok(())
 }
@@ -887,6 +885,9 @@ async fn extend_funded_from_precached_balances(
     if found_new {
         keystore::set_funded_script_hexes(coin, funded)?;
         refresh_utxos(coin, funded, backend, phrase).await?;
+    }
+    if take >= len {
+        mark_precache_probe_complete(coin);
     }
     Ok(())
 }

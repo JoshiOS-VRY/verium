@@ -254,7 +254,8 @@ async fn fetch_utxos_for_send(
 /// syncs (`light_syncing`) are NOT throttled so they keep making progress.
 const STEADY_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
 /// Minimum gap between gap-scan indexing slices (Electrum RPC budget per slice).
-const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(5);
+/// Match the 2s wallet poll during setup so each slice can start on the next poll.
+const INDEXING_SYNC_MIN_INTERVAL: Duration = Duration::from_secs(2);
 const SEND_FLOW_TIMEOUT: Duration = Duration::from_secs(180);
 
 static LAST_STEADY_SYNC: Lazy<Mutex<HashMap<CoinId, Instant>>> =
@@ -450,14 +451,10 @@ pub async fn get_wallet_info_json(
     let available_sats = bal.confirmed_sats + bal.unconfirmed_sats;
     let balance_probe_done = probe_complete || available_sats > 0;
     // Gap scan, post-scan UTXO refresh, or balance probe until first usable balance.
-    let light_balance_syncing = session_unlocked
-        && sync_in_flight
-        && (!scan_complete || !balance_probe_done);
-    let light_balance_ready = session_unlocked
-        && scan_complete
-        && !sync_in_flight
-        && balance_probe_done;
-    let light_setup_syncing = session_unlocked && !light_balance_ready;
+    let light_balance_syncing = session_unlocked && (!scan_complete || !balance_probe_done);
+    // Ready once gap scan + balance probe finish; background steady-state sync must not block UI.
+    let light_balance_ready = session_unlocked && scan_complete && balance_probe_done;
+    let light_setup_syncing = session_unlocked && (!scan_complete || !balance_probe_done);
     // Gap-scan syncs run from getwalletinfo while addresses are still being discovered.
     // Steady-state balance refresh is driven by the foreground balance poll (`light_wallet_refresh_balance`).
     let should_background_sync = light_syncing && indexing_sync_due(coin);

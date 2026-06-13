@@ -11,8 +11,10 @@ function scanPhaseLabel(phase: WalletInfo['light_scan_phase']): string {
       return lightWalletCopy.scanPhaseExternal;
     case 'internal':
       return lightWalletCopy.scanPhaseInternal;
+    case 'complete':
+      return lightWalletCopy.balanceUpdating;
     default:
-      return lightWalletCopy.balanceCheckingAddresses;
+      return lightWalletCopy.scanPhasePrecache;
   }
 }
 
@@ -42,10 +44,11 @@ export function LightWalletSyncStatus({
   const lightSyncing = wallet.light_syncing === true;
   const balanceSyncing = wallet.light_balance_syncing === true;
   const balanceReady = wallet.light_balance_ready === true;
-  const setupSyncing = wallet.light_setup_syncing === true || (!balanceReady && unlocked);
+  const setupSyncing = wallet.light_setup_syncing === true;
   const scanProgress = wallet.light_scan_progress ?? 0;
-  const showDeterminateProgress = lightSyncing && scanProgress < 1;
-  const showSetupProgress = setupSyncing || lightSyncing || balanceSyncing;
+  const gapScanActive = lightSyncing && wallet.light_scan_phase !== 'complete';
+  const showDeterminateProgress = gapScanActive && scanProgress < 1;
+  const showSetupProgress = setupSyncing || gapScanActive || balanceSyncing;
 
   if (refreshing) {
     return (
@@ -62,9 +65,11 @@ export function LightWalletSyncStatus({
   }
 
   if (showSetupProgress) {
-    const phaseLabel = lightSyncing
+    const phaseLabel = gapScanActive
       ? scanPhaseLabel(wallet.light_scan_phase)
-      : lightWalletCopy.balanceCheckingAddresses;
+      : balanceSyncing
+        ? lightWalletCopy.balanceUpdating
+        : lightWalletCopy.balanceCheckingAddresses;
     const indeterminate = !showDeterminateProgress;
 
     return (
