@@ -43,7 +43,7 @@ function ToastCard({
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-fg">{toast.title}</div>
         {toast.description && (
-          <div className="mt-0.5 text-xs text-fg-muted">{toast.description}</div>
+          <div className="mt-0.5 whitespace-pre-line text-xs text-fg-muted">{toast.description}</div>
         )}
       </div>
       <button

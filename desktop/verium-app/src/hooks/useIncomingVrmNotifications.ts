@@ -2,28 +2,8 @@ import { useEffect } from 'react';
 import { subscribeIncomingVrm, type IncomingVrmBatch } from '@/hooks/useIncomingVrmWatcher';
 import { playReceivedVrmSound } from '@/lib/received-vrm-sound';
 import { showReceiveNotification } from '@/lib/notifications/receive';
+import { formatReceiveBatchMessage } from '@/lib/notifications/receive-batch-message';
 import { useUserPreferences } from '@/lib/user-preferences';
-import { formatNumber } from '@/lib/utils';
-
-function formatBatchMessage(batch: IncomingVrmBatch): {
-  title: string;
-  description?: string;
-} {
-  const amount = formatNumber(batch.totalAmount, 4);
-  const count = batch.events.length;
-
-  if (count === 1) {
-    return {
-      title: `Received ${amount} VRM`,
-      description: '',
-    };
-  }
-
-  return {
-    title: `Received ${amount} VRM`,
-    description: `${count} transactions`,
-  };
-}
 
 /** Shows toast + plays chime when incoming VRM is detected (if enabled). */
 export function useIncomingVrmNotifications(): void {
@@ -33,7 +13,7 @@ export function useIncomingVrmNotifications(): void {
     if (!enabled) return;
 
     return subscribeIncomingVrm((batch) => {
-      const { title, description } = formatBatchMessage(batch);
+      const { title, description } = formatReceiveBatchMessage(batch.events, batch.totalAmount, 'VRM');
       void showReceiveNotification({
         title,
         description: description || undefined,
