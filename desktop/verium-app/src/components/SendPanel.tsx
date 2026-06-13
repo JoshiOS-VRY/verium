@@ -387,6 +387,17 @@ export function SendPanel({
     );
   });
 
+  const batchAsSingleTx = coinControl.length === 0 && validRows.length > 1;
+  const sendAmount = validRows.reduce((sum, row) => sum + parseAmount(row.amount)!, 0);
+  const feeEstimate = estimateSendFee(
+    feeRate,
+    batchAsSingleTx ? 1 : Math.max(1, validRows.length),
+    validRows.length + 1
+  );
+  const totalDebit =
+    subtractFee && validRows.length === 1 ? sendAmount : sendAmount + feeEstimate.totalFee;
+  const insufficientBalance = sendAmount > 0 && totalDebit > balance + 1e-8;
+
   const confirmRecipients: SendConfirmRecipient[] = validRows.map((row) => ({
     address: row.address.trim(),
     label: row.label.trim() || undefined,
@@ -396,12 +407,13 @@ export function SendPanel({
   const useAvailableBalance = useCallback(
     (id: string) => {
       if (balance <= 0) return;
-      const feeEstimate = estimateSendFee(feeRate, validRows.length || 1);
-      const feeBuffer = subtractFee ? 0 : feeEstimate.totalFee;
-      const spendable = Math.max(0, balance - feeBuffer);
+      const rowFee = estimateSendFee(feeRate, 1, 2);
+      const spendable = subtractFee
+        ? Math.max(0, balance)
+        : Math.max(0, balance - rowFee.totalFee);
       updateRecipient(id, { amount: spendable.toFixed(8) });
     },
-    [balance, feeRate, subtractFee, updateRecipient, validRows.length]
+    [balance, feeRate, subtractFee, updateRecipient]
   );
 
   const send = useMutation({
@@ -433,10 +445,28 @@ export function SendPanel({
           walletPassphrase
         );
         txids = [txid];
+      } else if (batchAsSingleTx) {
+        const outputs: Record<string, number> = {};
+        for (const row of validRows) {
+          outputs[row.address.trim()] = parseAmount(row.amount)!;
+        }
+        const txid = await rpcWalletSendWithInputs(
+          coin,
+          [],
+          outputs,
+          undefined,
+          feeRate,
+          totpCode,
+          walletPassphrase
+        );
+        txids = [txid];
       } else {
         txids = [];
         for (const row of validRows) {
-          const amount = parseAmount(row.amount)!;
+          let amount = parseAmount(row.amount)!;
+          if (subtractFee && validRows.length === 1) {
+            amount = Math.max(0, amount - feeEstimate.totalFee);
+          }
           const txid = await rpcSendToAddress(
             coin,
             row.address.trim(),
@@ -510,10 +540,16 @@ export function SendPanel({
       setTwoFaOpen(true);
       return;
     }
+    // Light wallet already unlocked — signing session has the seed; no re-prompt.
+    if (isLight && wallet.data?.private_keys_enabled === true) {
+      executeSend();
+      return;
+    }
     setPassphrasePromptOpen(true);
   };
 
-  const canSend = validRows.length > 0 && !send.isPending && !preparingConfirm;
+  const canSend =
+    validRows.length > 0 && !send.isPending && !preparingConfirm && !insufficientBalance;
 
   const openConfirm = async () => {
     if (preparingConfirm || send.isPending) return;
@@ -558,6 +594,13 @@ export function SendPanel({
             return;
           }
         }
+      }
+
+      if (insufficientBalance) {
+        setSpendWarning(
+          `Insufficient balance: need ${formatCoinAmount(totalDebit, coin, 4)} available (${formatCoinAmount(sendAmount, coin, 4)} send + ${formatCoinAmount(feeEstimate.totalFee, coin, 4)} fee).`
+        );
+        return;
       }
 
       const total = validRows.reduce((s, r) => s + parseAmount(r.amount)!, 0);
@@ -707,7 +750,12 @@ export function SendPanel({
             setLastSend(null);
           }}
           clipboardGuardError={clipboardGuardError}
-          spendWarning={spendWarning}
+          spendWarning={
+            spendWarning ??
+            (insufficientBalance
+              ? `Insufficient balance: need ${formatCoinAmount(totalDebit, coin, 4)} (${formatCoinAmount(sendAmount, coin, 4)} + ${formatCoinAmount(feeEstimate.totalFee, coin, 4)} fee).`
+              : null)
+          }
           sendError={send.error ? String(send.error) : null}
           lastSend={lastSend}
           onDismissSuccess={() => setLastSend(null)}

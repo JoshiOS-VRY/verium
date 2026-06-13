@@ -58,27 +58,23 @@ fn push_api_secret() -> Option<String> {
     None
 }
 
-const MAX_PUSH_SCRIPTHASHES_PER_CHAIN: usize = 64;
-
-fn cap_scripthashes(mut hashes: Vec<String>) -> Vec<String> {
-    hashes.sort();
-    hashes.dedup();
-    if hashes.len() > MAX_PUSH_SCRIPTHASHES_PER_CHAIN {
-        tracing::warn!(
-            registered = MAX_PUSH_SCRIPTHASHES_PER_CHAIN,
-            total = hashes.len(),
-            "capping push scripthashes for remote registration"
-        );
-        hashes.truncate(MAX_PUSH_SCRIPTHASHES_PER_CHAIN);
-    }
-    hashes
-}
-
-fn scripthashes_for_coin(coin: CoinId) -> AppResult<Vec<String>> {
+fn watch_script_hexes_for_coin(coin: CoinId) -> AppResult<Vec<String>> {
     if !keystore::wallet_exists(coin)? || !keystore::is_unlocked(coin)? {
         return Ok(Vec::new());
     }
-    let scripts = keystore::funded_script_hexes(coin)?;
+    let mut scripts = keystore::funded_script_hexes(coin)?;
+    for script in keystore::cached_script_hexes(coin)? {
+        if !scripts.iter().any(|s| s == &script) {
+            scripts.push(script);
+        }
+    }
+    scripts.sort();
+    scripts.dedup();
+    Ok(scripts)
+}
+
+fn scripthashes_for_coin(coin: CoinId) -> AppResult<Vec<String>> {
+    let scripts = watch_script_hexes_for_coin(coin)?;
     let mut out = Vec::with_capacity(scripts.len());
     for script_hex in scripts {
         out.push(scripthash_from_script_hex(&script_hex)?);
@@ -86,6 +82,13 @@ fn scripthashes_for_coin(coin: CoinId) -> AppResult<Vec<String>> {
     out.sort();
     out.dedup();
     Ok(out)
+}
+
+/// Preview scripthash counts for UI/debug (wallet must be unlocked).
+pub fn push_watch_scripthash_counts() -> AppResult<(usize, usize)> {
+    let vrm = scripthashes_for_coin(CoinId::Verium)?.len();
+    let vrc = scripthashes_for_coin(CoinId::Vericoin)?.len();
+    Ok((vrm, vrc))
 }
 
 async fn build_register_body(device_token: &str) -> AppResult<RegisterBody> {
@@ -96,12 +99,12 @@ async fn build_register_body(device_token: &str) -> AppResult<RegisterBody> {
         prefs.notify_on_vrc_received && prefs::coin_enabled(&prefs, CoinId::Vericoin);
 
     let verium_scripthashes = if notify_vrm {
-        cap_scripthashes(scripthashes_for_coin(CoinId::Verium)?)
+        scripthashes_for_coin(CoinId::Verium)?
     } else {
         Vec::new()
     };
     let vericoin_scripthashes = if notify_vrc {
-        cap_scripthashes(scripthashes_for_coin(CoinId::Vericoin)?)
+        scripthashes_for_coin(CoinId::Vericoin)?
     } else {
         Vec::new()
     };
@@ -164,6 +167,19 @@ pub async fn register_device(device_token: &str) -> AppResult<()> {
         return Ok(());
     }
     let body = build_register_body(device_token).await?;
+    if body.notify_vrm && body.verium_scripthashes.is_empty() {
+        tracing::warn!("push register: notify_vrm enabled but no verium scripthashes (unlock wallet and wait for address scan)");
+    }
+    if body.notify_vrc && body.vericoin_scripthashes.is_empty() {
+        tracing::warn!("push register: notify_vrc enabled but no vericoin scripthashes");
+    }
+    tracing::info!(
+        verium_scripthashes = body.verium_scripthashes.len(),
+        vericoin_scripthashes = body.vericoin_scripthashes.len(),
+        notify_vrm = body.notify_vrm,
+        notify_vrc = body.notify_vrc,
+        "push device register"
+    );
     post_json("/v1/devices/register", &body).await
 }
 

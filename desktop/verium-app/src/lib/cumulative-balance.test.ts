@@ -4,20 +4,13 @@ import {
   computeChartBalanceDomain,
   downsampleCumulativePoints,
   formatChartAxisBalance,
+  netTxBalanceEffectForGroup,
 } from './cumulative-balance';
 import type { TransactionItem } from '@/lib/rpc/client';
 
 describe('cumulative balance chart', () => {
-  it('anchors wallet series at total balance including immature', () => {
+  it('starts at zero and ends at anchor when history is complete', () => {
     const txs: TransactionItem[] = [
-      {
-        txid: 'a',
-        category: 'immature',
-        amount: 290,
-        confirmations: 10,
-        time: 1_700_000_000,
-        timereceived: 1_700_000_000,
-      },
       {
         txid: 'b',
         category: 'receive',
@@ -26,14 +19,20 @@ describe('cumulative balance chart', () => {
         time: 1_600_000_000,
         timereceived: 1_600_000_000,
       },
+      {
+        txid: 'a',
+        category: 'immature',
+        amount: 290,
+        confirmations: 10,
+        time: 1_700_000_000,
+        timereceived: 1_700_000_000,
+      },
     ];
 
-    const spendableOnly = buildWalletCumulativeSeries(txs, 9.4);
-    expect(Math.max(...spendableOnly.points.map((p) => p.balance))).toBeLessThan(20);
-
-    const total = buildWalletCumulativeSeries(txs, 300);
-    expect(Math.max(...total.points.map((p) => p.balance))).toBe(300);
-    expect(total.points[total.points.length - 1]?.balance).toBe(300);
+    const series = buildWalletCumulativeSeries(txs, 299.4);
+    expect(series.points[0]?.balance).toBe(0);
+    expect(series.points[series.points.length - 1]?.balance).toBe(299.4);
+    expect(Math.max(...series.points.map((p) => p.balance))).toBe(299.4);
   });
 
   it('formats axis labels for large balances', () => {
@@ -48,6 +47,52 @@ describe('cumulative balance chart', () => {
       300
     );
     expect(domain[1]).toBeGreaterThan(300);
+  });
+
+  it('nets self-send payment and change rows by txid', () => {
+    const rows: TransactionItem[] = [
+      {
+        txid: 'self',
+        category: 'send',
+        amount: -1,
+        confirmations: 10,
+        time: 1_700_000_000,
+        timereceived: 1_700_000_000,
+      },
+      {
+        txid: 'self',
+        category: 'receive',
+        amount: 1,
+        confirmations: 10,
+        time: 1_700_000_000,
+        timereceived: 1_700_000_000,
+      },
+      {
+        txid: 'self',
+        category: 'receive',
+        amount: 279,
+        confirmations: 10,
+        time: 1_700_000_000,
+        timereceived: 1_700_000_000,
+      },
+    ];
+    expect(netTxBalanceEffectForGroup(rows)).toBe(0);
+
+    const txs: TransactionItem[] = [
+      ...rows,
+      {
+        txid: 'fund',
+        category: 'receive',
+        amount: 280,
+        confirmations: 100,
+        time: 1_600_000_000,
+        timereceived: 1_600_000_000,
+      },
+    ];
+
+    const series = buildWalletCumulativeSeries(txs, 280);
+    expect(series.points[0]?.balance).toBe(0);
+    expect(series.points[series.points.length - 1]?.balance).toBe(280);
   });
 
   it('does not exceed anchor when send rows have inflated outgoing amounts', () => {
@@ -70,8 +115,9 @@ describe('cumulative balance chart', () => {
       },
     ];
 
-    const series = buildWalletCumulativeSeries(txs, 340);
-    expect(Math.max(...series.points.map((p) => p.balance))).toBeLessThanOrEqual(340);
+    const series = buildWalletCumulativeSeries(txs, 140);
+    expect(Math.max(...series.points.map((p) => p.balance))).toBe(300);
+    expect(series.points[series.points.length - 1]?.balance).toBe(140);
   });
 
   it('does not show negative history when send rows have wrong positive amounts', () => {

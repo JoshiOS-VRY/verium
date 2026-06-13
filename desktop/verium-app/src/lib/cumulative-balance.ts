@@ -136,6 +136,79 @@ function walletTxBalanceEffect(tx: TransactionItem): number {
   return amount;
 }
 
+/**
+ * Net balance change for one on-chain tx (all listtransactions rows grouped by txid).
+ * When send and receive rows share a txid, change outputs are not treated as new funds.
+ */
+export function netTxBalanceEffectForGroup(rows: TransactionItem[]): number {
+  let sendTotal = 0;
+  let recvTotal = 0;
+  let other = 0;
+
+  for (const tx of rows) {
+    const effect = walletTxBalanceEffect(tx);
+    if (tx.category === 'send') {
+      sendTotal += effect;
+    } else if (
+      tx.category === 'receive' ||
+      tx.category === 'immature' ||
+      tx.category === 'generate'
+    ) {
+      recvTotal += effect;
+    } else {
+      other += effect;
+    }
+  }
+
+  if (sendTotal !== 0 && recvTotal !== 0) {
+    return sendTotal + Math.min(recvTotal, Math.abs(sendTotal)) + other;
+  }
+
+  return sendTotal + recvTotal + other;
+}
+
+function groupTransactionsByTxid(
+  txs: TransactionItem[]
+): { txid: string; time: number; effect: number }[] {
+  const groups = new Map<string, TransactionItem[]>();
+  for (const tx of txs) {
+    const list = groups.get(tx.txid) ?? [];
+    list.push(tx);
+    groups.set(tx.txid, list);
+  }
+
+  return [...groups.entries()]
+    .map(([txid, rows]) => {
+      const time = Math.max(...rows.map(transactionTimestamp));
+      return { txid, time, effect: netTxBalanceEffectForGroup(rows) };
+    })
+    .filter((g) => g.time > 0)
+    .sort((a, b) => a.time - b.time);
+}
+
+function utcDayStart(time: number): number {
+  const d = new Date(time * 1000);
+  return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000);
+}
+
+/** Collapse intraday points to one balance per UTC day (last balance that day). */
+function bucketDailyPoints(points: ChartCumulativePoint[]): ChartCumulativePoint[] {
+  if (points.length === 0) return points;
+
+  const byDay = new Map<number, ChartCumulativePoint>();
+  for (const point of [...points].sort((a, b) => a.time - b.time)) {
+    const day = utcDayStart(point.time);
+    byDay.set(day, {
+      ...point,
+      id: `day-${day}`,
+      time: day,
+      label: formatChartPointDate(day),
+    });
+  }
+
+  return [...byDay.values()].sort((a, b) => a.time - b.time);
+}
+
 /** Historical points should not exceed the live wallet anchor when tx amounts are partial. */
 function clampWalletCumulativePoints(
   points: ChartCumulativePoint[],
@@ -198,41 +271,63 @@ function appendAnchorPoint(
   return points;
 }
 
-/** Wallet cumulative balance anchored at current total balance (newest txs when capped). */
+/** Wallet cumulative balance — daily totals from inception when history is complete. */
 export function buildWalletCumulativeSeries(
   txs: TransactionItem[],
   anchorBalanceCoins: number,
   maxPoints = 48
 ): { points: ChartCumulativePoint[]; complete: boolean; txCountUsed: number } {
-  const sorted = [...txs].sort((a, b) => transactionTimestamp(a) - transactionTimestamp(b));
+  const grouped = groupTransactionsByTxid(txs);
   const complete = txs.length < TRANSACTIONS_LIST_CAP;
 
-  let balance = anchorBalanceCoins;
-  const newestFirst = [...sorted].reverse();
-  const raw: ChartCumulativePoint[] = [];
+  let raw: ChartCumulativePoint[] = [];
 
-  for (const tx of newestFirst) {
-    const time = transactionTimestamp(tx);
-    if (time > 0) {
+  if (complete) {
+    if (grouped.length > 0) {
+      const firstDay = utcDayStart(grouped[0].time);
       raw.push({
-        id: tx.txid,
-        time,
-        balance,
-        label: formatChartPointDate(time),
+        id: 'origin',
+        time: firstDay - 86_400,
+        balance: 0,
+        label: formatChartPointDate(firstDay - 86_400),
       });
     }
-    balance -= walletTxBalanceEffect(tx);
+
+    let balance = 0;
+    for (const tx of grouped) {
+      balance += tx.effect;
+      balance = Math.max(0, balance);
+      raw.push({
+        id: tx.txid,
+        time: tx.time,
+        balance,
+        label: formatChartPointDate(tx.time, true),
+      });
+    }
+  } else {
+    let balance = anchorBalanceCoins;
+    const newestFirst = [...grouped].reverse();
+
+    for (const tx of newestFirst) {
+      raw.push({
+        id: tx.txid,
+        time: tx.time,
+        balance,
+        label: formatChartPointDate(tx.time, true),
+      });
+      balance -= tx.effect;
+      balance = Math.max(0, balance);
+    }
+
+    raw.sort((a, b) => a.time - b.time);
   }
 
-  const withAnchor = appendAnchorPoint(
-    raw.sort((a, b) => a.time - b.time),
-    anchorBalanceCoins
-  );
-
-  const points = clampWalletCumulativePoints(
-    downsampleCumulativePoints(withAnchor, maxPoints),
-    anchorBalanceCoins
-  );
+  const daily = bucketDailyPoints(raw.filter((p) => p.id !== 'anchor-now'));
+  const withAnchor = appendAnchorPoint(daily, anchorBalanceCoins);
+  const sampled = downsampleCumulativePoints(withAnchor, maxPoints);
+  const points = complete
+    ? sampled
+    : clampWalletCumulativePoints(sampled, anchorBalanceCoins);
 
   return { points, complete, txCountUsed: txs.length };
 }
@@ -243,14 +338,14 @@ export function cumulativeSeriesCaption(
   txCountTotal?: number | null
 ): string {
   if (complete && txCountTotal != null && txCountTotal > 0) {
-    return `Balance after each indexed transaction (${txCountTotal.toLocaleString()} total).`;
+    return `Daily wallet balance since inception (${txCountTotal.toLocaleString()} transactions).`;
   }
   if (complete) {
-    return `Balance after each indexed transaction (${txCountUsed.toLocaleString()} shown).`;
+    return `Daily wallet balance since inception (${txCountUsed.toLocaleString()} transactions).`;
   }
   const totalLabel =
     txCountTotal != null && txCountTotal > txCountUsed
       ? ` of ${txCountTotal.toLocaleString()} indexed`
       : '';
-  return `Balance over the latest ${txCountUsed.toLocaleString()} transactions${totalLabel} (anchored to current balance).`;
+  return `Daily balance over the latest ${txCountUsed.toLocaleString()} transactions${totalLabel} (earlier history not shown).`;
 }

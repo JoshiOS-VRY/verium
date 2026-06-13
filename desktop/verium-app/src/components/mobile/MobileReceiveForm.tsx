@@ -61,7 +61,7 @@ export function MobileReceiveForm({
   const active = selected;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mobile-send-form-root flex flex-col gap-4">
       {isLight && (
         <div className="flex items-center gap-2 rounded-xl border border-accent/25 bg-accent/5 px-3 py-2.5 text-sm text-fg-muted">
           <Radio className="h-4 w-4 shrink-0 animate-pulse text-accent" aria-hidden />
@@ -116,7 +116,6 @@ export function MobileReceiveForm({
                 {active.amount != null && (
                   <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-fg">
                     {formatCoinAmount(active.amount, coin, 4)}
-                    <span className="ml-1 text-sm font-medium text-fg-muted">{profile.symbol}</span>
                   </p>
                 )}
               </div>

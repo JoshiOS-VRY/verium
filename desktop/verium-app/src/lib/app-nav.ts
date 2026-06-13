@@ -80,7 +80,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     icon: BookUser,
     mobileTab: true,
   },
-  { to: '/security', label: 'Security', icon: Lock, requiresPassphrase: true },
+  { to: '/security', label: 'Security', shortLabel: 'Security', icon: Lock, requiresPassphrase: true, mobileTab: true },
   {
     to: '/sign',
     label: 'Sign & verify',

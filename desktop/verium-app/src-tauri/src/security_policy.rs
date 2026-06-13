@@ -54,12 +54,14 @@ async fn verify_wallet_passphrase_for_send(
     wallet_passphrase: Option<&str>,
 ) -> AppResult<()> {
     let pass = wallet_passphrase
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| AppError::other("Wallet passphrase required to send"))?;
 
     let prefs = crate::prefs::load().await?;
     if crate::prefs::wallet_mode_for(&prefs, coin).is_light() {
+        if crate::wallet::keystore::signing_session_active(coin) {
+            return Ok(());
+        }
         crate::wallet::keystore::verify_passphrase(coin, pass)?;
         return Ok(());
     }

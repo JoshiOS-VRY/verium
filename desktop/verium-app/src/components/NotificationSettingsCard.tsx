@@ -16,7 +16,7 @@ export function NotificationSettingsCard({ mobileLayout = false }: { mobileLayou
 
   const permissionHint = notif.available
     ? notif.granted
-      ? 'Banner and lock screen alerts are enabled in iOS.'
+      ? 'Banner and lock screen alerts are enabled.'
       : 'Allow notifications so incoming VRM and VRC appear on your lock screen and as banners.'
     : 'In-app alerts are shown while the app is open.';
 
@@ -77,10 +77,6 @@ export function NotificationSettingsCard({ mobileLayout = false }: { mobileLayou
             </Button>
           )}
         </div>
-      )}
-
-      {!notif.available && (
-        <p className="text-xs leading-relaxed text-fg-subtle">{permissionHint}</p>
       )}
     </div>
   );

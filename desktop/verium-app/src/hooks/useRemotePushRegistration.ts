@@ -8,12 +8,16 @@ import {
   pushRegistrationConfigured,
   pushSyncDevice,
   pushUnregisterDevice,
+  pushWatchScripthashCounts,
 } from '@/lib/push-notifications/register';
 import { isWalletUnlocked } from '@/lib/wallet-unlock';
 import { rpcGetWalletInfo } from '@/lib/rpc/client';
 
 const HEARTBEAT_MS = 15 * 60 * 1000;
 const TOKEN_POLL_MS = 30 * 60 * 1000;
+const TOKEN_RETRY_MS = 2_000;
+const TOKEN_RETRY_ATTEMPTS = 5;
+const WALLET_POLL_MS = 10_000;
 
 async function obtainPushToken(): Promise<string | null> {
   try {
@@ -25,6 +29,17 @@ async function obtainPushToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function obtainPushTokenWithRetry(): Promise<string | null> {
+  for (let i = 0; i < TOKEN_RETRY_ATTEMPTS; i++) {
+    const token = await obtainPushToken();
+    if (token) return token;
+    if (i < TOKEN_RETRY_ATTEMPTS - 1) {
+      await new Promise((r) => setTimeout(r, TOKEN_RETRY_MS));
+    }
+  }
+  return null;
 }
 
 /**
@@ -55,6 +70,7 @@ export function useRemotePushRegistration(): void {
     queryFn: () => rpcGetWalletInfo('verium'),
     enabled: wantsPush && veriumMode.isLight,
     staleTime: 5_000,
+    refetchInterval: wantsPush ? WALLET_POLL_MS : false,
   });
 
   const vrcWallet = useQuery({
@@ -62,14 +78,26 @@ export function useRemotePushRegistration(): void {
     queryFn: () => rpcGetWalletInfo('vericoin'),
     enabled: wantsPush && vericoinMode.isLight && vericoinEnabled,
     staleTime: 5_000,
+    refetchInterval: wantsPush ? WALLET_POLL_MS : false,
   });
 
   const vrmUnlocked = isWalletUnlocked(vrmWallet.data);
   const vrcUnlocked = isWalletUnlocked(vrcWallet.data);
   const anyUnlocked = vrmUnlocked || vrcUnlocked;
 
+  // Re-register when balance/history/indexing changes so new funded addresses are watched.
+  const walletSyncKey = [
+    vrmWallet.data?.balance,
+    vrmWallet.data?.txcount,
+    vrmWallet.data?.light_syncing,
+    vrcWallet.data?.balance,
+    vrcWallet.data?.txcount,
+    vrcWallet.data?.light_syncing,
+  ].join('|');
+
   const tokenRef = useRef<string | null>(null);
   const lastRegisteredRef = useRef(false);
+  const lastSyncKeyRef = useRef<string>('');
 
   useEffect(() => {
     if (!wantsPush || configured.data !== true) return;
@@ -79,16 +107,17 @@ export function useRemotePushRegistration(): void {
     const sync = async (heartbeat = false) => {
       if (cancelled) return;
 
-      // Keep server subscriptions after lock/background — remote push is for when
-      // the app is closed. Only sync scripthashes while the wallet is unlocked.
       if (!anyUnlocked) {
         return;
       }
 
       let token = tokenRef.current;
       if (!token) {
-        token = await obtainPushToken();
-        if (cancelled || !token) return;
+        token = await obtainPushTokenWithRetry();
+        if (cancelled || !token) {
+          console.warn('remote push: no APNs token (check notification permission)');
+          return;
+        }
         tokenRef.current = token;
       }
 
@@ -97,14 +126,23 @@ export function useRemotePushRegistration(): void {
           await pushHeartbeatDevice(token);
         } else {
           await pushSyncDevice(token);
+          const [vrm, vrc] = await pushWatchScripthashCounts();
+          console.info('remote push registered', { vrmScripthashes: vrm, vrcScripthashes: vrc });
+          if (notifyVrm && vrm === 0) {
+            console.warn('remote push: no VRM addresses registered — unlock and wait for sync');
+          }
         }
         lastRegisteredRef.current = true;
+        lastSyncKeyRef.current = walletSyncKey;
       } catch (e) {
         console.warn('push registration failed', e);
       }
     };
 
-    void sync(false);
+    const syncKeyChanged = walletSyncKey !== lastSyncKeyRef.current;
+    if (!lastRegisteredRef.current || syncKeyChanged) {
+      void sync(false);
+    }
 
     const heartbeatId = window.setInterval(() => void sync(true), HEARTBEAT_MS);
     const tokenPollId = window.setInterval(async () => {
@@ -124,6 +162,7 @@ export function useRemotePushRegistration(): void {
     wantsPush,
     configured.data,
     anyUnlocked,
+    walletSyncKey,
     notifyVrm,
     notifyVrc,
     vericoinEnabled,

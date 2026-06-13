@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/Button';
 import { ExplorerLink } from '@/components/ExplorerLink';
 import type { CoinId } from '@/lib/coin/profile';
-import { getCoinProfile } from '@/lib/coin/profile';
 import { formatCoinAmount } from '@/lib/units';
 import { validateSendAddress } from '@/lib/address-validation';
 import { cn } from '@/lib/utils';
@@ -41,7 +40,6 @@ function MobileSendSuccess({
   coin: CoinId;
   onDismiss: () => void;
 }) {
-  const symbol = getCoinProfile(coin).symbol;
   const primaryTxid = result.txids[0];
 
   return (
@@ -50,7 +48,7 @@ function MobileSendSuccess({
         <div>
           <p className="text-sm font-semibold text-fg">Payment sent</p>
           <p className="mt-1 text-sm tabular-nums text-fg">
-            {formatCoinAmount(result.totalAmount, coin, 4)} {symbol}
+            {formatCoinAmount(result.totalAmount, coin, 4)}
           </p>
         </div>
         <button
@@ -155,13 +153,12 @@ export function MobileSendForm({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mobile-send-form-root flex flex-col gap-4">
       <div className="mobile-send-available rounded-2xl border border-border bg-gradient-to-br from-bg-panel to-bg-subtle/50 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <span className="text-sm text-fg-muted">Available to send</span>
           <span className="text-lg font-bold tabular-nums tracking-tight text-fg">
             {formatCoinAmount(balance, coin, 4)}
-            <span className="ml-1 text-sm font-medium text-fg-muted">{profile.symbol}</span>
           </span>
         </div>
       </div>

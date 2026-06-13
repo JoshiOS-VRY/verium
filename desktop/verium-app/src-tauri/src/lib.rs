@@ -347,6 +347,7 @@ pub fn run() {
             push_commands::push_heartbeat_device,
             push_commands::push_unregister_device,
             push_commands::push_registration_configured,
+            push_commands::push_watch_scripthash_counts,
             onboarding_commands::wallet_profile,
             onboarding_commands::wallet_storage_diagnostics,
             onboarding_commands::secret_store_status,

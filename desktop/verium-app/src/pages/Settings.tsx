@@ -46,7 +46,6 @@ import { ADVANCED_SETTINGS_ENABLED } from '@/lib/features';
 import { BiometricUnlockCard } from '@/components/BiometricUnlockCard';
 import { NotificationSettingsCard } from '@/components/NotificationSettingsCard';
 import { MobileBuildStamp } from '@/components/mobile/MobileBuildStamp';
-import { MobileLightServersCard } from '@/components/mobile/MobileLightServersCard';
 import { MobileSettingsGroup } from '@/components/mobile/MobileSettingsGroup';
 import { LightWalletRescanCard } from '@/components/LightWalletRescanCard';
 
@@ -100,26 +99,6 @@ export function Settings() {
   if (mobileOnly) {
     return (
       <div className="mobile-page">
-        <section className="mobile-panel overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent/10 to-bg-panel p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
-              <Shield className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold text-fg">Security</h2>
-              <p className="mt-1 text-xs leading-relaxed text-fg-subtle">
-                Recovery phrase, backups, and spending controls.
-              </p>
-            </div>
-          </div>
-          <Link
-            to="/security"
-            className="mt-4 flex h-11 w-full items-center justify-center rounded-xl bg-accent text-sm font-semibold text-accent-fg active:bg-accent/90"
-          >
-            Open security settings
-          </Link>
-        </section>
-
         <MobileSettingsGroup
           title="Appearance"
           description="Light, dark, or match your device."
@@ -131,8 +110,6 @@ export function Settings() {
         <WalletBackupCard />
 
         {!mobileOnly && <NetworkModeCard />}
-
-        {mobileOnly ? <MobileLightServersCard /> : <WalletModeCard />}
 
         <LightWalletRescanCard mobileLayout />
 

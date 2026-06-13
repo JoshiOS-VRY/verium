@@ -4,8 +4,10 @@ import { BootstrapBanner } from '@/components/BootstrapBanner';
 import { BackupHealthCard } from '@/components/BackupHealthCard';
 import { DashboardHero } from '@/components/DashboardHero';
 import { ExplorerRecentBlocks } from '@/components/ExplorerRecentBlocks';
-import { MobileBalanceHero } from '@/components/mobile/MobileBalanceHero';
-import { WalletCumulativeBalanceChart } from '@/components/mobile/WalletCumulativeBalanceChart';
+import {
+  MobileBalanceHero,
+  useMobileBalanceRefreshing,
+} from '@/components/mobile/MobileBalanceHero';
 import { MobileDashboardHero } from '@/components/mobile/MobileDashboardHero';
 import { MobileQuickActions } from '@/components/mobile/MobileQuickActions';
 import { useActiveCoin } from '@/lib/coin/context';
@@ -28,9 +30,11 @@ export function Dashboard() {
 
   useLightWalletInstantReceiveSync(coin, isLight && visible);
 
+  const { refreshing, runRefresh } = useMobileBalanceRefreshing();
+
   const handleMobileRefresh = useCallback(async () => {
-    await refreshMobileDashboard(queryClient, coin, isLight);
-  }, [queryClient, coin, isLight]);
+    await runRefresh(() => refreshMobileDashboard(queryClient, coin, isLight));
+  }, [runRefresh, queryClient, coin, isLight]);
 
   if (mobileOnly) {
     return (
@@ -39,8 +43,7 @@ export function Dashboard() {
         {isLight && <LightWalletMissingBanner />}
         {isLight && <LightWalletDashboardUnlock />}
         {!mobileOnly && isLight && <LightWalletSyncBanner />}
-        <MobileBalanceHero />
-        <WalletCumulativeBalanceChart />
+        <MobileBalanceHero showChart refreshing={refreshing} />
         <MobileQuickActions />
         <MobileDashboardHero coin={coin} />
         {!isTestNetwork && <ExplorerRecentBlocks coin={coin} variant="dashboard" />}

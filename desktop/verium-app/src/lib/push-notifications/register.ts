@@ -15,3 +15,7 @@ export async function pushUnregisterDevice(deviceToken: string): Promise<void> {
 export async function pushRegistrationConfigured(): Promise<boolean> {
   return invoke<boolean>('push_registration_configured');
 }
+
+export async function pushWatchScripthashCounts(): Promise<[number, number]> {
+  return invoke<[number, number]>('push_watch_scripthash_counts');
+}

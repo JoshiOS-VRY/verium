@@ -1,21 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Cloud, HardDrive, Loader2, Server } from 'lucide-react';
+import { Cloud, HardDrive, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useInvalidateWalletMode, useWalletMode } from '@/hooks/useWalletMode';
 import { lightWalletCopy } from '@/lib/light-wallet/copy';
-import { electrumUriFriendlyLabel } from '@/lib/light-wallet/labels';
 import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
 import { invalidateLightWalletQueries } from '@/lib/invalidate-wallet-queries';
 import { useUserPreferences } from '@/lib/user-preferences';
 import {
-  electrumServersGet,
-  electrumServersSet,
-  electrumTestConnection,
   type WalletMode,
   walletModeGetForCoin,
   walletModeSetForCoin,
@@ -36,18 +32,11 @@ function WalletModeCardInner() {
   const queryClient = useQueryClient();
   const reloadPrefs = useUserPreferences((s) => s.load);
   const invalidateWalletMode = useInvalidateWalletMode();
-  const [customServers, setCustomServers] = useState('');
   const [confirmSwitch, setConfirmSwitch] = useState<WalletMode | null>(null);
 
   const modeStatus = useQuery({
     queryKey: ['wallet-mode-status', activeCoin],
     queryFn: () => walletModeGetForCoin(activeCoin),
-  });
-
-  const servers = useQuery({
-    queryKey: ['electrum-servers', activeCoin],
-    queryFn: () => electrumServersGet(activeCoin),
-    enabled: modeStatus.data?.mode === 'light',
   });
 
   const setMode = useMutation({
@@ -71,20 +60,6 @@ function WalletModeCardInner() {
         });
       }
     },
-  });
-
-  const saveServers = useMutation({
-    mutationFn: (list: string[]) => electrumServersSet(activeCoin, list),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['electrum-servers', activeCoin] });
-      void queryClient.invalidateQueries({
-        queryKey: coinQueryKey(activeCoin, 'light-server-status'),
-      });
-    },
-  });
-
-  const testConn = useMutation({
-    mutationFn: () => electrumTestConnection(activeCoin),
   });
 
   const activeMode = modeStatus.data?.mode ?? 'full_node';
@@ -168,103 +143,6 @@ function WalletModeCardInner() {
                 Cancel
               </Button>
             </div>
-          </div>
-        )}
-
-        {isLight && (
-          <div className="flex flex-col gap-3 rounded-md border border-border bg-bg-subtle p-3 text-xs">
-            <div className="flex items-center gap-2 font-medium text-fg">
-              <Server className="h-3.5 w-3.5" />
-              Light wallet servers
-            </div>
-            <ul className="flex flex-col gap-1.5 text-fg-muted">
-              {(servers.data ?? []).map((s, i) => (
-                <li key={s} className="flex flex-col gap-0.5">
-                  <span className="font-medium text-fg">
-                    {electrumUriFriendlyLabel(s, activeCoin, i)}
-                  </span>
-                  <span className="break-all font-mono text-[11px] text-fg-subtle">{s}</span>
-                </li>
-              ))}
-            </ul>
-            <textarea
-              className="min-h-[72px] w-full rounded border border-border bg-bg px-2 py-1 font-mono text-[11px]"
-              placeholder="Custom servers (comma-separated tls://host:port)"
-              value={customServers}
-              onChange={(e) => setCustomServers(e.target.value)}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  const list = customServers
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  if (list.length > 0) saveServers.mutate(list);
-                }}
-                disabled={saveServers.isPending}
-              >
-                Save custom servers
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => testConn.mutate()}
-                disabled={testConn.isPending}
-              >
-                {testConn.isPending ? 'Testing…' : 'Test connection'}
-              </Button>
-            </div>
-            {testConn.data && (
-              <div className="flex flex-col gap-2">
-                {(() => {
-                  const blocking = testConn.data.checks.filter((c) => !c.ok && !c.optional);
-                  return (
-                    <p className={testConn.data.passed ? 'text-success' : 'text-danger'}>
-                      {testConn.data.server}: {testConn.data.passed ? 'OK' : 'Failed'}
-                      {blocking.length > 0
-                        ? ` (${blocking.length} issue${blocking.length === 1 ? '' : 's'})`
-                        : ''}
-                    </p>
-                  );
-                })()}
-                {!testConn.data.passed && (
-                  <ul className="list-inside list-disc space-y-1 text-fg-muted">
-                    {testConn.data.checks
-                      .filter((c) => !c.ok && !c.optional)
-                      .map((c) => (
-                        <li key={c.method}>
-                          <span className="font-mono text-fg">{c.method}</span>
-                          {c.detail && c.detail !== 'ok' ? (
-                            <span className="text-danger"> — {c.detail}</span>
-                          ) : null}
-                        </li>
-                      ))}
-                  </ul>
-                )}
-                <details className="text-fg-subtle">
-                  <summary className="cursor-pointer text-[11px]">
-                    All checks ({testConn.data.checks.length})
-                  </summary>
-                  <ul className="mt-1 list-inside list-disc space-y-0.5 font-mono text-[11px]">
-                    {testConn.data.checks.map((c) => (
-                      <li
-                        key={c.method}
-                        className={
-                          c.ok ? 'text-success' : c.optional ? 'text-warning' : 'text-danger'
-                        }
-                      >
-                        {c.ok ? '✓' : c.optional ? '○' : '✗'} {c.method}
-                        {c.detail && c.detail !== 'ok' ? ` (${c.detail})` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </div>
-            )}
-            {testConn.error && <p className="text-danger text-xs">{String(testConn.error)}</p>}
           </div>
         )}
       </CardContent>

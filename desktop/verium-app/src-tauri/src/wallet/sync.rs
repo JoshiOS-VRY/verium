@@ -75,6 +75,16 @@ pub fn reset_balance_refresh_throttle(coin: CoinId) {
     }
 }
 
+/// True when a foreground balance refresh ran recently (UTO cache likely fresh).
+pub fn is_utxo_cache_recent(coin: CoinId) -> bool {
+    let Ok(map) = LAST_BALANCE_REFRESH.lock() else {
+        return false;
+    };
+    map.get(&coin)
+        .map(|last| last.elapsed() < BALANCE_REFRESH_MIN_INTERVAL)
+        .unwrap_or(false)
+}
+
 fn pending_refresh_due(coin: CoinId) -> bool {
     let mut map = match LAST_PENDING_REFRESH.lock() {
         Ok(m) => m,
@@ -243,7 +253,7 @@ fn mark_precache_probe_complete(coin: CoinId) {
 }
 
 /// Discover funded scripts + refresh UTXO cache (no transaction history RPC).
-async fn refresh_light_wallet_utxos_from_network(
+pub(crate) async fn refresh_light_wallet_utxos_from_network(
     coin: CoinId,
     phrase: Option<&str>,
     backend: &dyn ChainBackend,
@@ -278,6 +288,11 @@ pub async fn refresh_light_wallet_balance(state: &AppState, coin: CoinId) -> App
         refresh_light_wallet_utxos_from_network(coin, phrase.as_deref(), backend.as_ref()).await
     {
         tracing::debug!("balance utxo refresh failed for {}: {e}", coin.as_str());
+    } else if !keystore::needs_full_address_scan(coin)? {
+        let b = balance_from_utxo_cache(coin);
+        if b.confirmed_sats + b.unconfirmed_sats > 0 {
+            mark_precache_probe_complete(coin);
+        }
     }
     Ok(())
 }
@@ -465,32 +480,28 @@ async fn bootstrap_precache_slice(
         return Ok(true);
     }
 
-    loop {
-        let start = progress.precache_offset as usize;
-        let end = (start + SCRIPTS_PER_BATCH as usize).min(precached.len());
-        let chunk = &precached[start..end];
-        let balances = match backend.get_balances_per_script(chunk).await {
-            Ok(b) => b,
-            Err(e) if e.is_indexing_budget_exhausted() => {
-                keystore::set_indexing_progress(coin, *progress)?;
-                return Ok(false);
-            }
-            Err(e) => return Err(e),
-        };
-        for (script, bal) in chunk.iter().zip(balances) {
-            if bal.total_sats() > 0 && !funded_so_far.iter().any(|s| s == script) {
-                funded_so_far.push(script.clone());
-            }
+    let start = progress.precache_offset as usize;
+    let end = (start + SCRIPTS_PER_BATCH as usize).min(precached.len());
+    let chunk = &precached[start..end];
+    let balances = match backend.get_balances_per_script(chunk).await {
+        Ok(b) => b,
+        Err(e) if e.is_indexing_budget_exhausted() => {
+            keystore::set_indexing_progress(coin, *progress)?;
+            return Ok(false);
         }
-        if !funded_so_far.is_empty() {
-            keystore::set_funded_script_hexes(coin, funded_so_far)?;
-        }
-        progress.precache_offset = end as u32;
-        keystore::set_indexing_progress(coin, *progress)?;
-        if end >= precached.len() {
-            return Ok(true);
+        Err(e) => return Err(e),
+    };
+    for (script, bal) in chunk.iter().zip(balances) {
+        if bal.total_sats() > 0 && !funded_so_far.iter().any(|s| s == script) {
+            funded_so_far.push(script.clone());
         }
     }
+    if !funded_so_far.is_empty() {
+        keystore::set_funded_script_hexes(coin, funded_so_far)?;
+    }
+    progress.precache_offset = end as u32;
+    keystore::set_indexing_progress(coin, *progress)?;
+    Ok(end >= precached.len())
 }
 
 fn utxo_cache_needs_refresh(coin: CoinId, funded_count: usize) -> bool {

@@ -105,10 +105,21 @@ export interface WalletInfo {
   unlocked_minting_only?: boolean;
   light_wallet?: boolean;
   light_syncing?: boolean;
-  /** Gap scan or balance refresh in progress. */
+  /** Gap scan or rescan in progress (not routine background history sync). */
   light_balance_syncing?: boolean;
   /** All HD addresses probed and last balance refresh finished. */
   light_balance_ready?: boolean;
+  /** Gap-scan progress 0–1 while `light_syncing`. */
+  light_scan_progress?: number;
+  /** Gap-scan phase: precache | external | internal | complete */
+  light_scan_phase?: 'precache' | 'external' | 'internal' | 'complete';
+  light_indexing?: {
+    precache_offset: number;
+    gap_external: number;
+    gap_external_done: boolean;
+    gap_internal: number;
+    gap_internal_done: boolean;
+  };
   /** True when the wallet can sign (unlocked with keys available). */
   private_keys_enabled?: boolean;
 }

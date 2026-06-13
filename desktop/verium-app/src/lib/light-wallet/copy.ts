@@ -32,16 +32,21 @@ export const lightWalletCopy = {
   mobileOnboardingWelcome:
     'Your keys stay encrypted on this device. Balance and history sync through Vericonomy Electrum servers — no blockchain download required.',
   mobileFundsDisclaimer:
-    'This is wallet software for real mainnet assets. Only store amounts you are prepared to lose if something goes wrong. Always back up your recovery phrase before sending funds.',
+    'You are using a real mainnet wallet. Back up your recovery phrase in a safe place before you receive funds — it is the only way to restore access if you lose this device.',
   mobileOnboardingCreate:
     'Generate a new wallet with a recovery phrase you write down and store safely.',
   mobileOnboardingImport:
     'Already have a wallet? Restore it with your 24-word recovery phrase and passphrase.',
   sendAvailableIncludesChange:
     'Available balance includes unconfirmed change from your sends until the next block confirms.',
-  balanceUpdating: 'Updating balance…',
+  balanceUpdating: 'Refreshing balance…',
   balanceUpToDate: 'Balance up to date',
-  balanceCheckingAddresses: 'Checking all wallet addresses…',
+  balanceCheckingAddresses: 'Checking wallet addresses…',
+  scanPhasePrecache: 'Preparing address list…',
+  scanPhaseExternal: 'Checking receive addresses…',
+  scanPhaseInternal: 'Checking change addresses…',
+  scanProgress: '{percent}% complete',
+  balanceRefreshing: 'Refreshing…',
   rescanTitle: 'Rescan addresses',
   rescanDescription:
     'Re-discovers receive and change addresses on Vericonomy servers and rebuilds your local balance cache. Use this if balance looks too low compared to a full-node wallet with the same recovery phrase.',

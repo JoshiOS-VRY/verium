@@ -37,7 +37,9 @@ export function mergeRecentBlocks(
       time: block.time || existing.time,
     });
   }
-  return [...byHeight.values()].sort((a, b) => b.height - a.height).slice(0, limit);
+  return [...byHeight.values()]
+    .sort((a, b) => b.height - a.height || (b.time ?? 0) - (a.time ?? 0))
+    .slice(0, limit);
 }
 
 function voutAddress(vout: unknown): string | undefined {
