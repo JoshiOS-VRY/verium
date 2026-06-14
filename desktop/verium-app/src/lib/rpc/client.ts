@@ -91,6 +91,8 @@ export interface WalletInfo {
   balance: number;
   /** Light wallet: confirmed UTXOs only (subset of `balance`). */
   confirmed_balance?: number;
+  /** Light wallet: confirmed + pending + immature (sanitized UTXO sum). */
+  wallet_total?: number;
   unconfirmed_balance: number;
   immature_balance: number;
   txcount: number;

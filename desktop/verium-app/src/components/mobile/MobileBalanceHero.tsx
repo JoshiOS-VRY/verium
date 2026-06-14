@@ -100,7 +100,9 @@ export function MobileBalanceHero({
   const confirmed = wallet.data.confirmed_balance ?? available;
   const unconfirmed = wallet.data.unconfirmed_balance;
   const immature = wallet.data.immature_balance;
-  const total = isLight ? available + immature : available + unconfirmed + immature;
+  const total = isLight
+    ? (wallet.data.wallet_total ?? available + unconfirmed + immature)
+    : available + unconfirmed + immature;
   const blurClass = lockedWalletBalanceClass(wallet.data);
   const unlocked = wallet.data.private_keys_enabled === true;
   const hasPending = unconfirmed > 0 || immature > 0;

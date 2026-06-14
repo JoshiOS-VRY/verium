@@ -453,6 +453,8 @@ pub async fn get_wallet_info_json(
     // Light wallet: main balance is confirmed-only (spendable). Pending unconfirmed UTXOs
     // are shown separately — they may never confirm or may already be spent in mempool.
     let spendable_sats = bal.confirmed_sats;
+    let pending_sats = bal.unconfirmed_sats;
+    let total_sats = bal.total_sats();
     let balance_probe_done = probe_complete || spendable_sats > 0 || bal.unconfirmed_sats > 0;
     // Gap scan, post-scan UTXO refresh, or balance probe until first usable balance.
     let light_balance_syncing = session_unlocked && (!scan_complete || !balance_probe_done);
@@ -506,8 +508,9 @@ pub async fn get_wallet_info_json(
         "walletname": format!("{}-light", coin.as_str()),
         "balance": sats_to_coins(spendable_sats),
         "confirmed_balance": sats_to_coins(bal.confirmed_sats),
-        "unconfirmed_balance": sats_to_coins(bal.unconfirmed_sats),
+        "unconfirmed_balance": sats_to_coins(pending_sats),
         "immature_balance": sats_to_coins(bal.immature_sats),
+        "wallet_total": sats_to_coins(total_sats),
         "txcount": txcount,
         "keypoolsize": 0,
         "unlocked_until": unlocked_until,
