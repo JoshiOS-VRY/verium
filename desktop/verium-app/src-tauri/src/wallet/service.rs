@@ -242,6 +242,8 @@ async fn fetch_utxos_for_send(
             missing.txid, missing.vout
         )));
     }
+    // Only confirmed outputs are reliably spendable (unconfirmed may be mempool-chained or stale).
+    utxos.retain(|u| u.height > 0);
     if utxos.is_empty() {
         return Err(AppError::other("no spendable coins in wallet"));
     }
@@ -448,8 +450,10 @@ pub async fn get_wallet_info_json(
     let scan_phase = light_scan_phase(coin, &indexing, scan_complete);
     let scan_progress = light_scan_progress(&indexing, scan_complete);
     let bal = balance_from_utxo_cache(coin);
-    let available_sats = bal.confirmed_sats + bal.unconfirmed_sats;
-    let balance_probe_done = probe_complete || available_sats > 0;
+    // Light wallet: main balance is confirmed-only (spendable). Pending unconfirmed UTXOs
+    // are shown separately — they may never confirm or may already be spent in mempool.
+    let spendable_sats = bal.confirmed_sats;
+    let balance_probe_done = probe_complete || spendable_sats > 0 || bal.unconfirmed_sats > 0;
     // Gap scan, post-scan UTXO refresh, or balance probe until first usable balance.
     let light_balance_syncing = session_unlocked && (!scan_complete || !balance_probe_done);
     // Ready once gap scan + balance probe finish; background steady-state sync must not block UI.
@@ -500,7 +504,7 @@ pub async fn get_wallet_info_json(
 
     Ok(Some(json!({
         "walletname": format!("{}-light", coin.as_str()),
-        "balance": sats_to_coins(available_sats),
+        "balance": sats_to_coins(spendable_sats),
         "confirmed_balance": sats_to_coins(bal.confirmed_sats),
         "unconfirmed_balance": sats_to_coins(bal.unconfirmed_sats),
         "immature_balance": sats_to_coins(bal.immature_sats),

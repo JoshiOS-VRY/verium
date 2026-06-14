@@ -62,9 +62,7 @@ export function WalletCumulativeBalanceChart({
 
   const walletData = wallet.data;
   const anchorBalance =
-    (walletData?.balance ?? 0) +
-    (walletData?.unconfirmed_balance ?? 0) +
-    (walletData?.immature_balance ?? 0);
+    (walletData?.balance ?? 0) + (walletData?.immature_balance ?? 0);
 
   const useIndexerAggregate = isLight && explorerEnabled;
 

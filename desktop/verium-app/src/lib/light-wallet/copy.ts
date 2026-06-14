@@ -38,7 +38,7 @@ export const lightWalletCopy = {
   mobileOnboardingImport:
     'Already have a wallet? Restore it with your 24-word recovery phrase and passphrase.',
   sendAvailableIncludesChange:
-    'Available balance includes unconfirmed change from your sends until the next block confirms.',
+    'Spendable balance uses confirmed coins only. Pending amounts are shown separately and are not available to send.',
   balanceUpdating: 'Refreshing balance…',
   balanceUpToDate: 'Balance up to date',
   balanceCheckingAddresses: 'Checking wallet addresses…',
