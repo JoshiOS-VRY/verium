@@ -5,8 +5,7 @@ use tauri::State;
 
 use crate::chain::electrum::conformance::{run_all_default_servers, run_conformance, ConformanceResult};
 use crate::chain::electrum::multi_server::{verify_tip_consistency, TipVerifyResult};
-use crate::coin_profile::CoinId;
-use crate::coin_profile::parse_coin_id;
+use crate::coin_profile::{CoinId, CoinIdAppExt, parse_coin_id};
 use crate::error::AppResult;
 use crate::prefs::{self, UserPreferences};
 use crate::recovery;
@@ -64,7 +63,7 @@ fn wallet_mode_status_for(prefs: &UserPreferences, coin: CoinId) -> WalletModeSt
 #[tauri::command]
 pub async fn wallet_mode_get() -> AppResult<WalletModeStatus> {
     let prefs = prefs::load().await?;
-    let coin = prefs.active_coin.parse().unwrap_or(CoinId::Verium);
+    let coin = parse_coin_id(&prefs.active_coin).unwrap_or(CoinId::Verium);
     Ok(wallet_mode_status_for(&prefs, coin))
 }
 

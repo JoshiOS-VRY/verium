@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::coin_profile::{CoinId, CoinTarget, NetworkMode};
+use crate::coin_profile::{CoinId, CoinIdAppExt, CoinTarget, CoinTargetAppExt, NetworkMode};
 use crate::error::{AppError, AppResult};
 use crate::node::rpc_auth::restrict_conf_permissions;
 use crate::node::snapshot::is_wsl_unc_path;

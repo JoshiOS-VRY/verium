@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::coin_profile::CoinId;
+use crate::coin_profile::{CoinId, CoinIdAppExt};
 use crate::error::{AppError, AppResult};
 
 /// Matches `WALLET_UNLOCK_FOREVER_SECONDS` in the frontend.

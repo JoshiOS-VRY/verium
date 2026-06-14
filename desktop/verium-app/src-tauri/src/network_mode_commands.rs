@@ -9,7 +9,7 @@
 use serde::Serialize;
 use tauri::State;
 
-use crate::coin_profile::{CoinId, CoinTarget, NetworkMode};
+use crate::coin_profile::{CoinId, CoinTarget, CoinTargetAppExt, NetworkMode};
 use crate::config::{default_config_for_target, ensure_first_run_config, save_app_daemon_config};
 use crate::daemon::{dace_missing_hint, dace_sidecars_ready};
 use crate::error::{AppError, AppResult};

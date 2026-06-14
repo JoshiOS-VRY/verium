@@ -1,3 +1,5 @@
+import { sdkDefaultRpcPort, sdkMaturityConfirmations } from './sdk-profile';
+
 export type CoinId = 'verium' | 'vericoin';
 
 export interface CoinProfile {
@@ -26,10 +28,10 @@ export const COIN_PROFILES: Record<CoinId, CoinProfile> = {
     tagline: 'Reserve',
     binaryName: 'veriumd',
     confFilename: 'vericonomy.conf',
-    defaultRpcPort: 33987,
+    defaultRpcPort: sdkDefaultRpcPort('verium'),
     defaultP2pPort: 36988,
     earnMode: 'mining',
-    confirmationsMatured: 100,
+    confirmationsMatured: sdkMaturityConfirmations('verium'),
     explorerApiBase: 'https://explorer.vericonomy.com',
     bootstrapCdn: 'https://files.vericonomy.com/vrm/bootstrap',
     accentClass: 'bg-accent/15 text-accent border-accent/30',
@@ -42,10 +44,10 @@ export const COIN_PROFILES: Record<CoinId, CoinProfile> = {
     binaryName: 'vericoind',
     confFilename: 'vericonomy.conf',
     chainArg: '-vericoin',
-    defaultRpcPort: 58683,
+    defaultRpcPort: sdkDefaultRpcPort('vericoin'),
     defaultP2pPort: 58684,
     earnMode: 'staking',
-    confirmationsMatured: 500,
+    confirmationsMatured: sdkMaturityConfirmations('vericoin'),
     explorerApiBase: 'https://explorer.vericonomy.com',
     bootstrapCdn: 'https://files.vericonomy.com/vrc/bootstrap',
     accentClass: 'bg-bg-panel text-fg-muted border-border-strong',

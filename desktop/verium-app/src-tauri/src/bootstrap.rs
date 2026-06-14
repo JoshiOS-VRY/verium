@@ -11,7 +11,7 @@ use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 use zip::read::ZipArchive;
 
-use crate::coin_profile::CoinId;
+use crate::coin_profile::{CoinId, CoinIdAppExt};
 use crate::config::{
     bootstrap_chain_datadir, chain_snapshot_needs_reindex, ensure_daemon_conf_complete,
     promote_root_chain_data_for_unified, promote_subdir_chain_data_for_legacy,

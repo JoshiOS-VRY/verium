@@ -41,6 +41,7 @@ mod hd_wallet_export;
 mod mnemonic_backup;
 mod recovery;
 mod rpc;
+mod sdk_bridge;
 mod rpc_guard;
 mod secret_store;
 mod security_commands;

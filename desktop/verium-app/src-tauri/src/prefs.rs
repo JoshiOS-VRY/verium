@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-use crate::coin_profile::{CoinId, NetworkMode};
+use crate::coin_profile::{CoinId, CoinIdAppExt, NetworkMode};
 use crate::config::{load_config_for_network, resolve_legacy_wallet_outside_cfg, wallet_dat_exists};
 use crate::onboarding::OnboardingCheckpoint;
 use crate::wallet::keystore;

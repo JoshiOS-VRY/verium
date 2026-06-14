@@ -1,0 +1,32 @@
+﻿[
+  {
+    "id": "verium",
+    "symbol": "VRM",
+    "display_name": "Verium",
+    "p2pkh_version": 70,
+    "wif_secret_prefix": 198,
+    "bech32_hrp": "vry",
+    "bip44_coin_type": 462,
+    "maturity_confirmations": 100,
+    "default_rpc_port": 33987,
+    "default_p2p_port": 36988,
+    "earn_mode": "mining",
+    "p2pkh_address_prefix": "V",
+    "p2pkh_address_length": 34
+  },
+  {
+    "id": "vericoin",
+    "symbol": "VRC",
+    "display_name": "Vericoin",
+    "p2pkh_version": 70,
+    "wif_secret_prefix": 198,
+    "bech32_hrp": "vry",
+    "bip44_coin_type": 463,
+    "maturity_confirmations": 500,
+    "default_rpc_port": 58683,
+    "default_p2p_port": 58684,
+    "earn_mode": "staking",
+    "p2pkh_address_prefix": "V",
+    "p2pkh_address_length": 34
+  }
+]

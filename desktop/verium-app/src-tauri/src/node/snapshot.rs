@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::coin_profile::CoinId;
+use crate::coin_profile::{CoinId, CoinIdAppExt};
 use crate::features::is_light_wallet;
 use crate::node::status::NodeStatus;
 use crate::daemon::{binary_missing_hint, detect_binary, DaemonBinaryStatus};

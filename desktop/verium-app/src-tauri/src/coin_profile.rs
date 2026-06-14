@@ -1,86 +1,77 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+
+pub use vericonomy_chain_params::{CoinId, CoinTarget, NetworkMode};
 
 use crate::error::{AppError, AppResult};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum CoinId {
-    Verium,
-    Vericoin,
+// ---------------------------------------------------------------------------
+// App-only CoinId helpers (datadir, explorer URLs, daemon RPC matching, etc.)
+// Extension traits avoid orphan-rule issues with SDK re-exports.
+// ---------------------------------------------------------------------------
+
+pub trait CoinIdAppExt {
+    fn binary_base(self) -> &'static str;
+    fn conf_filename(self) -> &'static str;
+    fn default_rpc_port(self) -> u16;
+    fn default_p2p_port(self) -> u16;
+    fn default_network_chain(self) -> &'static str;
+    fn conf_section(self) -> Option<&'static str>;
+    fn chain_cli_arg(self) -> Option<&'static str>;
+    fn rpc_chain_matches(self, rpc_chain: &str, cfg_chain: &str) -> bool;
+    fn default_datadir(self) -> PathBuf;
+    fn bootstrap_cdn_base(self) -> &'static str;
+    fn explorer_api_base(self) -> &'static str;
+    fn explorer_chain_api_base(self) -> &'static str;
+    fn explorer_indexer_chain_id(self) -> &'static str;
+    fn explorer_logo_url(self) -> &'static str;
+    fn confirmations_matured(self) -> u32;
+    fn earn_mode(self) -> &'static str;
+    fn keychain_service(self) -> String;
+    fn default_rpc_user(self) -> &'static str;
+    fn wallet_backup_prefix(self) -> &'static str;
+    fn default_electrum_servers(self, network: NetworkMode) -> Vec<String>;
 }
 
-impl CoinId {
-    pub fn all() -> &'static [CoinId] {
-        &[CoinId::Verium, CoinId::Vericoin]
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            CoinId::Verium => "verium",
-            CoinId::Vericoin => "vericoin",
-        }
-    }
-
-    pub fn symbol(self) -> &'static str {
-        match self {
-            CoinId::Verium => "VRM",
-            CoinId::Vericoin => "VRC",
-        }
-    }
-
-    pub fn display_name(self) -> &'static str {
-        match self {
-            CoinId::Verium => "Verium",
-            CoinId::Vericoin => "Vericoin",
-        }
-    }
-
-    pub fn binary_base(self) -> &'static str {
+impl CoinIdAppExt for CoinId {
+    fn binary_base(self) -> &'static str {
         match self {
             CoinId::Verium => "veriumd",
             CoinId::Vericoin => "vericoind",
         }
     }
 
-    pub fn conf_filename(self) -> &'static str {
+    fn conf_filename(self) -> &'static str {
         // Unified vericoin/veriumd builds read vericonomy.conf (see BITCOIN_CONF_FILENAME).
         "vericonomy.conf"
     }
 
-    pub fn default_rpc_port(self) -> u16 {
-        match self {
-            CoinId::Verium => 33987,
-            CoinId::Vericoin => 58683,
-        }
+    fn default_rpc_port(self) -> u16 {
+        self.profile().default_rpc_port
     }
 
     /// Default P2P listen port for outbound `addnode` targets on mainnet.
-    pub fn default_p2p_port(self) -> u16 {
-        match self {
-            CoinId::Verium => 36988,
-            CoinId::Vericoin => 58684,
-        }
+    fn default_p2p_port(self) -> u16 {
+        self.profile().default_p2p_port
     }
 
-    pub fn default_network_chain(self) -> &'static str {
+    fn default_network_chain(self) -> &'static str {
         match self {
             CoinId::Verium => "main",
             CoinId::Vericoin => "vericoin",
         }
     }
 
-    pub fn conf_section(self) -> Option<&'static str> {
+    fn conf_section(self) -> Option<&'static str> {
         match self {
             CoinId::Verium => Some("verium"),
             CoinId::Vericoin => Some("vericoin"),
         }
     }
 
-    pub fn chain_cli_arg(self) -> Option<&'static str> {
+    fn chain_cli_arg(self) -> Option<&'static str> {
         match self {
             CoinId::Verium => Some("-verium"),
             CoinId::Vericoin => Some("-vericoin"),
@@ -88,7 +79,7 @@ impl CoinId {
     }
 
     /// True when `getblockchaininfo.chain` matches the requested coin.
-    pub fn rpc_chain_matches(self, rpc_chain: &str, cfg_chain: &str) -> bool {
+    fn rpc_chain_matches(self, rpc_chain: &str, cfg_chain: &str) -> bool {
         match self {
             CoinId::Vericoin => {
                 rpc_chain == "vericoin" || rpc_chain == "binarytest-vericoin"
@@ -102,7 +93,7 @@ impl CoinId {
         }
     }
 
-    pub fn default_datadir(self) -> PathBuf {
+    fn default_datadir(self) -> PathBuf {
         #[cfg(mobile)]
         {
             crate::config::app_config_base().join(match self {
@@ -134,7 +125,7 @@ impl CoinId {
         }
     }
 
-    pub fn bootstrap_cdn_base(self) -> &'static str {
+    fn bootstrap_cdn_base(self) -> &'static str {
         match self {
             CoinId::Verium => "https://files.vericonomy.com/vrm/bootstrap",
             CoinId::Vericoin => "https://files.vericonomy.com/vrc/bootstrap",
@@ -142,7 +133,7 @@ impl CoinId {
     }
 
     /// Base for wallet compatibility API on the production explorer-v2.
-    pub fn explorer_api_base(self) -> &'static str {
+    fn explorer_api_base(self) -> &'static str {
         match self {
             CoinId::Verium => "https://explorer.vericonomy.com/v1/vrm/wallet",
             CoinId::Vericoin => "https://explorer.vericonomy.com/v1/vrc/wallet",
@@ -150,7 +141,7 @@ impl CoinId {
     }
 
     /// Live chain API (`/blocks/latest`, `/block/:height`) on explorer-v2.
-    pub fn explorer_chain_api_base(self) -> &'static str {
+    fn explorer_chain_api_base(self) -> &'static str {
         match self {
             CoinId::Verium => "https://explorer.vericonomy.com/v1/vrm",
             CoinId::Vericoin => "https://explorer.vericonomy.com/v1/vrc",
@@ -158,14 +149,14 @@ impl CoinId {
     }
 
     /// Indexer V2 chain id (`/api/indexer/:chainId/...`).
-    pub fn explorer_indexer_chain_id(self) -> &'static str {
+    fn explorer_indexer_chain_id(self) -> &'static str {
         match self {
             CoinId::Verium => "vrm",
             CoinId::Vericoin => "vrc",
         }
     }
 
-    pub fn explorer_logo_url(self) -> &'static str {
+    fn explorer_logo_url(self) -> &'static str {
         match self {
             CoinId::Verium => "https://explorer.vericonomy.com/img/vericonomy/verium-logo.svg",
             CoinId::Vericoin => {
@@ -174,32 +165,26 @@ impl CoinId {
         }
     }
 
-    pub fn confirmations_matured(self) -> u32 {
-        match self {
-            CoinId::Verium => 100,
-            CoinId::Vericoin => 500,
-        }
+    fn confirmations_matured(self) -> u32 {
+        self.profile().maturity_confirmations
     }
 
-    pub fn earn_mode(self) -> &'static str {
-        match self {
-            CoinId::Verium => "mining",
-            CoinId::Vericoin => "staking",
-        }
+    fn earn_mode(self) -> &'static str {
+        self.profile().earn_mode
     }
 
-    pub fn keychain_service(self) -> String {
+    fn keychain_service(self) -> String {
         format!("com.vericonomy.wallet.desktop.{}", self.as_str())
     }
 
-    pub fn default_rpc_user(self) -> &'static str {
+    fn default_rpc_user(self) -> &'static str {
         match self {
             CoinId::Verium => "veriumwallet",
             CoinId::Vericoin => "vericoinwallet",
         }
     }
 
-    pub fn wallet_backup_prefix(self) -> &'static str {
+    fn wallet_backup_prefix(self) -> &'static str {
         match self {
             CoinId::Verium => "verium-wallet",
             CoinId::Vericoin => "vericoin-wallet",
@@ -207,124 +192,36 @@ impl CoinId {
     }
 
     /// Default Electrum server URIs for light wallet mode (existing infrastructure).
-    pub fn default_electrum_servers(self, network: NetworkMode) -> Vec<String> {
-        if network.is_test() {
-            return match self {
-                CoinId::Verium => vec![
-                    "tls://electrumx-vrm3.vericonomy.com:53002".into(),
-                ],
-                CoinId::Vericoin => vec![
-                    "tls://electrumx-vrc3.vericonomy.com:53012".into(),
-                ],
-            };
-        }
-        let env_key = match self {
-            CoinId::Verium => "VERICONOMY_VRM_ELECTRUM_SERVERS",
-            CoinId::Vericoin => "VERICONOMY_VRC_ELECTRUM_SERVERS",
-        };
-        if let Ok(raw) = std::env::var(env_key) {
-            let servers: Vec<String> = raw
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            if !servers.is_empty() {
-                return servers;
-            }
-        }
-        match self {
-            CoinId::Verium => vec![
-                "tls://electrumx-vrm3.vericonomy.com:53002".into(),
-                "tls://electrumx-vrm1.vericonomy.com:51002".into(),
-                "tls://electrumx-vrm2.vericonomy.com:52002".into(),
-            ],
-            CoinId::Vericoin => vec![
-                "tls://electrumx-vrc3.vericonomy.com:53012".into(),
-                "tls://electrumx-vrc1.vericonomy.com:50012".into(),
-                "tls://electrumx-vrc2.vericonomy.com:50012".into(),
-            ],
-        }
+    fn default_electrum_servers(self, network: NetworkMode) -> Vec<String> {
+        self.profile().default_electrum_servers(network)
     }
 }
 
 // ---------------------------------------------------------------------------
-// NetworkMode: orthogonal to CoinId. Switches the daemon between mainnet and
-// the isolated Binary Chain v3 (DACE) binarytest network.
+// App-only CoinTarget helpers
 // ---------------------------------------------------------------------------
 
-/// Which physical network a coin is operating against. Mainnet is the
-/// default; BinaryTest is the isolated Binary Chain v3 (DACE) test network
-/// defined in vericoin/src/chainparams.cpp (CBinaryTestVericoinParams and
-/// CBinaryTestVeriumParams) and documented in
-/// vericoin/doc/dace/binarytest-network.md.
-///
-/// The two modes use distinct ports, message-start magic, datadirs, and
-/// address prefixes — a binarytest daemon physically cannot peer with a
-/// mainnet daemon. See vericoin/test/binarychain/README.md.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum NetworkMode {
-    #[default]
-    Mainnet,
-    BinaryTest,
+pub trait CoinTargetAppExt {
+    fn binarytest(coin: CoinId) -> Self;
+    fn datadir(&self) -> PathBuf;
+    fn extra_cli_args(&self) -> Vec<&'static str>;
+    fn explorer_api_base(&self) -> Option<&'static str>;
+    fn bootstrap_cdn_base(&self) -> Option<&'static str>;
+    fn keychain_service(&self) -> String;
 }
 
-impl NetworkMode {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            NetworkMode::Mainnet => "mainnet",
-            NetworkMode::BinaryTest => "binarytest",
-        }
-    }
-
-    pub fn is_test(self) -> bool {
-        matches!(self, NetworkMode::BinaryTest)
-    }
-}
-
-/// Combined identity for a (coin, network) pair. Most daemon-side state is
-/// keyed by this so a wallet can hold mainnet AND binarytest configurations
-/// without collision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CoinTarget {
-    pub coin: CoinId,
-    pub network: NetworkMode,
-}
-
-impl CoinTarget {
-    pub fn new(coin: CoinId, network: NetworkMode) -> Self {
-        Self { coin, network }
-    }
-
-    pub fn mainnet(coin: CoinId) -> Self {
-        Self::new(coin, NetworkMode::Mainnet)
-    }
-
-    pub fn binarytest(coin: CoinId) -> Self {
+impl CoinTargetAppExt for CoinTarget {
+    fn binarytest(coin: CoinId) -> Self {
         Self::new(coin, NetworkMode::BinaryTest)
-    }
-
-    /// Daemon RPC port. Binarytest uses 41683 (VRC) / 41987 (VRM).
-    pub fn rpc_port(&self) -> u16 {
-        match (self.coin, self.network) {
-            (CoinId::Verium,   NetworkMode::Mainnet)    => 33987,
-            (CoinId::Vericoin, NetworkMode::Mainnet)    => 58683,
-            (CoinId::Verium,   NetworkMode::BinaryTest) => 41987,
-            (CoinId::Vericoin, NetworkMode::BinaryTest) => 41683,
-        }
     }
 
     /// Datadir subdirectory under the platform-default base. Binarytest gets
     /// the `binarytest-` prefix so it cannot collide with mainnet state.
-    pub fn datadir(&self) -> PathBuf {
+    fn datadir(&self) -> PathBuf {
         let base_default = self.coin.default_datadir();
         match self.network {
             NetworkMode::Mainnet => base_default,
             NetworkMode::BinaryTest => {
-                // Place binarytest under a parallel subdirectory of the
-                // platform-default base. On Windows that is
-                //   %APPDATA%\Vericonomy\binarytest-vericoin\
-                //   %APPDATA%\Verium\binarytest-verium\
                 let dir_name = match self.coin {
                     CoinId::Verium => "binarytest-verium",
                     CoinId::Vericoin => "binarytest-vericoin",
@@ -340,7 +237,7 @@ impl CoinTarget {
 
     /// Extra CLI args the daemon needs. Binarytest requires `-binarytest`
     /// in addition to `-vericoin` / `-verium`.
-    pub fn extra_cli_args(&self) -> Vec<&'static str> {
+    fn extra_cli_args(&self) -> Vec<&'static str> {
         let mut out = Vec::new();
         if self.network.is_test() {
             out.push("-binarytest");
@@ -355,7 +252,7 @@ impl CoinTarget {
     /// Suppress explorer URL when running on the binarytest network — there
     /// is no public explorer for binarytest. Callers should hide explorer
     /// links in this mode.
-    pub fn explorer_api_base(&self) -> Option<&'static str> {
+    fn explorer_api_base(&self) -> Option<&'static str> {
         match self.network {
             NetworkMode::Mainnet => Some(self.coin.explorer_api_base()),
             NetworkMode::BinaryTest => None,
@@ -363,30 +260,26 @@ impl CoinTarget {
     }
 
     /// Suppress bootstrap CDN on binarytest — no canonical snapshot.
-    pub fn bootstrap_cdn_base(&self) -> Option<&'static str> {
+    fn bootstrap_cdn_base(&self) -> Option<&'static str> {
         match self.network {
             NetworkMode::Mainnet => Some(self.coin.bootstrap_cdn_base()),
             NetworkMode::BinaryTest => None,
         }
     }
 
-    pub fn keychain_service(&self) -> String {
+    fn keychain_service(&self) -> String {
         match self.network {
             NetworkMode::Mainnet => self.coin.keychain_service(),
             NetworkMode::BinaryTest => {
-                format!("com.vericonomy.wallet.desktop.binarytest.{}", self.coin.as_str())
+                format!(
+                    "com.vericonomy.wallet.desktop.binarytest.{}",
+                    self.coin.as_str()
+                )
             }
         }
     }
 }
 
-impl FromStr for CoinId {
-    type Err = AppError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_coin_id(s)
-    }
-}
 
 pub fn parse_coin_id(s: &str) -> AppResult<CoinId> {
     match s.trim().to_ascii_lowercase().as_str() {
@@ -428,6 +321,7 @@ pub struct CoinProfileSummary {
 }
 
 pub fn profile_summary(coin: CoinId) -> CoinProfileSummary {
+    use CoinIdAppExt as _;
     let tagline = match coin {
         CoinId::Verium => "Reserve",
         CoinId::Vericoin => "Currency",
@@ -464,6 +358,7 @@ mod tests {
 
     #[test]
     fn rpc_chain_match_vericoin() {
+        use CoinIdAppExt as _;
         assert!(CoinId::Vericoin.rpc_chain_matches("vericoin", "vericoin"));
         assert!(CoinId::Vericoin.rpc_chain_matches("binarytest-vericoin", "binarytest-vericoin"));
         assert!(!CoinId::Vericoin.rpc_chain_matches("verium", "vericoin"));

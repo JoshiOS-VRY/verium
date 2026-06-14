@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use super::connection::{ElectrumConnection, ElectrumServerEndpoint};
-use crate::coin_profile::CoinId;
+use crate::coin_profile::{CoinId, CoinIdAppExt};
 use crate::error::AppResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

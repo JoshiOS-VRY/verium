@@ -17,7 +17,7 @@ use std::time::Instant;
 #[cfg(windows)]
 use once_cell::sync::Lazy;
 
-use crate::coin_profile::CoinId;
+use crate::coin_profile::{CoinId, CoinIdAppExt};
 use crate::config::{app_config_base, daemon_runtime_overrides, sync_cfg_rpc_credentials_from_conf, verium_uses_legacy_flat, DaemonConfig};
 use crate::error::{AppError, AppResult};
 use crate::features::is_light_wallet;

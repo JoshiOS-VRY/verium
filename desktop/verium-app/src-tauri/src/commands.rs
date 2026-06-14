@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::addressbook::{self, AddressBookEntry};
 use crate::bootstrap::{cancel_bootstrap as request_bootstrap_cancel, import_bootstrap as run_import_bootstrap, BootstrapResult};
 use crate::coin_profile::{
-    all_profile_summaries, assert_vericoin, assert_verium, parse_coin_id, CoinId,
+    all_profile_summaries, assert_vericoin, assert_verium, parse_coin_id, CoinId, CoinIdAppExt,
     CoinTarget, NetworkMode,
 };
 use crate::config::{

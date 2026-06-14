@@ -16,7 +16,7 @@ use super::scripthash::scripthash_from_script_hex;
 use super::throttle;
 use crate::chain::types::*;
 use crate::chain::ChainBackend;
-use crate::coin_profile::{CoinId, CoinTarget};
+use crate::coin_profile::{CoinId, CoinIdAppExt, CoinTarget};
 use crate::error::{AppError, AppResult};
 
 const COIN_SATS: f64 = 100_000_000.0;

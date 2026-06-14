@@ -4,7 +4,7 @@ use futures_util::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::coin_profile::CoinId;
+use crate::coin_profile::{CoinId, CoinIdAppExt};
 use crate::error::{AppError, AppResult};
 use crate::explorer_api::EXPLORER_API_ENABLED;
 use crate::http_shared::shared_http_client;

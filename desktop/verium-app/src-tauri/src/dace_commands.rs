@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde_json::{json, Value};
 use tauri::State;
 
-use crate::coin_profile::parse_coin_id;
+use crate::coin_profile::{parse_coin_id, CoinIdAppExt};
 use crate::commands::{ensure_daemon_running, wait_for_rpc, rpc_reachable};
 use crate::config::chain_datadir;
 use crate::error::{AppError, AppResult};
