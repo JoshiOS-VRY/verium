@@ -23,7 +23,9 @@ export function WalletBalanceSummary() {
   const confirmed = wallet.data.confirmed_balance ?? available;
   const unconfirmed = wallet.data.unconfirmed_balance;
   const immature = wallet.data.immature_balance;
-  const total = isLight ? available + immature : available + unconfirmed + immature;
+  const total = isLight
+    ? (wallet.data.wallet_total ?? available + unconfirmed + immature)
+    : available + unconfirmed + immature;
   const scanning = typeof wallet.data.scanning === 'object' ? wallet.data.scanning : null;
   const mature = coinMaturityConfirmations(coin);
   const blurClass = lockedWalletBalanceClass(wallet.data);

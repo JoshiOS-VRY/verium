@@ -75,7 +75,7 @@ export function shouldNotifyIncomingReceive(
 }
 
 export function isWalletReadyToWatchIncoming(
-  walletInfo: WalletInfo | undefined,
+  walletInfo: WalletInfo | null | undefined,
   isLight: boolean
 ): boolean {
   if (!walletInfo) return false;
@@ -88,7 +88,7 @@ export function isWalletReadyToWatchIncoming(
 
 /** True while history may still be backfilling — mark seen but never toast. */
 export function isIncomingReceiveBaselineOnly(
-  walletInfo: WalletInfo | undefined,
+  walletInfo: WalletInfo | null | undefined,
   isLight: boolean
 ): boolean {
   return !isWalletReadyToWatchIncoming(walletInfo, isLight);

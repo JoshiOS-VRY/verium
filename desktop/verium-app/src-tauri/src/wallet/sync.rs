@@ -145,6 +145,7 @@ pub fn apply_local_send_cache_update(
             address: change_address.to_string(),
             confirmations: 0,
         })?;
+        register_local_optimistic_utxo(coin, broadcast_txid, change_vout)?;
     }
 
     let mut wallet_addresses: HashSet<String> = spent
@@ -205,17 +206,62 @@ pub fn append_local_tx_history_rows(coin: CoinId, rows: &[crate::chain::types::W
 pub fn balance_from_utxo_cache(coin: CoinId) -> WalletBalance {
     let mut confirmed = 0i64;
     let mut unconfirmed = 0i64;
-    if let Ok(cache) = LightWalletCache::open(coin) {
-        if let Ok(utxos) = cache.list_utxos() {
-            for utxo in utxos {
-                if utxo.height == 0 {
-                    unconfirmed += utxo.value_sats;
-                } else {
-                    confirmed += utxo.value_sats;
-                }
-            }
+    let Ok(cache) = LightWalletCache::open(coin) else {
+        return WalletBalance {
+            confirmed_sats: 0,
+            unconfirmed_sats: 0,
+            immature_sats: 0,
+        };
+    };
+    let Ok(utxos) = cache.list_utxos() else {
+        return WalletBalance {
+            confirmed_sats: 0,
+            unconfirmed_sats: 0,
+            immature_sats: 0,
+        };
+    };
+
+    let optimistic = local_optimistic_utxo_keys(coin);
+    let electrum_keys = last_electrum_utxo_keys(coin);
+    let electrum_snapshot_ready = has_last_electrum_utxo_snapshot(coin);
+    let mut stale_unconfirmed: Vec<(String, u32)> = Vec::new();
+
+    for utxo in utxos {
+        if utxo.height > 0 {
+            confirmed += utxo.value_sats;
+            continue;
+        }
+        let key = (utxo.txid.clone(), utxo.vout);
+        let trusted = optimistic.contains(&key)
+            || (electrum_snapshot_ready && electrum_keys.contains(&key));
+        if trusted {
+            unconfirmed += utxo.value_sats;
+        } else if electrum_snapshot_ready {
+            stale_unconfirmed.push(key);
+        } else {
+            // Before the first Electrum UTXO snapshot, keep legacy behaviour.
+            unconfirmed += utxo.value_sats;
         }
     }
+
+    for (txid, vout) in stale_unconfirmed {
+        if let Err(e) = cache.remove_utxo(&txid, vout) {
+            tracing::debug!(
+                "pruned stale unconfirmed utxo {}:{} for {}: {e}",
+                txid,
+                vout,
+                coin.as_str()
+            );
+        } else {
+            tracing::info!(
+                "pruned stale unconfirmed utxo {}:{} for {}",
+                txid,
+                vout,
+                coin.as_str()
+            );
+        }
+    }
+
     WalletBalance {
         confirmed_sats: confirmed,
         unconfirmed_sats: unconfirmed,
@@ -869,8 +915,10 @@ async fn refresh_utxos(
     backend: &dyn ChainBackend,
     phrase: Option<&str>,
 ) -> AppResult<bool> {
-    let mut utxos = backend.list_utxos_for_scripts(funded_scripts).await?;
-    preserve_unconfirmed_utxos_not_yet_indexed(coin, funded_scripts, &mut utxos)?;
+    let electrum_utxos = backend.list_utxos_for_scripts(funded_scripts).await?;
+    store_last_electrum_utxo_keys(coin, &electrum_utxos)?;
+    let mut utxos = electrum_utxos;
+    preserve_local_optimistic_utxos(coin, funded_scripts, &mut utxos)?;
     if let Some(phrase) = phrase {
         enrich_utxo_addresses(coin, phrase, None, &mut utxos)?;
     }
@@ -880,6 +928,9 @@ async fn refresh_utxos(
         if let Ok(tip) = backend.get_tip().await {
             let _ = cache.set_meta("tip_height", &tip.height.to_string());
         }
+    }
+    for utxo in &utxos {
+        clear_local_optimistic_utxo(coin, &utxo.txid, utxo.vout);
     }
     register_funded_scripts_from_utxos(coin, &utxos)?;
     Ok(changed)
@@ -994,8 +1045,8 @@ async fn finish_precache_balance_probe(
     Ok(())
 }
 
-/// Keep optimistic 0-conf UTXOs (e.g. post-send change) until Electrum indexes them.
-fn preserve_unconfirmed_utxos_not_yet_indexed(
+/// Keep locally broadcast 0-conf change until Electrum indexes it.
+fn preserve_local_optimistic_utxos(
     coin: CoinId,
     funded_scripts: &[String],
     utxos: &mut Vec<crate::chain::types::Utxo>,
@@ -1007,6 +1058,10 @@ fn preserve_unconfirmed_utxos_not_yet_indexed(
     if funded_set.is_empty() {
         return Ok(());
     }
+    let optimistic = local_optimistic_utxo_keys(coin);
+    if optimistic.is_empty() {
+        return Ok(());
+    }
     let incoming_keys: HashSet<(String, u32)> =
         utxos.iter().map(|u| (u.txid.clone(), u.vout)).collect();
     let cache = LightWalletCache::open(coin)?;
@@ -1015,7 +1070,11 @@ fn preserve_unconfirmed_utxos_not_yet_indexed(
         if u.height != 0 {
             continue;
         }
-        if incoming_keys.contains(&(u.txid.clone(), u.vout)) {
+        let key = (u.txid.clone(), u.vout);
+        if !optimistic.contains(&key) {
+            continue;
+        }
+        if incoming_keys.contains(&key) {
             continue;
         }
         if !funded_set.contains(&u.script_hex.trim().to_ascii_lowercase()) {
@@ -1024,6 +1083,122 @@ fn preserve_unconfirmed_utxos_not_yet_indexed(
         utxos.push(u);
     }
     Ok(())
+}
+
+const LOCAL_OPTIMISTIC_UTXOS_META: &str = "local_optimistic_utxos";
+const LAST_ELECTRUM_UTXO_KEYS_META: &str = "last_electrum_utxo_keys";
+const OPTIMISTIC_UTXO_TTL_SECS: u64 = 2 * 60 * 60;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct LocalOptimisticUtxo {
+    txid: String,
+    vout: u32,
+    added_at: u64,
+}
+
+fn utxo_pair_key(txid: &str, vout: u32) -> (String, u32) {
+    (txid.to_string(), vout)
+}
+
+fn load_local_optimistic_utxos(coin: CoinId) -> AppResult<Vec<LocalOptimisticUtxo>> {
+    let cache = LightWalletCache::open(coin)?;
+    let Some(raw) = cache.get_meta(LOCAL_OPTIMISTIC_UTXOS_META)? else {
+        return Ok(Vec::new());
+    };
+    serde_json::from_str(&raw)
+        .map_err(|e| AppError::other(format!("local optimistic utxo meta: {e}")))
+}
+
+fn save_local_optimistic_utxos(coin: CoinId, entries: &[LocalOptimisticUtxo]) -> AppResult<()> {
+    let cache = LightWalletCache::open(coin)?;
+    let raw = serde_json::to_string(entries)
+        .map_err(|e| AppError::other(format!("local optimistic utxo encode: {e}")))?;
+    cache.set_meta(LOCAL_OPTIMISTIC_UTXOS_META, &raw)
+}
+
+fn prune_expired_optimistic_entries(entries: &mut Vec<LocalOptimisticUtxo>) {
+    let now = unix_now_secs();
+    entries.retain(|e| now.saturating_sub(e.added_at) <= OPTIMISTIC_UTXO_TTL_SECS);
+}
+
+pub fn register_local_optimistic_utxo(coin: CoinId, txid: &str, vout: u32) -> AppResult<()> {
+    let mut entries = load_local_optimistic_utxos(coin).unwrap_or_default();
+    prune_expired_optimistic_entries(&mut entries);
+    let key = utxo_pair_key(txid, vout);
+    entries.retain(|e| utxo_pair_key(&e.txid, e.vout) != key);
+    entries.push(LocalOptimisticUtxo {
+        txid: txid.to_string(),
+        vout,
+        added_at: unix_now_secs(),
+    });
+    save_local_optimistic_utxos(coin, &entries)
+}
+
+fn clear_local_optimistic_utxo(coin: CoinId, txid: &str, vout: u32) {
+    let Ok(mut entries) = load_local_optimistic_utxos(coin) else {
+        return;
+    };
+    let key = utxo_pair_key(txid, vout);
+    let before = entries.len();
+    entries.retain(|e| utxo_pair_key(&e.txid, e.vout) != key);
+    if entries.len() == before {
+        return;
+    }
+    let _ = save_local_optimistic_utxos(coin, &entries);
+}
+
+fn local_optimistic_utxo_keys(coin: CoinId) -> HashSet<(String, u32)> {
+    let Ok(mut entries) = load_local_optimistic_utxos(coin) else {
+        return HashSet::new();
+    };
+    prune_expired_optimistic_entries(&mut entries);
+    entries
+        .into_iter()
+        .map(|e| utxo_pair_key(&e.txid, e.vout))
+        .collect()
+}
+
+fn store_last_electrum_utxo_keys(
+    coin: CoinId,
+    utxos: &[crate::chain::types::Utxo],
+) -> AppResult<()> {
+    let keys: Vec<String> = utxos
+        .iter()
+        .map(|u| format!("{}:{}", u.txid, u.vout))
+        .collect();
+    let raw = serde_json::to_string(&keys)
+        .map_err(|e| AppError::other(format!("electrum utxo keys encode: {e}")))?;
+    let cache = LightWalletCache::open(coin)?;
+    cache.set_meta(LAST_ELECTRUM_UTXO_KEYS_META, &raw)
+}
+
+fn has_last_electrum_utxo_snapshot(coin: CoinId) -> bool {
+    LightWalletCache::open(coin)
+        .ok()
+        .and_then(|c| c.get_meta(LAST_ELECTRUM_UTXO_KEYS_META).ok().flatten())
+        .is_some()
+}
+
+fn last_electrum_utxo_keys(coin: CoinId) -> HashSet<(String, u32)> {
+    let Ok(cache) = LightWalletCache::open(coin) else {
+        return HashSet::new();
+    };
+    let Some(raw) = cache
+        .get_meta(LAST_ELECTRUM_UTXO_KEYS_META)
+        .ok()
+        .flatten()
+    else {
+        return HashSet::new();
+    };
+    let Ok(keys) = serde_json::from_str::<Vec<String>>(&raw) else {
+        return HashSet::new();
+    };
+    keys.into_iter()
+        .filter_map(|k| {
+            let (txid, vout) = k.rsplit_once(':')?;
+            Some((txid.to_string(), vout.parse().ok()?))
+        })
+        .collect()
 }
 
 pub fn scripts_for_history(coin: CoinId) -> AppResult<Vec<String>> {
