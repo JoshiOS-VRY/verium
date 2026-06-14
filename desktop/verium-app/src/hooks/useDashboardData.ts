@@ -8,7 +8,7 @@ import { useWalletTransactions } from '@/hooks/useWalletTransactions';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { blocksBehindNetwork, chainSyncPhase, syncTargetHeight } from '@/lib/bootstrap-policy';
 import { useChainTip } from '@/lib/chain-tip-store';
-import { fetchExplorerBlocks, fetchExplorerStats } from '@/lib/explorer-api';
+import { EXPLORER_BLOCKS_POLL_MS, fetchExplorerBlocks, fetchExplorerStats } from '@/lib/explorer-api';
 import { deriveDashboardActivity, type DashboardActivity } from '@/lib/node/dashboard-activity';
 import { useExplorerQueriesEnabled } from '@/lib/network-mode';
 import { fetchPoolMinerStatus } from '@/lib/pool-miner-api';
@@ -75,7 +75,7 @@ export function useDashboardData(coin: CoinId) {
     queryKey: coinQueryKey(coin, 'explorer-blocks', 10),
     queryFn: () => fetchExplorerBlocks(coin, 10),
     enabled: explorerEnabled && connected && visible,
-    staleTime: isLight ? 5_000 : 60_000,
+    staleTime: EXPLORER_BLOCKS_POLL_MS,
     // ExplorerRecentBlocks is the single writer for this key on the dashboard.
     refetchInterval: false,
     retry: 2,

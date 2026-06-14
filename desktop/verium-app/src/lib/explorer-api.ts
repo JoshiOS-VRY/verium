@@ -76,6 +76,9 @@ export function isExplorerApiEnabled(): Promise<boolean> {
   return invoke<boolean>('is_explorer_api_enabled');
 }
 
+/** Poll interval for dashboard recent-blocks list (full node + light wallet). */
+export const EXPLORER_BLOCKS_POLL_MS = 10_000;
+
 export function fetchExplorerStats(coin: CoinId): Promise<ExplorerStats> {
   return invoke<ExplorerStats>('fetch_explorer_stats', { coin });
 }

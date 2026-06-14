@@ -265,9 +265,7 @@ export function MobileReceiveForm({
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-accent">
               <QrCode className="h-8 w-8" />
             </div>
-            <p className="mt-4 text-sm font-medium text-fg">
-              Receive {profile.symbol}
-            </p>
+            <p className="mt-4 text-sm font-medium text-fg">Receive {profile.symbol}</p>
             <p className="mt-1 text-xs text-fg-muted">
               Get an address to copy, or create a QR payment request below.
             </p>

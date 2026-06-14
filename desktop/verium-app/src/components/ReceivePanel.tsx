@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useDaemonStatus } from '@/hooks/useDaemonStatus';
 import { MobileReceiveForm } from '@/components/mobile/MobileReceiveForm';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { useIsTestNetwork } from '@/lib/network-mode';
 
 interface ReceivePanelProps {
@@ -29,7 +29,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
   const isTestNetwork = useIsTestNetwork();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
   const { data: nodeStatus } = useDaemonStatus(coin);
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');
@@ -157,7 +157,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
     setMessage('');
   };
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
       <div className={cn('flex flex-col', className)}>
         <MobileReceiveForm
@@ -364,9 +364,7 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
               <X className="h-4 w-4" />
             </button>
           </div>
-          {showPlainQr ? (
-            <QrCodeDisplay coin={coin} address={plainAddress} size={220} />
-          ) : null}
+          {showPlainQr ? <QrCodeDisplay coin={coin} address={plainAddress} size={220} /> : null}
           <div
             className={cn(
               'mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors',
@@ -427,10 +425,10 @@ export function ReceivePanel({ className }: ReceivePanelProps) {
         <div
           className={cn(
             'max-h-[280px] min-w-0 overflow-x-hidden',
-            mobileOnly ? 'overflow-y-auto px-3 py-3' : 'overflow-auto'
+            isPhoneLayout ? 'overflow-y-auto px-3 py-3' : 'overflow-auto'
           )}
         >
-          {mobileOnly ? (
+          {isPhoneLayout ? (
             <div className="flex flex-col gap-2.5">
               {requests.map((row) => {
                 const isSelected = row.id === selectedId;

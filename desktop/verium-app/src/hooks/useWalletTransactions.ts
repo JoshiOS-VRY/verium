@@ -37,8 +37,7 @@ export function useWalletTransactions(
 
   return useQuery({
     queryKey: walletTransactionsQueryKey(coin),
-    queryFn: () =>
-      fetchWalletTransactions(coin, { lightRefreshPending: incomingWatch || isLight }),
+    queryFn: () => fetchWalletTransactions(coin, { lightRefreshPending: incomingWatch || isLight }),
     refetchInterval,
     enabled: options?.enabled ?? true,
     retry: 0,

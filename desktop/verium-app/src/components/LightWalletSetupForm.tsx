@@ -17,6 +17,7 @@ import { onboardingMarkComplete } from '@/lib/wallet-profile';
 import { scorePassphrase } from '@/lib/passphrase-strength';
 import { biometricUnlockStatus } from '@/lib/biometric/client';
 import { requestBiometricSetupOffer, shouldOfferBiometricSetup } from '@/lib/biometric/setup-offer';
+import { biometricUnlockQueryKey } from '@/hooks/useBiometricUnlock';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { useWalletMode } from '@/hooks/useWalletMode';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,8 @@ export function LightWalletSetupForm({
           const bioStatus = await biometricUnlockStatus(coin);
           if (shouldOfferBiometricSetup(bioStatus, prefs, prefsLoaded)) {
             requestBiometricSetupOffer(coin, passphrase);
+          } else if (bioStatus.enabled && bioStatus.configured && mode !== 'unlock') {
+            await queryClient.invalidateQueries({ queryKey: biometricUnlockQueryKey(coin) });
           }
         } catch {
           // Non-fatal — user can enable Face ID in Settings.

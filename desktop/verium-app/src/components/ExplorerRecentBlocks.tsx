@@ -28,7 +28,7 @@ import { useChainSynced } from '@/hooks/useChainSynced';
 import { useBlockAgeTick } from '@/hooks/useBlockAgeTick';
 import { useEffectiveLocalChainTip } from '@/hooks/useEffectiveLocalChainTip';
 
-import { fetchExplorerBlocks, isExplorerApiEnabled } from '@/lib/explorer-api';
+import { fetchExplorerBlocks, EXPLORER_BLOCKS_POLL_MS, isExplorerApiEnabled } from '@/lib/explorer-api';
 import type { ExplorerBlock } from '@/lib/explorer-api';
 import {
   blockNeedsRpcEnrichment,
@@ -40,7 +40,7 @@ import {
   MAX_PENDING_BLOCKS_ABOVE,
   mergeRecentBlocks,
 } from '@/lib/local-recent-block';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 
 import { explorerBlocksHash } from '@/lib/explorer-links';
 import { coinQueryKey } from '@/lib/coin/profile';
@@ -62,8 +62,6 @@ interface ExplorerRecentBlocksProps {
  * miner address and reward once the indexer catches up (see explorer-v2
  * `useLatestBlocksPoll` + `liveBlocksMerge`).
  */
-const BLOCKS_FALLBACK_REFETCH_MS = 60_000;
-const BLOCKS_LIGHT_REFETCH_MS = 5_000;
 const BLOCKS_INDEXING_REFETCH_MS = 2_000;
 const BLOCKS_ENRICH_RETRY_MS = 3_000;
 
@@ -98,7 +96,7 @@ export function ExplorerRecentBlocks({
   const { synced } = useChainSynced(coin);
 
   const visible = useWindowVisible();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
 
   const {
     height: localTipHeight,
@@ -129,7 +127,7 @@ export function ExplorerRecentBlocks({
     staleTime: Infinity,
   });
 
-  const blocksPollMs = isLight ? BLOCKS_LIGHT_REFETCH_MS : BLOCKS_FALLBACK_REFETCH_MS;
+  const blocksPollMs = EXPLORER_BLOCKS_POLL_MS;
 
   const blocks = useQuery({
     queryKey: coinQueryKey(coin, 'explorer-blocks', 10),
@@ -240,9 +238,7 @@ export function ExplorerRecentBlocks({
       const next = prev.filter((local) => {
         const explorerRow = indexed.find((row) => row.height === local.height);
         if (!explorerRow) return true;
-        return !(
-          isPlaceholderBlockHash(local.hash) && !isPlaceholderBlockHash(explorerRow.hash)
-        );
+        return !(isPlaceholderBlockHash(local.hash) && !isPlaceholderBlockHash(explorerRow.hash));
       });
       return next.length === prev.length ? prev : next;
     });
@@ -420,14 +416,19 @@ export function ExplorerRecentBlocks({
             Could not load blocks from explorer.
             {blocks.error != null && <div className="mt-1 text-danger">{String(blocks.error)}</div>}
           </div>
-        ) : mobileOnly ? (
+        ) : isPhoneLayout ? (
           <div
             className={cn(
-              'relative isolate overflow-x-hidden overflow-y-auto px-3 pb-3',
+              'relative isolate overflow-x-hidden overflow-y-auto px-3 pb-3 mobile-recent-blocks-scroll',
               isDashboard ? 'flex-1' : 'max-h-[480px]'
             )}
           >
-            <div className="flex flex-col gap-2.5">
+            <div
+              className={cn(
+                'flex flex-col gap-2.5',
+                isDashboard && 'mobile-recent-blocks-grid'
+              )}
+            >
               {loading &&
                 Array.from({ length: isDashboard ? 8 : 5 }).map((_, i) => (
                   <div

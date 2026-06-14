@@ -17,7 +17,7 @@ interface QrScanModalProps {
 function cameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-      return 'Camera permission denied. Open Settings → Vericonomy Wallet and enable Camera, then try again.';
+      return 'Camera permission denied. Open Settings → Vericonomy and enable Camera, then try again.';
     }
     if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
       return 'No camera found on this device.';

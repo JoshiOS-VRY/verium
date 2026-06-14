@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { useActiveCoin } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { lightWalletExists } from '@/lib/light-wallet/client';
 import { lightWalletCopy } from '@/lib/light-wallet/copy';
 import { rpcGetWalletInfo } from '@/lib/rpc/client';
@@ -13,7 +13,7 @@ import { walletInfoForMode } from '@/lib/wallet-unlock';
 export function LightWalletMissingBanner() {
   const coin = useActiveCoin();
   const location = useLocation();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
   const exists = useQuery({
     queryKey: coinQueryKey(coin, 'light-wallet-exists'),
     queryFn: () => lightWalletExists(coin),
@@ -35,7 +35,7 @@ export function LightWalletMissingBanner() {
   if (exists.data === true || effectiveWallet) return null;
   if (exists.data !== false) return null;
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
       <div className="mobile-banner border border-warning/40 bg-warning/10">
         <div className="flex items-start gap-2 font-medium text-fg">

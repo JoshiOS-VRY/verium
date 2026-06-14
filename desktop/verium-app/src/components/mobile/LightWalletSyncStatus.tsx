@@ -99,11 +99,7 @@ export function LightWalletSyncStatus({
                 ? 'light-sync-progress-indeterminate w-2/5'
                 : 'transition-[width] duration-500 ease-out'
             )}
-            style={
-              indeterminate
-                ? undefined
-                : { width: `${Math.max(8, scanProgress * 100)}%` }
-            }
+            style={indeterminate ? undefined : { width: `${Math.max(8, scanProgress * 100)}%` }}
           />
         </div>
       </div>

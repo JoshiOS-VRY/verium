@@ -77,13 +77,10 @@ export function MobileBalanceHero({
   const [scrubPoint, setScrubPoint] = useState<ChartCumulativePoint | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
 
-  const handleScrubChange = useCallback(
-    (point: ChartCumulativePoint | null, active: boolean) => {
-      setScrubbing(active);
-      setScrubPoint(active ? point : null);
-    },
-    []
-  );
+  const handleScrubChange = useCallback((point: ChartCumulativePoint | null, active: boolean) => {
+    setScrubbing(active);
+    setScrubPoint(active ? point : null);
+  }, []);
 
   const handlePointsChange = useCallback((points: ChartCumulativePoint[]) => {
     setChartPoints(points);

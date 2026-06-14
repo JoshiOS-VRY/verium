@@ -13,7 +13,11 @@ export function useIncomingVrmNotifications(): void {
     if (!enabled) return;
 
     return subscribeIncomingVrm((batch) => {
-      const { title, description } = formatReceiveBatchMessage(batch.events, batch.totalAmount, 'VRM');
+      const { title, description } = formatReceiveBatchMessage(
+        batch.events,
+        batch.totalAmount,
+        'VRM'
+      );
       void showReceiveNotification({
         title,
         description: description || undefined,

@@ -4,7 +4,8 @@ import { isExplorerDetailPath } from '@/lib/explorer-nav';
 import { MobileScrollContext } from '@/contexts/MobileScrollContext';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useMobileInteractiveBack } from '@/hooks/useMobileInteractiveBack';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
+import { cn } from '@/lib/utils';
 import { DashboardNodeActivity } from './DashboardNodeActivity';
 import { NodeRecoveryBanner } from './NodeRecoveryBanner';
 import { NetworkModeBanner } from './NetworkModeBanner';
@@ -20,7 +21,7 @@ import { TopBar } from './TopBar';
 
 export function AppShell() {
   const coin = useActiveCoin();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout, isTabletLayout, useDesktopShell } = useResponsiveLayout();
   const { pathname } = useLocation();
   const hideMobileTabBar = isExplorerDetailPath(pathname);
 
@@ -28,10 +29,10 @@ export function AppShell() {
   const mobileScrollRef = useRef<HTMLElement>(null);
   const { canBack, contentStyle, scrimStyle, isDragging } = useMobileInteractiveBack(
     mobileShellRef,
-    mobileOnly
+    isPhoneLayout
   );
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
       <div
         ref={mobileShellRef}
@@ -48,48 +49,63 @@ export function AppShell() {
           />
         )}
         <div
-          className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg"
+          className="mobile-shell-body relative z-10 flex min-h-0 min-w-0 flex-1 overflow-hidden bg-bg"
           style={contentStyle}
         >
-          <NetworkModeBanner />
-          <MobileHeader />
-          <MobileScrollContext.Provider value={mobileScrollRef}>
-            <main
-              ref={mobileScrollRef}
-              className="mobile-main relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden"
-              style={{
-                overscrollBehaviorX: isDragging ? 'none' : undefined,
-              }}
-            >
-              <CoinSwitchOverlay />
-              <div className="mx-auto flex w-full min-w-0 max-w-lg flex-col gap-3">
-                <Outlet />
-              </div>
-            </main>
-          </MobileScrollContext.Provider>
-          {!hideMobileTabBar && <MobileTabBar />}
+          <div className="mobile-shell-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <NetworkModeBanner />
+            <MobileHeader />
+            <MobileScrollContext.Provider value={mobileScrollRef}>
+              <main
+                ref={mobileScrollRef}
+                className="mobile-main relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden"
+                style={{
+                  overscrollBehaviorX: isDragging ? 'none' : undefined,
+                }}
+              >
+                <CoinSwitchOverlay />
+                <div className="mobile-content-inner mx-auto flex w-full min-w-0 max-w-lg flex-col gap-3">
+                  <Outlet />
+                </div>
+              </main>
+            </MobileScrollContext.Provider>
+            {!hideMobileTabBar && <MobileTabBar />}
+          </div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex h-screen w-screen overflow-hidden bg-bg text-fg">
-      <ShutdownProgressOverlay />
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <NetworkModeBanner />
-        <TopBar />
-        <main className="relative flex-1 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6 lg:px-6 xl:px-8">
-          <CoinSwitchOverlay />
-          <div className="mx-auto flex flex-col gap-4">
-            {!isLight && <DashboardNodeActivity coin={coin} />}
-            {!isLight && <NodeRecoveryBanner />}
-            {!isLight && <SyncStallBanner />}
-            <Outlet />
-          </div>
-        </main>
+  if (useDesktopShell) {
+    return (
+      <div
+        className={cn(
+          'flex w-full overflow-hidden bg-bg text-fg',
+          isTabletLayout
+            ? 'h-dvh max-h-dvh pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]'
+            : 'h-screen w-screen'
+        )}
+      >
+        <ShutdownProgressOverlay />
+        <BiometricSetupOfferHost />
+        <NotificationPermissionOfferHost />
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <NetworkModeBanner />
+          <TopBar />
+          <main className="relative flex-1 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6 lg:px-6 xl:px-8">
+            <CoinSwitchOverlay />
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+              {!isLight && <DashboardNodeActivity coin={coin} />}
+              {!isLight && <NodeRecoveryBanner />}
+              {!isLight && <SyncStallBanner />}
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }

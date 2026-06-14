@@ -54,9 +54,7 @@ export function useRemotePushRegistration(): void {
   const notifyVrm = prefs.notify_on_vrm_received !== false;
   const notifyVrc = prefs.notify_on_vrc_received !== false;
   const vericoinEnabled = prefs.vericoin_enabled !== false;
-  const wantsPush =
-    veriumMode.mobileOnly &&
-    (notifyVrm || (notifyVrc && vericoinEnabled));
+  const wantsPush = veriumMode.mobileOnly && (notifyVrm || (notifyVrc && vericoinEnabled));
 
   const configured = useQuery({
     queryKey: ['push-registration-configured'],

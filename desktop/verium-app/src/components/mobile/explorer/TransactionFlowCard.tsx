@@ -77,7 +77,7 @@ export function TransactionFlowCard({
   const hiddenOutputs = outputs.length - outputPreview.length;
 
   return (
-    <section className="mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4">
+    <section className="mobile-explorer-span-full mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4">
       <div className="flex items-center gap-2">
         <Coins className="h-4 w-4 text-accent" aria-hidden />
         <h3 className="text-sm font-semibold text-fg">Money flow</h3>

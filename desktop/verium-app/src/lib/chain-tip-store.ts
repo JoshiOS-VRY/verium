@@ -56,10 +56,7 @@ function applyChainTip(tip: ChainTip): void {
   };
 
   const blockHeight = Number(block.height);
-  const recentBlocks = [
-    block,
-    ...prev.recentBlocks.filter((b) => Number(b.height) !== blockHeight),
-  ]
+  const recentBlocks = [block, ...prev.recentBlocks.filter((b) => Number(b.height) !== blockHeight)]
     .sort((a, b) => b.height - a.height)
     .slice(0, MAX_RECENT);
 

@@ -12,7 +12,7 @@ import { MobileQuickActions } from '@/components/mobile/MobileQuickActions';
 import { useActiveCoin } from '@/lib/coin/context';
 import { useIsTestNetwork } from '@/lib/network-mode';
 import { useLightWalletInstantReceiveSync } from '@/hooks/useLightWalletInstantReceiveSync';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { LightWalletDashboardUnlock } from '@/components/LightWalletDashboardUnlock';
 import { LightWalletMissingBanner } from '@/components/LightWalletMissingBanner';
@@ -23,7 +23,7 @@ import { refreshMobileDashboard } from '@/lib/dashboard-refresh';
 export function Dashboard() {
   const coin = useActiveCoin();
   const isTestNetwork = useIsTestNetwork();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
   const visible = useWindowVisible();
   const queryClient = useQueryClient();
 
@@ -35,16 +35,33 @@ export function Dashboard() {
     await runRefresh(() => refreshMobileDashboard(queryClient, coin, isLight));
   }, [runRefresh, queryClient, coin, isLight]);
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
-      <div className="mobile-page">
-        <MobilePullToRefresh onRefresh={handleMobileRefresh} />
-        {isLight && <LightWalletMissingBanner />}
-        {isLight && <LightWalletDashboardUnlock />}
-        {!mobileOnly && isLight && <LightWalletSyncBanner />}
-        <MobileBalanceHero showChart refreshing={refreshing} />
-        <MobileQuickActions />
-        {!isTestNetwork && <ExplorerRecentBlocks coin={coin} variant="dashboard" />}
+      <div className="mobile-page mobile-page--dashboard">
+        <div className="mobile-dashboard-span-full">
+          <MobilePullToRefresh onRefresh={handleMobileRefresh} />
+        </div>
+        {isLight && (
+          <div className="mobile-dashboard-span-full">
+            <LightWalletMissingBanner />
+          </div>
+        )}
+        {isLight && (
+          <div className="mobile-dashboard-span-full">
+            <LightWalletDashboardUnlock />
+          </div>
+        )}
+        <div className="mobile-dashboard-primary">
+          <MobileBalanceHero showChart refreshing={refreshing} />
+        </div>
+        <div className="mobile-dashboard-secondary">
+          <MobileQuickActions className="h-full" />
+        </div>
+        {!isTestNetwork && (
+          <div className="mobile-dashboard-span-full">
+            <ExplorerRecentBlocks coin={coin} variant="dashboard" />
+          </div>
+        )}
       </div>
     );
   }

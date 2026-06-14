@@ -6,7 +6,7 @@ import { useWalletMode } from '@/hooks/useWalletMode';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { coinQueryKey, type CoinId } from '@/lib/coin/profile';
 import { pushChainTip, useChainTip } from '@/lib/chain-tip-store';
-import { fetchExplorerBlocks } from '@/lib/explorer-api';
+import { EXPLORER_BLOCKS_POLL_MS, fetchExplorerBlocks } from '@/lib/explorer-api';
 import { rpcGetBlockchainInfo } from '@/lib/rpc/client';
 
 /**
@@ -32,8 +32,8 @@ export function useEffectiveLocalChainTip(coin: CoinId) {
     queryKey: coinQueryKey(coin, 'explorer-blocks', 10),
     queryFn: () => fetchExplorerBlocks(coin, 10),
     enabled: isLight && visible,
-    staleTime: 5_000,
-    refetchInterval: isLight && visible ? 5_000 : false,
+    staleTime: EXPLORER_BLOCKS_POLL_MS,
+    refetchInterval: isLight && visible ? EXPLORER_BLOCKS_POLL_MS : false,
   });
 
   const rpcHeight = blockchain.data?.blocks ?? 0;

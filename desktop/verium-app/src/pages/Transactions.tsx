@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useMinerPayoutsQuery } from '@/hooks/usePoolQueries';
 import { useLightWalletInstantReceiveSync } from '@/hooks/useLightWalletInstantReceiveSync';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { LIGHT_HISTORY_POLL_MS } from '@/lib/light-wallet/poll';
 import { useWindowVisible } from '@/hooks/useWindowVisible';
 import { resolvePoolDashboardAddress } from '@/lib/pool-dashboard-address';
@@ -101,7 +101,7 @@ export function Transactions() {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
   const location = useLocation();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout, mobileOnly } = useResponsiveLayout();
   const visible = useWindowVisible();
   const prefs = useUserPreferences((s) => s.prefs);
   const [mode, setMode] = useState<TransferMode>('send');
@@ -118,21 +118,21 @@ export function Transactions() {
     const pending = consumePendingPaymentUri();
     if (!pending) return;
     setMode('send');
-    if (mobileOnly) setMobileView('send');
+    if (isPhoneLayout) setMobileView('send');
     setPrefill({
       address: pending.address,
       amount: pending.amount != null && pending.amount > 0 ? String(pending.amount) : undefined,
       label: pending.label ?? undefined,
     });
-  }, [mobileOnly]);
+  }, [isPhoneLayout]);
 
   useEffect(() => {
     const view = (location.state as { mobileActivityView?: MobileActivityView })
       ?.mobileActivityView;
-    if (!mobileOnly || !view) return;
+    if (!isPhoneLayout || !view) return;
     setMobileView(view);
     if (view === 'send' || view === 'receive') setMode(view);
-  }, [location.state, mobileOnly]);
+  }, [location.state, isPhoneLayout]);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -440,79 +440,85 @@ export function Transactions() {
     </Card>
   );
 
+  const transferView: MobileActivityView = mobileView;
+
   return (
     <WalletUnlockGate
       title="Unlock to send and view transactions"
       description={`Enter your wallet passphrase to send or receive ${profile.symbol} and view your transaction history.`}
     >
-      {mobileOnly ? (
+      {isPhoneLayout ? (
         <div
           className={cn(
             'mobile-page',
             (mobileView === 'send' || mobileView === 'receive') && 'mobile-page--transfer'
           )}
         >
-          {mobileView === 'history' ? <MobileBalanceHero /> : null}
-          <MobileSegmented
-            value={mobileView}
-            ariaLabel="Activity"
-            onChange={(view) => {
-              setMobileView(view);
-              if (view === 'send' || view === 'receive') setMode(view);
-            }}
-            options={[
-              {
-                value: 'receive',
-                label: 'Receive',
-                icon: <ArrowDownLeft className="h-3.5 w-3.5" />,
-              },
-              { value: 'send', label: 'Send', icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
-              { value: 'history', label: 'History' },
-            ]}
-          />
-          {mobileView === 'send' ? (
-            <section className="mobile-panel min-w-0">
-              <div className="mb-3 px-1">
-                <h2 className="text-lg font-semibold tracking-tight text-fg">
-                  Send {profile.symbol}
-                </h2>
-                <p className="mt-0.5 text-sm text-fg-muted">
-                  Scan, paste, or enter a {profile.displayName} address.
-                </p>
-              </div>
-              <SendPanel
-                initialAddress={prefill.address}
-                initialAmount={prefill.amount}
-                initialLabel={prefill.label}
-              />
-            </section>
-          ) : null}
-          {mobileView === 'receive' ? (
-            <section className="mobile-panel min-w-0">
-              <div className="mb-3 px-1">
-                <h2 className="text-lg font-semibold tracking-tight text-fg">
-                  Receive {profile.symbol}
-                </h2>
-                <p className="mt-0.5 text-sm text-fg-muted">
-                  Show a QR code for in-person payments.
-                </p>
-              </div>
-              <ReceivePanel />
-            </section>
-          ) : null}
-          {mobileView === 'history' ? (
-            <MobileTransactionHistory
-              coin={coin}
-              txs={sortedTxs}
-              isLoading={isHistoryLoading}
-              isError={txs.isError}
-              showEmpty={showEmptyHistory}
-              lightSyncing={lightSyncing}
-              historyNeedsRefresh={historyNeedsRefresh}
-              poolPayoutTxids={poolPayoutTxids}
-              profileSymbol={profile.symbol}
+          <div className="mobile-activity-transfer">
+            {mobileView === 'history' ? <MobileBalanceHero /> : null}
+            <MobileSegmented
+              value={transferView === 'history' ? 'send' : transferView}
+              ariaLabel="Activity"
+              onChange={(view) => {
+                setMobileView(view);
+                if (view === 'send' || view === 'receive') setMode(view);
+              }}
+              options={[
+                {
+                  value: 'receive',
+                  label: 'Receive',
+                  icon: <ArrowDownLeft className="h-3.5 w-3.5" />,
+                },
+                { value: 'send', label: 'Send', icon: <ArrowUpRight className="h-3.5 w-3.5" /> },
+                { value: 'history' as const, label: 'History' },
+              ]}
             />
-          ) : null}
+            {transferView === 'send' ? (
+              <section className="mobile-panel min-w-0">
+                <div className="mb-3 px-1">
+                  <h2 className="text-lg font-semibold tracking-tight text-fg">
+                    Send {profile.symbol}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-fg-muted">
+                    Scan, paste, or enter a {profile.displayName} address.
+                  </p>
+                </div>
+                <SendPanel
+                  initialAddress={prefill.address}
+                  initialAmount={prefill.amount}
+                  initialLabel={prefill.label}
+                />
+              </section>
+            ) : null}
+            {transferView === 'receive' ? (
+              <section className="mobile-panel min-w-0">
+                <div className="mb-3 px-1">
+                  <h2 className="text-lg font-semibold tracking-tight text-fg">
+                    Receive {profile.symbol}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-fg-muted">
+                    Show a QR code for in-person payments.
+                  </p>
+                </div>
+                <ReceivePanel />
+              </section>
+            ) : null}
+          </div>
+          {mobileView === 'history' && (
+            <div className="mobile-activity-history">
+              <MobileTransactionHistory
+                coin={coin}
+                txs={sortedTxs}
+                isLoading={isHistoryLoading}
+                isError={txs.isError}
+                showEmpty={showEmptyHistory}
+                lightSyncing={lightSyncing}
+                historyNeedsRefresh={historyNeedsRefresh}
+                poolPayoutTxids={poolPayoutTxids}
+                profileSymbol={profile.symbol}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex min-w-0 max-w-full flex-col gap-6">

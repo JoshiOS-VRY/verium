@@ -72,7 +72,7 @@ export function BlockTransactionsSection({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <section className="mobile-panel overflow-hidden rounded-2xl border border-border bg-bg-panel/60">
+    <section className="mobile-explorer-span-full mobile-panel overflow-hidden rounded-2xl border border-border bg-bg-panel/60">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

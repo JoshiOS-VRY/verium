@@ -100,3 +100,26 @@ pub fn clear_passphrase(coin: CoinId) {
         );
     }
 }
+
+/// Keep the stored biometric passphrase aligned with the wallet after import/create
+/// or any other operation that re-encrypts the light wallet with a new passphrase.
+pub fn sync_passphrase_if_enabled(coin: CoinId, new_passphrase: &str) -> AppResult<()> {
+    #[cfg(not(mobile))]
+    {
+        let _ = (coin, new_passphrase);
+        return Ok(());
+    }
+    #[cfg(mobile)]
+    {
+        let prefs = crate::prefs::load_sync()?;
+        if !prefs.biometric_unlock_enabled || !is_configured(coin)? {
+            return Ok(());
+        }
+        store_passphrase(coin, new_passphrase)?;
+        tracing::info!(
+            "biometric unlock: refreshed stored passphrase for {}",
+            coin.as_str()
+        );
+        Ok(())
+    }
+}

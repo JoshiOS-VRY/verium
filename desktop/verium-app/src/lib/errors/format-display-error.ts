@@ -45,7 +45,10 @@ function refineOperationalMessage(message: string): string {
   ) {
     return 'Incorrect wallet passphrase.';
   }
-  if (lower.includes('wallet passphrase is required') || lower.includes('passphrase required to send')) {
+  if (
+    lower.includes('wallet passphrase is required') ||
+    lower.includes('passphrase required to send')
+  ) {
     return 'Enter your wallet passphrase to send.';
   }
   if (lower.includes('insufficient funds')) {
@@ -135,7 +138,10 @@ function mapElectrumError(code: number, message: string): string {
 }
 
 /** Normalize any thrown/rejected value into copy safe to show users. */
-export function formatDisplayError(error: unknown, fallback = 'Something went wrong. Try again.'): string {
+export function formatDisplayError(
+  error: unknown,
+  fallback = 'Something went wrong. Try again.'
+): string {
   const raw =
     error instanceof Error
       ? error.message.trim()

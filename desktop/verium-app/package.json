@@ -33,6 +33,7 @@
     "ios:ship": "bash scripts/build-ios.sh",
     "ios:archive": "bash scripts/archive-ios-appstore.sh",
     "ios:export": "EXPORT_ONLY=1 bash scripts/archive-ios-appstore.sh",
+    "ios:verify-icon": "bash scripts/verify-ios-app-icon.sh",
     "icons:ios": "bash scripts/sync-ios-icons.sh",
     "fetch:veriumd": "node scripts/fetch-veriumd.cjs",
     "fetch:veriumd:if-missing": "node scripts/fetch-veriumd.cjs --skip-if-present",

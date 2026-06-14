@@ -1,24 +1,28 @@
 import { useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useCoinWalletMode } from '@/hooks/useWalletMode';
 import { useDaemonStatus } from '@/hooks/useDaemonStatus';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { useWalletTransactions } from '@/hooks/useWalletTransactions';
 import { isIncomingReceiveTx } from '@/lib/wallet-transactions-query';
-import { type TransactionItem } from '@/lib/rpc/client';
+import { coinQueryKey } from '@/lib/coin/profile';
+import { rpcGetWalletInfo } from '@/lib/rpc/client';
+import {
+  INCOMING_RECEIVE_BATCH_DEBOUNCE_MS,
+  incomingReceiveStorageKey,
+  isIncomingReceiveBaselineOnly,
+  loadSessionSeenReceiveTxids,
+  markIncomingReceiveTxidsSeen,
+  mergeIncomingReceiveEvent,
+  persistSessionSeenReceiveTxids,
+  shouldNotifyIncomingReceive,
+} from '@/lib/incoming-receive-watch';
 
-export interface IncomingVrmEvent {
-  txid: string;
-  amount: number;
-  address?: string;
-  confirmations: number;
-  time?: number;
-  blockheight?: number;
-}
-
-export interface IncomingVrmBatch {
+export type IncomingVrmEvent = import('@/lib/incoming-receive-watch').IncomingReceiveEvent;
+export type IncomingVrmBatch = {
   events: IncomingVrmEvent[];
   totalAmount: number;
-}
+};
 
 type IncomingVrmListener = (batch: IncomingVrmBatch) => void;
 
@@ -36,73 +40,28 @@ function emitIncomingVrm(batch: IncomingVrmBatch): void {
   }
 }
 
-const BATCH_DEBOUNCE_MS = 800;
-const SEEN_STORAGE_KEY = 'verium-notified-receive-txids';
-const MAX_SEEN_TXIDS = 2_000;
+const SEEN_STORAGE_KEY = incomingReceiveStorageKey('verium');
 const VERIUM = 'verium' as const;
-
-function storage(): Storage | null {
-  if (typeof localStorage !== 'undefined') return localStorage;
-  if (typeof sessionStorage !== 'undefined') return sessionStorage;
-  return null;
-}
-
-function loadSeenTxids(): Set<string> {
-  const store = storage();
-  if (!store) return new Set();
-  try {
-    const raw = store.getItem(SEEN_STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((id): id is string => typeof id === 'string'));
-  } catch {
-    return new Set();
-  }
-}
-
-function persistSeenTxids(seen: Set<string>): void {
-  const store = storage();
-  if (!store) return;
-  try {
-    const ids = [...seen];
-    const trimmed = ids.length > MAX_SEEN_TXIDS ? ids.slice(-MAX_SEEN_TXIDS) : ids;
-    store.setItem(SEEN_STORAGE_KEY, JSON.stringify(trimmed));
-  } catch {
-    // Ignore quota / privacy mode failures.
-  }
-}
-
-function mergeReceiveEvent(map: Map<string, IncomingVrmEvent>, tx: TransactionItem): void {
-  const existing = map.get(tx.txid);
-  if (existing) {
-    existing.amount += tx.amount;
-    if (!existing.address && tx.address) existing.address = tx.address;
-    existing.confirmations = Math.max(existing.confirmations, tx.confirmations);
-    if (!existing.time && tx.time) existing.time = tx.time;
-    if (!existing.blockheight && tx.blockheight) existing.blockheight = tx.blockheight;
-    return;
-  }
-
-  map.set(tx.txid, {
-    txid: tx.txid,
-    amount: tx.amount,
-    address: tx.address,
-    confirmations: tx.confirmations,
-    time: tx.time,
-    blockheight: tx.blockheight,
-  });
-}
 
 export function useIncomingVrmWatcher(): void {
   const notify = useUserPreferences((s) => s.prefs.notify_on_vrm_received !== false);
   const { isLight } = useCoinWalletMode(VERIUM);
   const { data: status } = useDaemonStatus(VERIUM, { enabled: notify && !isLight });
   const pollEnabled = notify && (isLight || status?.connected === true);
-  const seen = useRef<Set<string>>(loadSeenTxids());
+  const seen = useRef<Set<string>>(loadSessionSeenReceiveTxids(SEEN_STORAGE_KEY));
   const initialized = useRef(false);
+  const watchStartedAtSec = useRef(Math.floor(Date.now() / 1000));
   const pending = useRef<IncomingVrmEvent[]>([]);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const walletInfo = useQuery({
+    queryKey: coinQueryKey(VERIUM, 'getwalletinfo'),
+    queryFn: () => rpcGetWalletInfo(VERIUM),
+    enabled: pollEnabled,
+    refetchInterval: false,
+    staleTime: 5_000,
+    gcTime: 30_000,
+  });
 
   const txs = useWalletTransactions(VERIUM, {
     enabled: pollEnabled,
@@ -119,12 +78,24 @@ export function useIncomingVrmWatcher(): void {
     if (!txs.isSuccess || txs.data === undefined) return;
 
     const incoming = txs.data.filter(isIncomingReceiveTx);
+    const baselineOnly = isIncomingReceiveBaselineOnly(walletInfo.data, isLight);
+
+    if (baselineOnly) {
+      markIncomingReceiveTxidsSeen(
+        seen.current,
+        incoming.map((tx) => tx.txid),
+        SEEN_STORAGE_KEY
+      );
+      return;
+    }
 
     if (!initialized.current) {
-      for (const tx of incoming) {
-        seen.current.add(tx.txid);
-      }
-      persistSeenTxids(seen.current);
+      markIncomingReceiveTxidsSeen(
+        seen.current,
+        incoming.map((tx) => tx.txid),
+        SEEN_STORAGE_KEY
+      );
+      watchStartedAtSec.current = Math.floor(Date.now() / 1000);
       initialized.current = true;
       return;
     }
@@ -140,7 +111,7 @@ export function useIncomingVrmWatcher(): void {
           events,
           totalAmount: events.reduce((sum, e) => sum + e.amount, 0),
         });
-      }, BATCH_DEBOUNCE_MS);
+      }, INCOMING_RECEIVE_BATCH_DEBOUNCE_MS);
     };
 
     const newlyDetected = new Map<string, IncomingVrmEvent>();
@@ -148,17 +119,26 @@ export function useIncomingVrmWatcher(): void {
 
     for (const tx of incoming) {
       if (seen.current.has(tx.txid)) continue;
+      if (!shouldNotifyIncomingReceive(tx, watchStartedAtSec.current)) {
+        seen.current.add(tx.txid);
+        continue;
+      }
       seen.current.add(tx.txid);
-      mergeReceiveEvent(newlyDetected, tx);
+      mergeIncomingReceiveEvent(newlyDetected, tx);
       added = true;
     }
 
-    if (!added) return;
+    if (!added) {
+      if (seen.current.size > 0) {
+        persistSessionSeenReceiveTxids(seen.current, SEEN_STORAGE_KEY);
+      }
+      return;
+    }
 
-    persistSeenTxids(seen.current);
+    persistSessionSeenReceiveTxids(seen.current, SEEN_STORAGE_KEY);
     for (const event of newlyDetected.values()) {
       pending.current.push(event);
     }
     scheduleFlush();
-  }, [txs.data, txs.isSuccess]);
+  }, [txs.data, txs.isSuccess, walletInfo.data, isLight]);
 }

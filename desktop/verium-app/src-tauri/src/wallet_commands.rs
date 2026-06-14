@@ -27,6 +27,20 @@ async fn ensure_light_wallet_mode_active(coin: CoinId) -> AppResult<()> {
     Ok(())
 }
 
+fn sync_biometric_passphrase_after_wallet_write(coin: CoinId, passphrase: &str, context: &str) {
+    #[cfg(mobile)]
+    if let Err(e) = crate::biometric_unlock::sync_passphrase_if_enabled(coin, passphrase) {
+        tracing::warn!(
+            "biometric unlock: could not refresh after {context} for {}: {e}",
+            coin.as_str()
+        );
+    }
+    #[cfg(not(mobile))]
+    {
+        let _ = (coin, passphrase, context);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletModeStatus {
     pub mode: String,
@@ -158,6 +172,7 @@ pub async fn light_wallet_create(
         ));
     }
     keystore::create_wallet(coin, &trimmed, &passphrase, label.as_deref())?;
+    sync_biometric_passphrase_after_wallet_write(coin, &passphrase, "light wallet create");
     ensure_light_wallet_mode_active(coin).await?;
     let mut prefs = prefs::load().await?;
     prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;
@@ -213,6 +228,7 @@ pub async fn light_wallet_import(
         ));
     }
     keystore::import_wallet(coin, &trimmed, &passphrase, label.as_deref())?;
+    sync_biometric_passphrase_after_wallet_write(coin, &passphrase, "light wallet import");
     ensure_light_wallet_mode_active(coin).await?;
     let mut prefs = prefs::load().await?;
     prefs::reconcile_setup_flags_with_keystore(&mut prefs)?;

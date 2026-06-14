@@ -26,10 +26,7 @@ export function walletTransactionsKeyPrefix(coin: CoinId) {
 
 /** Receive rows for incoming-payment watchers (includes 0-conf). */
 export function isIncomingReceiveTx(tx: TransactionItem): boolean {
-  return (
-    (tx.category === 'receive' || tx.category === 'unconfirmed') &&
-    tx.amount > 0
-  );
+  return (tx.category === 'receive' || tx.category === 'unconfirmed') && tx.amount > 0;
 }
 
 export async function fetchWalletTransactions(

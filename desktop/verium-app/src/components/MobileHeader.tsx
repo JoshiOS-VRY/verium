@@ -26,12 +26,12 @@ export function MobileHeader() {
 
   return (
     <header className="mobile-header z-30 shrink-0 border-b border-border bg-bg-subtle/95 backdrop-blur-md">
-      <div className="flex min-w-0 items-center gap-2 px-3 py-1.5">
+      <div className="mobile-header-row flex min-w-0 items-center gap-2 px-3 py-1.5">
         <button
           type="button"
           onClick={() => performMobileBack(navigate, pathname)}
           className={cn(
-            'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-muted',
+            'mobile-header-back inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-muted',
             'transition-colors hover:bg-bg-panel hover:text-fg'
           )}
           aria-label={mobileBackAriaLabel(pathname)}
@@ -39,14 +39,21 @@ export function MobileHeader() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-semibold leading-tight">{title}</h1>
+          <h1 className="truncate text-base font-semibold leading-tight mobile-tablet:text-lg">
+            {title}
+          </h1>
         </div>
-        <div className="min-w-0 max-w-[42%]">
+        {!explorerDetail && (
+          <div className="mobile-header-coin-inline hidden min-w-0 max-w-[38%] shrink mobile-tablet:block">
+            <CoinSwitcher />
+          </div>
+        )}
+        <div className="min-w-0 shrink-0 max-w-[42%] mobile-tablet:max-w-[30%]">
           {isLight ? <LightServerBadge /> : <DaemonStatusBadge />}
         </div>
       </div>
       {!explorerDetail && (
-        <div className="min-w-0 border-t border-border/60 px-3 py-1.5">
+        <div className="mobile-header-coin-row min-w-0 border-t border-border/60 px-3 py-1.5 mobile-tablet:hidden">
           <CoinSwitcher />
         </div>
       )}

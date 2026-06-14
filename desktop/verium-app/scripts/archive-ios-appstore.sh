@@ -57,7 +57,23 @@ fi
 
 export APPLE_DEVELOPMENT_TEAM="${TEAM_ID}"
 
+# shellcheck source=ios-icon-cache.sh
+source "${ROOT}/scripts/ios-icon-cache.sh"
+
+echo "==> Syncing iOS app icons…"
+bash "${ROOT}/scripts/sync-ios-icons.sh"
+
+if [[ "${EXPORT_ONLY:-}" == "1" ]]; then
+  if ! ios_icon_archived_matches_current "${ROOT}"; then
+    echo "error: AppIcon changed since the last archive — ios:export would reuse stale icons." >&2
+    echo "  Run: IOS_FORCE_ICON_REBUILD=1 npm run ios:archive" >&2
+    exit 1
+  fi
+fi
+
 if [[ "${EXPORT_ONLY:-}" != "1" ]]; then
+  ios_icon_invalidate_if_needed "${ROOT}" "${WITH_XCODE}"
+
   export SKIP_IOS_INSTALL=1
   bash "${ROOT}/scripts/build-ios.sh"
 
@@ -112,6 +128,7 @@ echo "==> xcodebuild -exportArchive (team ${TEAM_ID})…"
 
 IPA="${EXPORT_DIR}/Vericonomy Wallet.ipa"
 if [[ -f "${IPA}" ]]; then
+  bash "${ROOT}/scripts/verify-ios-app-icon.sh" "${IPA}"
   echo ""
   echo "App Store IPA ready:"
   echo "  ${IPA}"

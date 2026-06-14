@@ -53,8 +53,9 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        CFBundleDisplayName: Vericonomy
         CFBundleShortVersionString: 1.0.0
-        CFBundleVersion: "3"
+        CFBundleVersion: "17"
         LSApplicationCategoryType: public.app-category.finance
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: Vericonomy Wallet uses the camera to scan payment QR codes when you send Verium or Vericoin.

@@ -9,7 +9,7 @@ import { RecoveryPhraseWizard } from '@/components/RecoveryPhraseWizard';
 import { RestoreFromPhraseForm } from '@/components/RestoreFromPhraseForm';
 import { TwoFactorEnrollmentPanel } from '@/components/TwoFactorEnrollmentPanel';
 import { useActiveCoin } from '@/lib/coin/context';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { MobileSettingsGroup } from '@/components/mobile/MobileSettingsGroup';
 import {
   autoLockGetConfig,
@@ -42,7 +42,7 @@ const DEFAULT_SPENDING: SpendingControlsConfig = {
 
 export function Security() {
   const coin = useActiveCoin();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const [totpCode, setTotpCode] = useState('');
   const [showRecovery, setShowRecovery] = useState(false);
@@ -303,10 +303,10 @@ export function Security() {
     </div>
   );
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
-      <div className="mobile-page">
-        <p className="px-1 text-sm text-fg-muted">
+      <div className="mobile-page mobile-page--settings">
+        <p className="mobile-settings-span-full px-1 text-sm text-fg-muted">
           Recovery phrase, 2FA, spending controls, and auto-lock.
           {isLight
             ? ' Light wallets use an encrypted keystore — export your recovery phrase regularly.'

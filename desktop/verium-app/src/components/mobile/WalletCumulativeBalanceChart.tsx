@@ -110,7 +110,8 @@ export function WalletCumulativeBalanceChart({
     return () => window.clearInterval(id);
   }, [coin, queryClient, useIndexerAggregate, walletData, walletSettling]);
 
-  const useIndexerData = useIndexerAggregate && indexerSeries.data != null && !indexerSeries.isError;
+  const useIndexerData =
+    useIndexerAggregate && indexerSeries.data != null && !indexerSeries.isError;
   const historyLoading = useIndexerAggregate
     ? indexerSeries.isLoading && !indexerSeries.isError
     : txs.isLoading;

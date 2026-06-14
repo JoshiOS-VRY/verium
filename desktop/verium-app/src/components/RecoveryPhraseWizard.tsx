@@ -4,10 +4,7 @@ import { AlertTriangle, Check, CheckCircle2, Copy, Eye, EyeOff } from 'lucide-re
 import { Button } from '@/components/ui/Button';
 import { TwoFactorPrompt } from '@/components/TwoFactorPrompt';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
-import {
-  recoveryGenerateMnemonic,
-  recoveryVerificationIndices,
-} from '@/lib/security/client';
+import { recoveryGenerateMnemonic, recoveryVerificationIndices } from '@/lib/security/client';
 import {
   formatNumberedRecoveryPhraseForCopy,
   verifyRecoveryWordsAtIndices,
@@ -136,11 +133,14 @@ export function RecoveryPhraseWizard({ onComplete, onSkip }: RecoveryPhraseWizar
             />
             I have written down my recovery phrase and stored it securely offline.
           </label>
-          <Button disabled={!acknowledged} onClick={() => {
-            setAnswers(['', '', '']);
-            setVerifyError(null);
-            setStep('verify');
-          }}>
+          <Button
+            disabled={!acknowledged}
+            onClick={() => {
+              setAnswers(['', '', '']);
+              setVerifyError(null);
+              setStep('verify');
+            }}
+          >
             Continue to verification
           </Button>
         </div>

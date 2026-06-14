@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { MobileSegmented } from '@/components/mobile/MobileSegmented';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import {
   deleteAddressBookEntry,
   listAddressBookEntries,
@@ -31,7 +31,7 @@ function emptyDraft(category: AddressBookCategory = 'send'): DraftEntry {
 
 export function AddressBook() {
   const coin = useActiveCoin();
-  const { mobileOnly } = useWalletMode();
+  const { isPhoneLayout } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<AddressBookCategory>('send');
   const [draft, setDraft] = useState<DraftEntry | null>(null);
@@ -82,88 +82,92 @@ export function AddressBook() {
     return rows.sort((a, b) => a.label.localeCompare(b.label));
   }, [entries.data, filter]);
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
-      <div className="mobile-page">
-        <section className="mobile-panel rounded-2xl border border-border bg-bg-panel px-4 py-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="flex items-center gap-2 text-base font-semibold text-fg">
-                <BookUser className="h-4 w-4 shrink-0 text-accent" />
-                Saved addresses
-              </h1>
-              <p className="mt-1 text-xs leading-relaxed text-fg-subtle">
-                Contacts for sending and receiving. Stored on this device only.
-              </p>
+      <div className="mobile-page mobile-page--address-book">
+        <div className="mobile-address-book-controls">
+          <section className="mobile-panel rounded-2xl border border-border bg-bg-panel px-4 py-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="flex items-center gap-2 text-base font-semibold text-fg">
+                  <BookUser className="h-4 w-4 shrink-0 text-accent" />
+                  Saved addresses
+                </h1>
+                <p className="mt-1 text-xs leading-relaxed text-fg-subtle">
+                  Contacts for sending and receiving. Stored on this device only.
+                </p>
+              </div>
             </div>
-          </div>
-          <Button
-            className="mt-4 h-11 w-full rounded-xl"
-            onClick={() => setDraft(emptyDraft(filter))}
-          >
-            <Plus className="h-4 w-4" /> Add address
-          </Button>
-        </section>
-
-        <MobileSegmented
-          value={filter}
-          ariaLabel="Address type"
-          onChange={setFilter}
-          options={[
-            { value: 'send', label: 'Send to' },
-            { value: 'receive', label: 'Receive at' },
-          ]}
-        />
-
-        {draft && (
-          <section className="mobile-panel rounded-2xl border border-accent/40 bg-accent/5 p-4">
-            <DraftRow
-              draft={draft}
-              onChange={setDraft}
-              onCancel={() => setDraft(null)}
-              onSave={() => upsert.mutate(draft)}
-              saving={upsert.isPending}
-              saveError={upsert.error ? String(upsert.error) : null}
-              mobile
-            />
+            <Button
+              className="mt-4 h-11 w-full rounded-xl"
+              onClick={() => setDraft(emptyDraft(filter))}
+            >
+              <Plus className="h-4 w-4" /> Add address
+            </Button>
           </section>
-        )}
 
-        {entries.isError && (
-          <div className="mobile-banner border border-danger/30 bg-danger/10 text-danger">
-            Could not load address book: {String(entries.error)}
-          </div>
-        )}
-        {upsert.isError && (
-          <div className="mobile-banner border border-danger/30 bg-danger/10 text-danger">
-            Save failed: {String(upsert.error)}
-          </div>
-        )}
+          <MobileSegmented
+            value={filter}
+            ariaLabel="Address type"
+            onChange={setFilter}
+            options={[
+              { value: 'send', label: 'Send to' },
+              { value: 'receive', label: 'Receive at' },
+            ]}
+          />
 
-        {entries.isLoading ? (
-          <div className="py-12 text-center text-sm text-fg-muted">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <section className="mobile-panel rounded-2xl border border-dashed border-border px-4 py-12 text-center">
-            <p className="text-sm font-medium text-fg-muted">
-              No {filter === 'send' ? 'send' : 'receive'} addresses yet
-            </p>
-            <p className="mt-1 text-xs text-fg-subtle">
-              Tap Add address to save a label and address for quick reuse.
-            </p>
-          </section>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {filtered.map((entry) => (
-              <EntryRow
-                key={entry.id}
-                entry={entry}
-                onEdit={() => setDraft({ ...entry })}
-                onDelete={() => remove.mutate(entry.id)}
+          {draft && (
+            <section className="mobile-panel rounded-2xl border border-accent/40 bg-accent/5 p-4">
+              <DraftRow
+                draft={draft}
+                onChange={setDraft}
+                onCancel={() => setDraft(null)}
+                onSave={() => upsert.mutate(draft)}
+                saving={upsert.isPending}
+                saveError={upsert.error ? String(upsert.error) : null}
                 mobile
               />
-            ))}
-          </ul>
-        )}
+            </section>
+          )}
+
+          {entries.isError && (
+            <div className="mobile-banner border border-danger/30 bg-danger/10 text-danger">
+              Could not load address book: {String(entries.error)}
+            </div>
+          )}
+          {upsert.isError && (
+            <div className="mobile-banner border border-danger/30 bg-danger/10 text-danger">
+              Save failed: {String(upsert.error)}
+            </div>
+          )}
+        </div>
+
+        <div className="mobile-address-book-list">
+          {entries.isLoading ? (
+            <div className="py-12 text-center text-sm text-fg-muted">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <section className="mobile-panel rounded-2xl border border-dashed border-border px-4 py-12 text-center">
+              <p className="text-sm font-medium text-fg-muted">
+                No {filter === 'send' ? 'send' : 'receive'} addresses yet
+              </p>
+              <p className="mt-1 text-xs text-fg-subtle">
+                Tap Add address to save a label and address for quick reuse.
+              </p>
+            </section>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {filtered.map((entry) => (
+                <EntryRow
+                  key={entry.id}
+                  entry={entry}
+                  onEdit={() => setDraft({ ...entry })}
+                  onDelete={() => remove.mutate(entry.id)}
+                  mobile
+                />
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     );
   }

@@ -18,6 +18,8 @@ import { useTwoFactorGate } from '@/hooks/useTwoFactorGate';
 
 import { lightWalletImport } from '@/lib/light-wallet/client';
 
+import { biometricUnlockQueryKey } from '@/hooks/useBiometricUnlock';
+
 import { lightWalletCopy } from '@/lib/light-wallet/copy';
 
 import { scorePassphrase } from '@/lib/passphrase-strength';
@@ -69,6 +71,8 @@ export function LightWalletImportForm({ onSuccess }: LightWalletImportFormProps)
           }),
 
           queryClient.invalidateQueries({ queryKey: WALLET_MODE_QUERY_KEY }),
+
+          queryClient.invalidateQueries({ queryKey: biometricUnlockQueryKey(coin) }),
         ]);
 
         await queryClient.refetchQueries({

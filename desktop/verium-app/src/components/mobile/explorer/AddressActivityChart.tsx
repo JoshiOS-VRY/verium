@@ -47,7 +47,7 @@ export function AddressActivityChart({
 
   if (bars.length === 0) {
     return (
-      <section className="mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4">
+      <section className="mobile-explorer-span-full mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4">
         <h3 className="text-sm font-semibold text-fg">Recent activity</h3>
         <p className="mt-2 text-xs text-fg-muted">No chartable transactions in this sample.</p>
       </section>
@@ -55,7 +55,7 @@ export function AddressActivityChart({
   }
 
   return (
-    <section className="mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4">
+    <section className="mobile-explorer-span-full mobile-panel rounded-2xl border border-border bg-bg-panel/60 p-4">
       <div className="flex items-center gap-2">
         <Activity className="h-4 w-4 text-accent" aria-hidden />
         <h3 className="text-sm font-semibold text-fg">Recent activity</h3>

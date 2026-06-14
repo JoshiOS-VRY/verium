@@ -41,7 +41,7 @@ export function BlockStatsStrip({ block }: { block: IndexerBlockSummary }) {
   const difficulty = formatBlockDifficulty(block.difficulty ?? undefined);
 
   return (
-    <section className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <section className="mobile-explorer-stats-strip -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <StatCard
         icon={<Hash className="h-3.5 w-3.5" />}
         label="Transactions"

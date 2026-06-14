@@ -17,7 +17,9 @@ export function MobileSetupLayout({
           className
         )}
       >
-        <div className="mobile-setup-content mx-auto w-full max-w-lg">{children}</div>
+        <div className="mobile-setup-content mx-auto w-full max-w-lg mobile-tablet:max-w-2xl">
+          {children}
+        </div>
       </main>
     </div>
   );

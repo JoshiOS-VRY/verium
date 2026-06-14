@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { WalletUnlockForm } from '@/components/WalletUnlockForm';
 import { useActiveCoin } from '@/lib/coin/context';
 import { coinQueryKey } from '@/lib/coin/profile';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { lightWalletExists } from '@/lib/light-wallet/client';
 import { needsLightWalletRecovery } from '@/lib/setup';
 import { rpcGetWalletInfo } from '@/lib/rpc/client';
@@ -15,7 +15,7 @@ import { isWalletLocked } from '@/lib/wallet-unlock';
 /** Prompt to unlock the light wallet so balance and history can load from Electrum. */
 export function LightWalletDashboardUnlock() {
   const coin = useActiveCoin();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
   const exists = useQuery({
     queryKey: coinQueryKey(coin, 'light-wallet-exists'),
     queryFn: () => lightWalletExists(coin),
@@ -37,7 +37,7 @@ export function LightWalletDashboardUnlock() {
   if (profile.isLoading || wallet.isLoading) return null;
 
   if (needsLightWalletRecovery(profile.data, 'light')) {
-    if (mobileOnly) {
+    if (isPhoneLayout) {
       return (
         <div className="mobile-banner border border-warning/40 bg-warning/10">
           <div className="flex items-start gap-2 font-medium text-fg">
@@ -83,7 +83,7 @@ export function LightWalletDashboardUnlock() {
   const locked = !wallet.data || isWalletLocked(wallet.data);
   if (!locked) return null;
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
       <section className="mobile-panel overflow-hidden rounded-2xl border border-accent/30 bg-accent/5 p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm font-semibold text-fg">

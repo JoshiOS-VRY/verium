@@ -30,7 +30,7 @@ import { coinQueryKey, getCoinProfile, type CoinId } from '@/lib/coin/profile';
 import { useUserPreferences } from '@/lib/user-preferences';
 import { coinSymbol, formatCoinAmount } from '@/lib/units';
 import { MobileSendForm } from '@/components/mobile/MobileSendForm';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { walletTransactionsKeyPrefix } from '@/lib/wallet-transactions-query';
 import { cn } from '@/lib/utils';
 import { estimateSendFee } from '@/lib/send-fee-estimate';
@@ -213,7 +213,7 @@ export function SendPanel({
 }: SendPanelProps) {
   const coin = useActiveCoin();
   const profile = useCoinProfile();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout } = useResponsiveLayout();
   const symbol = coinSymbol(coin);
   const exampleAddress = EXAMPLE_ADDRESSES[coin];
   const queryClient = useQueryClient();
@@ -410,9 +410,7 @@ export function SendPanel({
     (id: string) => {
       if (balance <= 0) return;
       const rowFee = estimateSendFee(feeRate, 1, 2);
-      const spendable = subtractFee
-        ? Math.max(0, balance)
-        : Math.max(0, balance - rowFee.totalFee);
+      const spendable = subtractFee ? Math.max(0, balance) : Math.max(0, balance - rowFee.totalFee);
       updateRecipient(id, { amount: spendable.toFixed(8) });
     },
     [balance, feeRate, subtractFee, updateRecipient]
@@ -714,7 +712,7 @@ export function SendPanel({
         }}
       />
 
-      {mobileOnly ? (
+      {isPhoneLayout ? (
         <MobileSendForm
           coin={coin}
           profile={profile}

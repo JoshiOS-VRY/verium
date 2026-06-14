@@ -6,7 +6,9 @@ describe('formatDisplayError', () => {
     expect(formatDisplayError('rpc error -6: Insufficient funds')).toBe(
       'Not enough spendable balance for this amount and fee.'
     );
-    expect(formatDisplayError('rpc error -14: wrong passphrase')).toBe('Incorrect wallet passphrase.');
+    expect(formatDisplayError('rpc error -14: wrong passphrase')).toBe(
+      'Incorrect wallet passphrase.'
+    );
   });
 
   it('maps electrum rate limits', () => {

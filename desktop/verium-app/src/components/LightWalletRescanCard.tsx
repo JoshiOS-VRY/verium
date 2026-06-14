@@ -45,10 +45,7 @@ function rescanBlockedReason(
   return null;
 }
 
-function rescanAvailable(
-  wallet: WalletInfo | null | undefined,
-  unlocked: boolean
-): boolean {
+function rescanAvailable(wallet: WalletInfo | null | undefined, unlocked: boolean): boolean {
   return unlocked && rescanBlockedReason(wallet, unlocked) == null;
 }
 
@@ -93,11 +90,9 @@ export function LightWalletRescanCard({ mobileLayout = false }: { mobileLayout?:
     return null;
   }
 
-  const walletForCoin = (coin: CoinId) =>
-    coin === 'verium' ? vrmWallet.data : vrcWallet.data;
+  const walletForCoin = (coin: CoinId) => (coin === 'verium' ? vrmWallet.data : vrcWallet.data);
 
-  const unlockedForCoin = (coin: CoinId) =>
-    walletForCoin(coin)?.private_keys_enabled === true;
+  const unlockedForCoin = (coin: CoinId) => walletForCoin(coin)?.private_keys_enabled === true;
 
   const body = (
     <div className="flex flex-col gap-3">
@@ -120,9 +115,7 @@ export function LightWalletRescanCard({ mobileLayout = false }: { mobileLayout?:
           >
             <div className="min-w-0">
               <p className="text-sm font-medium text-fg">{profile.displayName}</p>
-              {blockedReason && (
-                <p className="text-xs text-fg-muted">{blockedReason}</p>
-              )}
+              {blockedReason && <p className="text-xs text-fg-muted">{blockedReason}</p>}
             </div>
             <Button
               size={mobileLayout ? 'md' : 'sm'}

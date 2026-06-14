@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { isExplorerDetailPath } from '@/lib/explorer-nav';
 import { useToastStore, type ToastItem } from '@/lib/toast-store';
 import { cn } from '@/lib/utils';
@@ -43,7 +43,9 @@ function ToastCard({
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-fg">{toast.title}</div>
         {toast.description && (
-          <div className="mt-0.5 whitespace-pre-line text-xs text-fg-muted">{toast.description}</div>
+          <div className="mt-0.5 whitespace-pre-line text-xs text-fg-muted">
+            {toast.description}
+          </div>
         )}
       </div>
       <button
@@ -61,9 +63,9 @@ function ToastCard({
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
-  const { mobileOnly } = useWalletMode();
+  const { isPhoneLayout } = useResponsiveLayout();
   const { pathname } = useLocation();
-  const hideTabBar = mobileOnly && isExplorerDetailPath(pathname);
+  const hideTabBar = isPhoneLayout && isExplorerDetailPath(pathname);
 
   if (toasts.length === 0) return null;
 
@@ -71,7 +73,7 @@ export function ToastHost() {
     <div
       className={cn(
         'pointer-events-none fixed left-4 right-4 z-[100] mx-auto flex w-full max-w-sm flex-col gap-2',
-        mobileOnly ? (hideTabBar ? 'toast-host-mobile-no-tab' : 'toast-host-mobile') : 'top-4'
+        isPhoneLayout ? (hideTabBar ? 'toast-host-mobile-no-tab' : 'toast-host-mobile') : 'top-4 right-4'
       )}
       aria-label="Notifications"
     >
@@ -79,7 +81,7 @@ export function ToastHost() {
         <ToastCard
           key={toast.id}
           toast={toast}
-          mobileBottom={mobileOnly}
+          mobileBottom={isPhoneLayout}
           onDismiss={() => dismiss(toast.id)}
         />
       ))}

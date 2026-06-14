@@ -12,7 +12,7 @@ import { VeriumConfEditorCard } from '@/components/VeriumConfEditorCard';
 import { NetworkModeCard } from '@/components/NetworkModeCard';
 import { ThemeSegmented } from '@/components/ThemeSegmented';
 import { WalletModeCard } from '@/components/WalletModeCard';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { useTheme } from '@/hooks/useTheme';
 import { ALL_COINS, coinQueryKey, getCoinProfile, type CoinId } from '@/lib/coin/profile';
 import { useActiveCoin, useEnabledCoins } from '@/lib/coin/context';
@@ -52,7 +52,7 @@ import { LightWalletRescanCard } from '@/components/LightWalletRescanCard';
 export function Settings() {
   const enabledCoins = useEnabledCoins();
   const activeCoin = useActiveCoin();
-  const { isLight, mobileOnly } = useWalletMode();
+  const { isLight, isPhoneLayout, mobileOnly } = useResponsiveLayout();
   const [daemonCoin, setDaemonCoin] = useState<CoinId>('verium');
   const config = useQuery({
     queryKey: coinQueryKey(daemonCoin, 'daemon-config'),
@@ -96,9 +96,9 @@ export function Settings() {
     void updatePrefs(updates);
   };
 
-  if (mobileOnly) {
+  if (isPhoneLayout) {
     return (
-      <div className="mobile-page">
+      <div className="mobile-page mobile-page--settings">
         <MobileSettingsGroup
           title="Appearance"
           description="Light, dark, or match your device."
@@ -107,7 +107,9 @@ export function Settings() {
           <ThemeSegmented value={themeMode} onChange={setThemeMode} />
         </MobileSettingsGroup>
 
-        <WalletBackupCard />
+        <div className="mobile-settings-span-full">
+          <WalletBackupCard />
+        </div>
 
         {!mobileOnly && <NetworkModeCard />}
 
@@ -143,7 +145,9 @@ export function Settings() {
 
         <NotificationSettingsCard mobileLayout />
 
-        <MobileBuildStamp />
+        <div className="mobile-settings-span-full">
+          <MobileBuildStamp />
+        </div>
       </div>
     );
   }
@@ -186,11 +190,13 @@ export function Settings() {
 
       <WalletBackupCard />
 
-      <NetworkModeCard />
+      {!mobileOnly && <NetworkModeCard />}
 
-      <WalletModeCard />
+      {!mobileOnly && <WalletModeCard />}
 
       <LightWalletRescanCard />
+
+      {mobileOnly && isLight && <BiometricUnlockCard />}
 
       <Card>
         <CardHeader>

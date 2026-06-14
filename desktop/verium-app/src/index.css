@@ -44,6 +44,11 @@
   --danger: rgb(220 38 76);
 }
 
+/* iPad / tablet within the mobile shell — excludes iPhone portrait and landscape. */
+@custom-variant mobile-tablet (@media (min-width: 768px) and (min-height: 768px));
+
+@custom-variant mobile-large-tablet (@media (min-width: 1024px) and (min-height: 768px));
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-subtle: var(--bg-subtle);
@@ -324,6 +329,314 @@
     border: 1px solid var(--border);
     background-color: color-mix(in srgb, var(--bg-subtle) 40%, transparent);
     padding: 0.875rem 1rem;
+  }
+
+  /* ── Tablet (iPad) layout — phone styles above stay untouched ── */
+  .mobile-tablet-nav {
+    display: none;
+  }
+
+  .mobile-explorer-content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .mobile-tablet-nav-brand {
+    display: none;
+  }
+
+  @media (min-width: 768px) and (min-height: 768px) {
+    .mobile-shell-body {
+      flex-direction: row;
+    }
+
+    .mobile-tablet-nav {
+      display: flex;
+      width: 5.75rem;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .mobile-tablet-nav-item {
+      min-height: 3.25rem;
+      touch-action: manipulation;
+    }
+
+    .mobile-tablet-nav-brand {
+      display: block;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+      margin-bottom: 0.25rem;
+    }
+
+    .mobile-shell-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .mobile-tab-bar {
+      display: none;
+    }
+
+    .mobile-header-row {
+      padding: 0.625rem 1rem;
+    }
+
+    .mobile-main {
+      padding: 1rem 1.25rem 0.5rem;
+    }
+
+    .mobile-content-inner {
+      max-width: 56rem;
+      gap: 1rem;
+    }
+
+    .mobile-page {
+      gap: 1rem;
+    }
+
+    /* Dashboard */
+    .mobile-page--dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      align-items: start;
+    }
+
+    .mobile-dashboard-span-full {
+      grid-column: 1 / -1;
+    }
+
+    .mobile-dashboard-primary {
+      grid-column: 1;
+    }
+
+    .mobile-dashboard-secondary {
+      grid-column: 2;
+      align-self: stretch;
+    }
+
+    .mobile-dashboard-secondary > .grid {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .mobile-dashboard-secondary .mobile-action-tile {
+      flex: 1;
+    }
+
+    /* Activity — send/receive + persistent history */
+    .mobile-page--activity {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .mobile-activity-transfer {
+      min-width: 0;
+    }
+
+    .mobile-activity-history {
+      min-width: 0;
+      position: sticky;
+      top: 0;
+    }
+
+    /* Settings, security, address book */
+    .mobile-page--settings {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .mobile-settings-span-full {
+      grid-column: 1 / -1;
+    }
+
+    .mobile-page--address-book {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .mobile-address-book-controls {
+      grid-column: 1;
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .mobile-address-book-list {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    /* Explorer detail pages */
+    .mobile-page--explorer {
+      display: block;
+    }
+
+    .mobile-explorer-content {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .mobile-explorer-span-full {
+      grid-column: 1 / -1;
+    }
+
+    .mobile-explorer-stats-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+      overflow: visible;
+      margin-left: 0;
+      margin-right: 0;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .mobile-explorer-stats-strip > * {
+      min-width: 0;
+    }
+
+    /* Setup */
+    .mobile-setup-content {
+      max-width: 42rem;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .mobile-setup-hub .mobile-setup-coin-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mobile-setup-hub {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .mobile-setup-hub .mobile-setup-span-full {
+      grid-column: 1 / -1;
+    }
+
+    .mobile-setup-card:not(:has(.mobile-setup-hub)) {
+      max-width: 36rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Shared mobile components */
+    .mobile-balance-hero {
+      padding: 1.5rem;
+    }
+
+    .mobile-balance-hero .text-3xl {
+      font-size: 2.25rem;
+      line-height: 2.5rem;
+    }
+
+    .mobile-page--transfer {
+      min-height: auto;
+    }
+
+    .mobile-send-sticky-bar {
+      position: static;
+      margin-left: 0;
+      margin-right: 0;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    }
+
+    .mobile-transaction-filters {
+      flex-wrap: wrap;
+      overflow: visible;
+    }
+
+    .mobile-recent-blocks-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .mobile-activity-transfer .mobile-panel {
+      padding-bottom: 0.25rem;
+    }
+
+    .mobile-activity-history .mobile-balance-hero {
+      margin-bottom: 0.25rem;
+    }
+
+    .mobile-page--explorer .mobile-explorer-span-full:first-child {
+      margin-bottom: 0.25rem;
+    }
+
+  @media (min-width: 1024px) and (min-height: 768px) {
+    .mobile-tablet-nav {
+      width: 11.5rem;
+    }
+
+    .mobile-tablet-nav-brand {
+      padding-left: 0.875rem;
+      padding-right: 0.875rem;
+    }
+
+    .mobile-tablet-nav-item {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.625rem;
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+    }
+
+    .mobile-tablet-nav-item span {
+      font-size: 0.8125rem;
+    }
+
+    .mobile-content-inner {
+      max-width: 72rem;
+    }
+
+    .mobile-page--settings {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mobile-page--address-book {
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    }
+
+    .mobile-page--activity {
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    }
+
+    .mobile-explorer-content {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mobile-explorer-stats-strip {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mobile-recent-blocks-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .mobile-setup-content {
+      max-width: 48rem;
+    }
+
+    .mobile-setup-hub .mobile-setup-coin-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
   }
 }
 

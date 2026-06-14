@@ -13,7 +13,11 @@ export function useIncomingVrcNotifications(): void {
     if (!enabled) return;
 
     return subscribeIncomingVrc((batch) => {
-      const { title, description } = formatReceiveBatchMessage(batch.events, batch.totalAmount, 'VRC');
+      const { title, description } = formatReceiveBatchMessage(
+        batch.events,
+        batch.totalAmount,
+        'VRC'
+      );
       void showReceiveNotification({
         title,
         description: description || undefined,

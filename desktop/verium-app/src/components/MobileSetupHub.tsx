@@ -181,7 +181,7 @@ export function MobileSetupHub({
 
   return (
     <div className="mobile-setup-hub flex min-w-0 flex-col gap-4">
-      <header className="mobile-setup-hero rounded-2xl border border-border/80 bg-gradient-to-br from-accent/10 via-bg-panel to-bg-subtle/60 px-4 py-5 text-center shadow-sm">
+      <header className="mobile-setup-span-full mobile-setup-hero rounded-2xl border border-border/80 bg-gradient-to-br from-accent/10 via-bg-panel to-bg-subtle/60 px-4 py-5 text-center shadow-sm">
         <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/15 text-accent">
           <Wallet className="h-5 w-5" aria-hidden />
         </span>
@@ -191,11 +191,11 @@ export function MobileSetupHub({
         </p>
       </header>
 
-      <p className="rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5 text-xs leading-relaxed text-fg-muted">
+      <p className="mobile-setup-span-full rounded-xl border border-accent/20 bg-accent/5 px-3 py-2.5 text-xs leading-relaxed text-fg-muted">
         {lightWalletCopy.mobileFundsDisclaimer}
       </p>
 
-      <div className="grid min-w-0 gap-3">
+      <div className="grid min-w-0 gap-3 mobile-setup-coin-grid">
         {options.map((coin) => {
           const query = profileByCoin[coin];
           const profile = query.data;
@@ -223,7 +223,7 @@ export function MobileSetupHub({
       </div>
 
       {showOtherChainHint && (
-        <p className="border-t border-border/60 pt-3 text-center text-xs text-fg-subtle">
+        <p className="mobile-setup-span-full border-t border-border/60 pt-3 text-center text-xs text-fg-subtle">
           You can set up the other chain whenever you are ready.
         </p>
       )}

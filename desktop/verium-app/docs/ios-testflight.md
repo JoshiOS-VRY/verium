@@ -106,18 +106,18 @@ If you use XcodeGen: `xcodegen generate` from `src-tauri/gen/apple/`.
 
 Run on a **release** build before inviting external testers.
 
-| Area       | Steps                                                                       |
-| ---------- | --------------------------------------------------------------------------- |
-| Onboarding | Create VRM wallet; import VRC phrase; funds disclaimer visible on setup hub |
-| Unlock     | Passphrase unlock; enable Face ID; disable Face ID                          |
-| Sync       | Balance appears via Electrum (vrm3 / vrc3 defaults)                         |
-| Receive    | Show address, copy, QR                                                      |
-| Send       | Small test send with default fee; confirm tx in history / explorer          |
-| QR scan    | Camera permission prompt; scan payment QR on send                           |
-| Explorer   | Tap tx / block / address links (in-app routes)                              |
+| Area       | Steps                                                                              |
+| ---------- | ---------------------------------------------------------------------------------- |
+| Onboarding | Create VRM wallet; import VRC phrase; funds disclaimer visible on setup hub        |
+| Unlock     | Passphrase unlock; enable Face ID; disable Face ID                                 |
+| Sync       | Balance appears via Electrum (vrm3 / vrc3 defaults)                                |
+| Receive    | Show address, copy, QR                                                             |
+| Send       | Small test send with default fee; confirm tx in history / explorer                 |
+| QR scan    | Camera permission prompt; scan payment QR on send                                  |
+| Explorer   | Tap tx / block / address links (in-app routes)                                     |
 | Push       | Allow notifications; unlock wallet; kill app; receive test VRM → lock screen alert |
-| Settings   | **No** “Check for updates” / download UI; Electrum server card works        |
-| Deep links | Open `verium://…` payment URI → lands on send flow                          |
+| Settings   | **No** “Check for updates” / download UI; Electrum server card works               |
+| Deep links | Open `verium://…` payment URI → lands on send flow                                 |
 
 ### Send path (technical)
 
@@ -136,5 +136,6 @@ If send fails, note the **in-app error** (pre-broadcast) vs Electrum error.
 | Biometrics unavailable | Confirm `NSFaceIDUsageDescription` in Info.plist; Face ID enrolled on device |
 | Archive missing plist  | Run `npm run tauri:ios:init` or sync from `project.yml`                      |
 | Stale UI on device     | `FORCE_RUST_REBUILD=1 npm run ios:archive`                                   |
+| Stale icon in Transporter | Icons updated in `Assets.xcassets` but Xcode reused cached `Assets.car`. Run `IOS_FORCE_ICON_REBUILD=1 npm run ios:archive`, then `npm run ios:verify-icon` before uploading. Do **not** use `ios:export` alone after icon changes. |
 | Invalid large app icon | Run `npm run icons:ios`, rebuild IPA (`npm run ios:archive`), re-upload      |
 | iPad orientation error | `Info.plist` needs all four iPad orientations for multitasking; rebuild IPA  |

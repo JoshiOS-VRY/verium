@@ -266,7 +266,12 @@ export function CumulativeBalanceChart({
 
       <div className={cn(embedded ? 'mt-3' : 'mt-3', blurClass)}>
         {!embedded && (
-          <PinnedChartValue point={displayPoint} scrubbing={scrubbing} coin={coin} ticker={ticker} />
+          <PinnedChartValue
+            point={displayPoint}
+            scrubbing={scrubbing}
+            coin={coin}
+            ticker={ticker}
+          />
         )}
 
         <div

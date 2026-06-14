@@ -91,8 +91,7 @@ export function balanceDayOverDayChange(
   const priorBalance = balanceAtOrBefore(points, referenceUnixSeconds - SECONDS_PER_DAY);
   if (priorBalance == null) return null;
   const delta = currentBalance - priorBalance;
-  const tone: BalanceDayChangeTone =
-    delta > 1e-8 ? 'up' : delta < -1e-8 ? 'down' : 'flat';
+  const tone: BalanceDayChangeTone = delta > 1e-8 ? 'up' : delta < -1e-8 ? 'down' : 'flat';
   return { delta, priorBalance, tone };
 }
 
@@ -162,11 +161,7 @@ function walletTxBalanceEffect(tx: TransactionItem): number {
   if (tx.category === 'send') {
     return amount < 0 ? amount : -Math.abs(amount);
   }
-  if (
-    tx.category === 'receive' ||
-    tx.category === 'immature' ||
-    tx.category === 'generate'
-  ) {
+  if (tx.category === 'receive' || tx.category === 'immature' || tx.category === 'generate') {
     return amount > 0 ? amount : Math.abs(amount);
   }
   return amount;
@@ -361,9 +356,7 @@ export function buildWalletCumulativeSeries(
   const daily = bucketDailyPoints(raw.filter((p) => p.id !== 'anchor-now'));
   const withAnchor = appendAnchorPoint(daily, anchorBalanceCoins);
   const sampled = downsampleCumulativePoints(withAnchor, maxPoints);
-  const points = complete
-    ? sampled
-    : clampWalletCumulativePoints(sampled, anchorBalanceCoins);
+  const points = complete ? sampled : clampWalletCumulativePoints(sampled, anchorBalanceCoins);
 
   return { points, complete, txCountUsed: txs.length };
 }

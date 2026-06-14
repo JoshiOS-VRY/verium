@@ -19,12 +19,16 @@ const titles: Record<string, string> = {
   '/logs': 'Logs',
   '/resources': 'Resources',
   '/settings': 'Settings',
+  '/explorer/tx': 'Transaction',
+  '/explorer/block': 'Block',
+  '/explorer/address': 'Address',
 };
 
 export function TopBar() {
   const { pathname } = useLocation();
   const { isLight } = useWalletMode();
-  const title = titles[pathname] ?? 'Vericonomy Wallet';
+  const title =
+    Object.entries(titles).find(([path]) => pathname.startsWith(path))?.[1] ?? 'Vericonomy';
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-bg-subtle px-8">
       <div className="flex min-w-0 items-center gap-4">

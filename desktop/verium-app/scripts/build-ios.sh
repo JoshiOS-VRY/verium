@@ -52,7 +52,7 @@ run_rust_ios_compile() {
 echo "==> [1/4] Building frontend (no Prettier — use npm run build for a formatted CI build)…"
 npm run build:app
 
-echo "==> Syncing iOS app icons (logo scale ${IOS_LOGO_SCALE:-0.68})…"
+echo "==> Syncing iOS app icons (logo scale ${IOS_LOGO_SCALE:-0.73})…"
 bash "${ROOT}/scripts/sync-ios-icons.sh"
 
 CURRENT_FP="$(frontend_fingerprint || echo missing)"

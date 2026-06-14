@@ -53,7 +53,7 @@ export function AddressStatsStrip({
         </div>
       )}
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mobile-explorer-stats-strip -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <StatCard
           icon={<ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
           label="Received"

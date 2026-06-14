@@ -1,24 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { useActiveCoin, useEnabledCoins } from '@/lib/coin/context';
-import { BINARYTEST_ENABLED } from '@/lib/features';
-import { useIsTestNetwork } from '@/lib/network-mode';
-import { APP_NAV_ITEMS, filterAppNavItems } from '@/lib/app-nav';
-import { useWalletMode } from '@/hooks/useWalletMode';
+import { useMobileNavTabs } from '@/hooks/useMobileNavTabs';
 import { cn } from '@/lib/utils';
 
 export function MobileTabBar() {
-  const activeCoin = useActiveCoin();
-  const enabledCoins = useEnabledCoins();
-  const isTestNetwork = useIsTestNetwork();
-  const { isLight } = useWalletMode();
-
-  const tabs = filterAppNavItems(APP_NAV_ITEMS, {
-    activeCoin,
-    enabledCoins,
-    isLight,
-    isTestNetwork,
-    binarytestEnabled: BINARYTEST_ENABLED,
-  }).filter((item) => item.mobileTab);
+  const tabs = useMobileNavTabs();
 
   return (
     <nav
