@@ -2,6 +2,17 @@
 
 STRIDE analysis for `desktop/verium-app` (Tauri 2 + React WebView + bundled nodes).
 
+> **Qt / QML shell (`desktop/verium-qt`):** The native Qt port replaces the
+> React-in-WebView frontend with QML rendered directly by the Qt engine. There
+> is **no embedded browser engine and no hand-written C++**; the UI talks to the
+> shared Rust core (`vericonomy-sdk`) through a cxx-qt bridge and the
+> `vericonomy-desktop-host` layer. The WebView-related rows below (CSP, XSS →
+> arbitrary invoke, `localStorage` history) are therefore **N/A** for that shell:
+> there is no JS execution context, no DOM, and no `invoke()` reachable from web
+> content. Q_INVOKABLE methods are only callable from the app's own compiled QML.
+> All other rows (security policy, full-node path, secret store, updates) apply
+> unchanged because that logic is shared.
+
 ## Components
 
 | Component       | Description                                       |
@@ -57,7 +68,7 @@ STRIDE analysis for `desktop/verium-app` (Tauri 2 + React WebView + bundled node
 
 | Threat                   | Mitigation                                                        |
 | ------------------------ | ----------------------------------------------------------------- |
-| XSS → arbitrary invoke   | CSP restricts `connect-src`; backend policy on sensitive commands |
+| XSS → arbitrary invoke   | (Tauri) CSP restricts `connect-src`; backend policy on sensitive commands. **N/A on the Qt/QML shell — no WebView, no JS, no DOM-reachable `invoke()`.** |
 | Malware with disk access | Wallet passphrase is root of trust; documented limitation         |
 
 ## Out of scope (documented)

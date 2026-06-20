@@ -1,5 +1,7 @@
 # iOS TestFlight release guide
 
+> **Native Swift path:** The preferred iOS wallet is now `ios/VericonomyWallet/` (SwiftUI + UniFFI only). The Tauri iOS shell below is **deprecated** after side-by-side QA — see [`ios/VericonomyWallet/docs/ios-native-cutover.md`](../../../../ios/VericonomyWallet/docs/ios-native-cutover.md).
+
 Vericonomy Wallet for iOS is a **light wallet only** (Electrum sync, no bundled
 `veriumd` / `vericoind`). Bundle ID: `com.vericonomy.wallet.ios`. Marketing
 version: **1.0.0**.

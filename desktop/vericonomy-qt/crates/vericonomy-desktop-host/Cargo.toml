@@ -1,0 +1,39 @@
+[package]
+name = "vericonomy-desktop-host"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+description = "Tauri-free desktop host layer: daemon/RPC orchestration + HostBridge contract for the Qt shell. Wraps the shared vericonomy-sdk."
+authors = ["Vericonomy developers"]
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+thiserror = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync", "time", "fs", "io-util", "rt-multi-thread", "macros"] }
+dirs = "5"
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Shared wallet stack (same as iOS / Tauri light mode)
+vericonomy-wallet-facade = { path = "../../../../../vericonomy-sdk/vericonomy-wallet-facade" }
+vericonomy-storage-file = { path = "../../../../../vericonomy-sdk/vericonomy-storage-file" }
+vericonomy-storage-sqlite = { path = "../../../../../vericonomy-sdk/vericonomy-storage-sqlite" }
+vericonomy-storage = { path = "../../../../../vericonomy-sdk/vericonomy-storage" }
+vericonomy-chain-params = { path = "../../../../../vericonomy-sdk/vericonomy-chain-params" }
+vericonomy-chain = { path = "../../../../../vericonomy-sdk/vericonomy-chain" }
+vericonomy-hd = { path = "../../../../../vericonomy-sdk/vericonomy-hd" }
+vericonomy-wallet-core = { path = "../../../../../vericonomy-sdk/vericonomy-wallet-core" }
+vericonomy-wallet-engine = { path = "../../../../../vericonomy-sdk/vericonomy-wallet-engine" }
+vericonomy-errors = { path = "../../../../../vericonomy-sdk/vericonomy-errors" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+# NOTE: As Phase 1a (SDK promotion) lands, shared logic is consumed from the SDK
+# here, e.g.:
+#   vericonomy-wallet-facade = { path = "../../../../../vericonomy-sdk/vericonomy-wallet-facade" }
+#   vericonomy-chain-params  = { path = "../../../../../vericonomy-sdk/vericonomy-chain-params" }
+# Kept out of the initial node-status vertical to keep the host build lean.
