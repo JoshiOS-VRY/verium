@@ -7,8 +7,12 @@ Item {
     id: page
     property string coin: "verium"
     property var wallet
+    property var security
+    property var parseJson
     readonly property string ticker: coin === "vericoin" ? "VRC" : "VRM"
     property int tab: 0
+    property string sendWarning: ""
+    property real feeRate: 0.001
 
     Component.onCompleted: if (page.wallet) page.wallet.refreshAddress()
 
@@ -67,6 +71,16 @@ Item {
                 LabeledField { id: amount; label: qsTr("Amount (%1)").arg(page.ticker); placeholder: "0.0000" }
 
                 Text {
+                    visible: page.sendWarning.length > 0
+                    text: page.sendWarning
+                    color: Theme.danger
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                    Layout.fillWidth: true
+                }
+
+                Text {
                     visible: page.wallet && page.wallet.lastMessage.length > 0
                     text: page.wallet ? page.wallet.lastMessage : ""
                     color: Theme.fgMuted
@@ -93,11 +107,15 @@ Item {
                 AppButton {
                     Layout.fillWidth: true
                     text: qsTr("Send")
-                    enabled: addr.text.length > 0 && amount.text.length > 0 && page.wallet
+                    enabled: addr.text.length > 0 && amount.text.length > 0 && page.wallet && page.security
                     onClicked: {
                         var v = parseFloat(amount.text)
-                        if (!isNaN(v) && page.wallet)
-                            page.wallet.send(addr.text, v)
+                        if (isNaN(v) || v <= 0) {
+                            page.sendWarning = qsTr("Enter a valid amount")
+                            return
+                        }
+                        page.sendWarning = ""
+                        page.security.checkSend(addr.text, v)
                     }
                 }
             }
@@ -113,18 +131,11 @@ Item {
                 spacing: 14
                 SectionHeader { title: qsTr("Receive %1").arg(page.ticker); Layout.fillWidth: true }
 
-                Rectangle {
+                QrCodeDisplay {
                     Layout.alignment: Qt.AlignHCenter
-                    width: 160; height: 160; radius: Theme.radiusLg
-                    color: Theme.bgSubtle
-                    border.color: Theme.border; border.width: 1
-                    Text {
-                        anchors.centerIn: parent
-                        text: page.wallet && page.wallet.receiveAddress.length > 0
-                            ? qsTr("Address ready") : qsTr("Loading…")
-                        color: Theme.fgMuted
-                        font.pixelSize: 13
-                    }
+                    coin: page.coin
+                    address: page.wallet ? page.wallet.receiveAddress : ""
+                    size: 160
                 }
                 Rectangle {
                     Layout.fillWidth: true
@@ -158,12 +169,59 @@ Item {
                         text: qsTr("Copy address")
                         variant: "secondary"
                         enabled: page.wallet && page.wallet.receiveAddress.length > 0
+                        onClicked: if (page.wallet)
+                            HostLinks.copyText(page.wallet.receiveAddress)
                     }
                 }
             }
         }
 
         Item { Layout.fillHeight: true }
+    }
+
+    SendConfirmDialog {
+        id: sendConfirm
+        coin: page.coin
+        onConfirmed: function(totpCode) {
+            sendConfirm.confirming = true
+            page.wallet.send(addr.text, parseFloat(amount.text), page.feeRate, totpCode, true)
+        }
+        onCancelled: sendConfirm.confirming = false
+    }
+
+    Connections {
+        target: page.security
+        function onSendCheckCompleted(ok) {
+            if (!ok) {
+                page.sendWarning = page.security ? page.security.lastMessage : qsTr("Send check failed")
+                return
+            }
+            var check = page.parseJson(page.security.sendCheckJson, {})
+            if (!check.allowed) {
+                page.sendWarning = check.reason || qsTr("Send blocked by spending controls.")
+                return
+            }
+            page.sendWarning = ""
+            sendConfirm.address = addr.text
+            sendConfirm.amount = parseFloat(amount.text)
+            sendConfirm.feeRate = page.feeRate
+            sendConfirm.extraConfirmDelay = check.requires_extra_confirmation === true
+            sendConfirm.lookalikeWarning = check.look_alike_warning || ""
+            sendConfirm.twoFactorRequired = check.two_factor_required === true
+            sendConfirm.open()
+        }
+    }
+
+    Connections {
+        target: page.wallet
+        function onSendCompleted(ok) {
+            sendConfirm.confirming = false
+            if (ok) {
+                sendConfirm.close()
+                addr.text = ""
+                amount.text = ""
+            }
+        }
     }
 
     component LabeledField: ColumnLayout {

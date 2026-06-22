@@ -42,20 +42,19 @@ Item {
         modal: true
         anchors.centerIn: Overlay.overlay
         standardButtons: Dialog.NoButton
+        width: 448
 
         background: Rectangle {
             radius: Theme.radiusLg
             color: Theme.bgPanel
             border.color: Theme.border
             border.width: 1
-            implicitWidth: dialogCol.implicitWidth + 48
-            implicitHeight: dialogCol.implicitHeight + 48
         }
 
         contentItem: ColumnLayout {
             id: dialogCol
             spacing: 16
-            width: 400
+            width: parent ? parent.width : 400
 
             Text {
                 Layout.fillWidth: true

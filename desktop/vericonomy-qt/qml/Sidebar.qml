@@ -69,16 +69,22 @@ Rectangle {
         spacing: 0
 
         Item {
+            id: coinHeader
             Layout.fillWidth: true
-            Layout.preferredHeight: coinSwitcher.implicitHeight + 32
+            Layout.preferredHeight: coinSwitcher.height + 8
+            Layout.minimumHeight: 60
             Layout.leftMargin: 12
             Layout.rightMargin: 12
             Layout.topMargin: 16
+            Layout.bottomMargin: 8
+            z: 1
 
             CoinSwitcher {
                 id: coinSwitcher
+                anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
+                height: 52
                 coin: sidebar.coin
                 onCoinSelected: (coinId) => sidebar.switchCoin(coinId)
             }
@@ -89,6 +95,7 @@ Rectangle {
             Layout.fillHeight: true
             Layout.leftMargin: 8
             Layout.rightMargin: 8
+            Layout.topMargin: 0
             contentHeight: navCol.height
             clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -106,7 +113,7 @@ Rectangle {
                         label: modelData.label
                         icon: modelData.icon
                         selected: sidebar.current === modelData.route
-                        showLock: modelData.requiresPassphrase && sidebar.walletLocked
+                        showLock: modelData.requiresPassphrase === true && sidebar.walletLocked
                         onActivated: sidebar.navigate(modelData.route)
                     }
                 }

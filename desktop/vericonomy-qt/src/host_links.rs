@@ -25,6 +25,10 @@ pub mod qobject {
         /// Open an external http(s) URL with the OS default handler.
         #[qinvokable]
         fn open(self: &HostLinks, url: &QString);
+
+        /// Copy plain text to the system clipboard.
+        #[qinvokable]
+        fn copyText(self: &HostLinks, text: &QString) -> bool;
     }
 }
 
@@ -37,5 +41,9 @@ impl qobject::HostLinks {
         if vericonomy_desktop_host::os::is_safe_external(&url) {
             vericonomy_desktop_host::os::open_external(&url);
         }
+    }
+
+    pub fn copyText(&self, text: &QString) -> bool {
+        vericonomy_desktop_host::os::set_clipboard(&text.to_string()).is_ok()
     }
 }

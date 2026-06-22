@@ -15,7 +15,7 @@ Storage paths (macOS): `~/Library/Application Support/Vericonomy/desktop-app/`
 
 ## Phase status
 
-### P0 — Wallet access & migration (in progress)
+### P0 — Wallet access & migration
 - [x] Align `app_config_base` with Tauri
 - [x] SDK light session (xprv + phrase import, unlock, sync, balance)
 - [x] Setup hub: Import phrase/xprv + Unlock
@@ -23,30 +23,44 @@ Storage paths (macOS): `~/Library/Application Support/Vericonomy/desktop-app/`
 - [x] DashboardHero layout (wallet / market / mining-staking / network footer)
 - [x] wallet.dat file picker in Setup UI
 - [x] Wallet mode defaults to full node; light mode in Settings
-- [ ] Light send + transaction history from Electrum cache
-- [ ] `recovery_apply_hd_seed` (full-node phrase restore)
+- [x] Light send + transaction history from Electrum/explorer cache
+- [x] `recovery_apply_hd_seed` (full-node phrase restore)
 
 ### P1 — Full-node parity (scaffold started)
-- [x] `daemon_config.rs` + `commands/daemon.rs` stub
-- [ ] DaemonManager spawn/stop/restart
-- [ ] Pool miner sidecar
-- [ ] Bootstrap import
+- [x] `daemon_config.rs` + `commands/daemon.rs`
+- [x] DaemonManager spawn/stop/restart (`daemon_manager.rs`, binary detection)
+- [x] Pool miner sidecar (`mining_supervisor.rs`, `commands/pool.rs`)
+- [x] Bootstrap import (CDN download, local zip, extract/apply, restart)
 
-### P2 — Security (scaffold started)
-- [x] `commands/security.rs` stub
-- [ ] 2FA, auto-lock, spending controls, scheduled backups
+### P2 — Security (partial)
+- [x] 2FA enroll/verify/disable (TOTP, shared JSON store)
+- [x] Auto-lock config + idle tracking
+- [x] Spending controls (caps, allowlist, first-send flag)
+- [x] Receive requests list (label/amount/message)
+- [x] Light-wallet recovery export (phrase/xprv)
+- [x] Full-node HD xprv export (`hd_wallet_export.rs`, Security → Export)
+- [ ] Scheduled backups / mnemonic backup (full node)
+- [ ] Audit log
 
 ### P3 — Explorer & activity (partial)
 - [x] Dashboard recent blocks feed
 - [x] `commands/addressbook.rs` CRUD
-- [x] `commands/pool.rs` stub
+- [x] Address book QML page
+- [x] Receive panel with QR + saved requests
 - [ ] Explorer tx/block/address detail routes
-- [ ] Address book QML page
+- [ ] Binary Chain page
 
-### P4 — Polish
-- [ ] Inter + Lucide assets
+### P4 — Send UX (partial)
+- [x] Fee rate field (light + full node path for light)
+- [x] Payment URI QR codes + clipboard
+- [x] Send confirm dialog + 2FA prompt at send time (single recipient)
+- [ ] Multi-recipient single tx / coin control dialog
+- [ ] QR scan for send address
+
+### P5 — Polish
+- [ ] Inter + Lucide assets (partial nav icons exist)
 - [ ] Installers + signing (scripts exist)
 
 ## Command surface (~200 Tauri commands)
 
-See agent inventory in chat; grouped modules: `commands.rs`, `wallet_commands.rs`, `security_commands.rs`, `onboarding_commands.rs`, `network_mode_commands.rs`, `pool_miner.rs`, `mining_opt.rs`, `dace_commands.rs`.
+Grouped modules: `commands.rs`, `wallet_commands.rs`, `security_commands.rs`, `onboarding_commands.rs`, `network_mode_commands.rs`, `pool_miner.rs`, `mining_opt.rs`, `dace_commands.rs`.

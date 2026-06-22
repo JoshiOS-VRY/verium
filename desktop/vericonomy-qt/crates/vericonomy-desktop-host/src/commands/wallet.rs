@@ -65,21 +65,33 @@ async fn light_wallet_info(coin: CoinId) -> HostResult<WalletInfo> {
             ..Default::default()
         });
     }
+    let unlocked = crate::light_session::light_wallet_is_unlocked(coin).await?;
     let bal = crate::light_session::light_wallet_balance(coin).await?;
     let confirmed = vericonomy_hd::sats_to_coins(bal.confirmed_sats);
     let unconfirmed = vericonomy_hd::sats_to_coins(bal.unconfirmed_sats);
     let immature = vericonomy_hd::sats_to_coins(bal.immature_sats);
+    let txcount = crate::light_session::light_wallet_list_transactions(coin, 500)
+        .await
+        .map(|rows| rows.len() as i64)
+        .unwrap_or(0);
     Ok(WalletInfo {
         balance: confirmed,
         unconfirmed_balance: unconfirmed,
         immature_balance: immature,
-        locked: false,
+        locked: !unlocked,
         missing: false,
-        txcount: 0,
+        txcount,
     })
 }
 
-pub async fn get_new_address(ctx: &AppContext, coin: CoinId) -> HostResult<String> {
+pub async fn get_new_address(
+    ctx: &AppContext,
+    coin: CoinId,
+    passphrase: &str,
+) -> HostResult<String> {
+    if crate::light_session::is_light_mode(coin)? {
+        return crate::light_session::light_wallet_new_address(coin, passphrase).await;
+    }
     let endpoint = ctx
         .endpoint(coin)
         .ok_or_else(|| HostError::other("no RPC endpoint"))?;
@@ -93,7 +105,30 @@ pub async fn send_to_address(
     coin: CoinId,
     address: &str,
     amount: f64,
+    fee_rate: Option<f64>,
+    passphrase: &str,
+    totp_code: Option<&str>,
+    extra_confirmed: bool,
 ) -> HostResult<String> {
+    crate::send_policy::authorize_send(coin, amount, totp_code)?;
+    crate::send_policy::ensure_wallet_unlocked_for_send(ctx, coin, passphrase).await?;
+    let check = crate::send_policy::check_send_allowed(coin, amount, address, extra_confirmed)?;
+    if !check.allowed {
+        return Err(HostError::other(
+            check
+                .reason
+                .unwrap_or_else(|| "Send blocked by spending controls".into()),
+        ));
+    }
+
+    if crate::light_session::is_light_mode(coin)? {
+        let txid = crate::light_session::light_wallet_send(
+            coin, address, amount, fee_rate, passphrase,
+        )
+        .await?;
+        let _ = crate::send_policy::record_send(coin, amount, address);
+        return Ok(txid);
+    }
     let endpoint = ctx
         .endpoint(coin)
         .ok_or_else(|| HostError::other("no RPC endpoint"))?;
@@ -104,7 +139,9 @@ pub async fn send_to_address(
             serde_json::json!([address, amount, ""]),
         )
         .await?;
-    serde_json::from_value(v).map_err(Into::into)
+    let txid: String = serde_json::from_value(v).map_err(HostError::from)?;
+    let _ = crate::send_policy::record_send(coin, amount, address);
+    Ok(txid)
 }
 
 pub async fn sign_message(

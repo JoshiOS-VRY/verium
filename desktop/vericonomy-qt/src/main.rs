@@ -4,19 +4,25 @@
 //! (`QGuiApplication` + `QQmlApplicationEngine`). There is no hand-written C++
 //! and no WebView — which is the security goal driving this port.
 
+mod bootstrap_controller;
+mod host_events;
+mod addressbook_controller;
 mod app_context;
 mod explorer_controller;
 mod host_links;
 mod logs_controller;
+mod pool_miner_controller;
 mod mining_controller;
 mod network_controller;
 mod node_controller;
+mod qr_helper;
 mod rpc_controller;
 mod runtime;
 mod settings_controller;
 mod wallet_mode_controller;
 mod dashboard_controller;
 mod light_wallet_controller;
+mod security_controller;
 mod setup_controller;
 mod staking_controller;
 mod theme;

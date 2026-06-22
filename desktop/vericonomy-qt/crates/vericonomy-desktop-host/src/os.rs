@@ -37,3 +37,10 @@ fn launch(target: &str) -> std::io::Result<()> {
 pub fn is_safe_external(url: &str) -> bool {
     url.starts_with("https://") || url.starts_with("http://")
 }
+
+/// Copy plain text to the system clipboard.
+pub fn set_clipboard(text: &str) -> Result<(), String> {
+    arboard::Clipboard::new()
+        .and_then(|mut clip| clip.set_text(text.to_owned()))
+        .map_err(|e| e.to_string())
+}

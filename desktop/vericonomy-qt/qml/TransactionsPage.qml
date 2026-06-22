@@ -9,7 +9,11 @@ Item {
     property string coin: "verium"
     property var transactions
     property var wallet
+    property var security
     property var parseJson
+    property real feeRate: 0.001
+    property var sendRecipients: [{ address: "", amount: "" }]
+    property string sendWarning: ""
 
     readonly property string ticker: coin === "vericoin" ? "VRC" : "VRM"
     readonly property string displayName: coin === "vericoin" ? qsTr("Vericoin") : qsTr("Verium")
@@ -97,6 +101,17 @@ Item {
 
                             LabeledField { id: sendAddr; label: qsTr("Recipient address"); placeholder: "V…" }
                             LabeledField { id: sendAmount; label: qsTr("Amount (%1)").arg(page.ticker); placeholder: "0.0000" }
+                            LabeledField { id: sendFee; label: qsTr("Fee rate (coins/kB)"); placeholder: "0.001"; text: String(page.feeRate) }
+
+                            Text {
+                                visible: page.sendWarning.length > 0
+                                text: page.sendWarning
+                                color: Theme.danger
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                Layout.fillWidth: true
+                            }
 
                             Text {
                                 visible: page.wallet && page.wallet.lastMessage.length > 0
@@ -121,11 +136,19 @@ Item {
                             AppButton {
                                 Layout.fillWidth: true
                                 text: qsTr("Send")
-                                enabled: sendAddr.text.length > 0 && sendAmount.text.length > 0 && page.wallet
+                                enabled: sendAddr.text.length > 0 && sendAmount.text.length > 0
+                                    && page.wallet && page.security
                                 onClicked: {
-                                    var v = parseFloat(sendAmount.text)
-                                    if (!isNaN(v) && page.wallet)
-                                        page.wallet.send(sendAddr.text, v)
+                                    var fee = parseFloat(sendFee.text)
+                                    if (isNaN(fee) || fee <= 0) fee = page.feeRate
+                                    page.feeRate = fee
+                                    var primary = parseFloat(sendAmount.text)
+                                    if (isNaN(primary) || primary <= 0) {
+                                        page.sendWarning = qsTr("Enter a valid amount")
+                                        return
+                                    }
+                                    page.sendWarning = ""
+                                    page.security.checkSend(sendAddr.text, primary)
                                 }
                             }
                         }
@@ -137,46 +160,12 @@ Item {
                             spacing: 14
                             visible: page.transferMode === "receive"
 
-                            Rectangle {
-                                Layout.alignment: Qt.AlignHCenter
-                                width: 160; height: 160; radius: Theme.radiusLg
-                                color: Theme.bgSubtle
-                                border.color: Theme.border; border.width: 1
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: page.wallet && page.wallet.receiveAddress.length > 0
-                                        ? qsTr("Address ready") : qsTr("Loading…")
-                                    color: Theme.fgMuted
-                                    font.pixelSize: 13
-                                }
-                            }
-                            Rectangle {
+                            ReceivePanel {
                                 Layout.fillWidth: true
-                                implicitHeight: 44
-                                radius: Theme.radiusMd
-                                color: Theme.bgSubtle
-                                border.color: Theme.border; border.width: 1
-                                Text {
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: page.wallet && page.wallet.receiveAddress.length
-                                        ? page.wallet.receiveAddress : qsTr("No address yet")
-                                    color: Theme.fg
-                                    font.family: Theme.monoFamily
-                                    font.pixelSize: 11
-                                    wrapMode: Text.Wrap
-                                }
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-                                AppButton {
-                                    Layout.fillWidth: true
-                                    text: qsTr("New address")
-                                    variant: "secondary"
-                                    onClicked: if (page.wallet) page.wallet.refreshAddress()
-                                }
+                                coin: page.coin
+                                wallet: page.wallet
+                                security: page.security
+                                parseJson: page.parseJson
                             }
                         }
                     }
@@ -199,10 +188,51 @@ Item {
         }
     }
 
+    SendConfirmDialog {
+        id: sendConfirm
+        coin: page.coin
+        onConfirmed: function(totpCode) {
+            sendConfirm.confirming = true
+            var fee = parseFloat(sendFee.text)
+            if (isNaN(fee) || fee <= 0) fee = page.feeRate
+            page.wallet.send(sendAddr.text, parseFloat(sendAmount.text), fee, totpCode, true)
+        }
+        onCancelled: sendConfirm.confirming = false
+    }
+
+    Connections {
+        target: page.security
+        function onSendCheckCompleted(ok) {
+            if (!ok) {
+                page.sendWarning = page.security ? page.security.lastMessage : qsTr("Send check failed")
+                return
+            }
+            var check = page.parseJson(page.security.sendCheckJson, {})
+            if (!check.allowed) {
+                page.sendWarning = check.reason || qsTr("Send blocked by spending controls.")
+                return
+            }
+            page.sendWarning = ""
+            sendConfirm.address = sendAddr.text
+            sendConfirm.amount = parseFloat(sendAmount.text)
+            sendConfirm.feeRate = page.feeRate
+            sendConfirm.extraConfirmDelay = check.requires_extra_confirmation === true
+            sendConfirm.lookalikeWarning = check.look_alike_warning || ""
+            sendConfirm.twoFactorRequired = check.two_factor_required === true
+            sendConfirm.open()
+        }
+    }
+
     Connections {
         target: page.wallet
         function onSendCompleted(ok) {
-            if (ok && page.transactions) page.transactions.refresh()
+            sendConfirm.confirming = false
+            if (ok) {
+                sendConfirm.close()
+                sendAddr.text = ""
+                sendAmount.text = ""
+                if (page.transactions) page.transactions.refresh()
+            }
         }
         function onUnlockCompleted(ok) {
             if (ok && page.transactions) page.transactions.refresh()

@@ -13,9 +13,19 @@ serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 thiserror = "1"
 async-trait = "0.1"
-tokio = { version = "1", features = ["sync", "time", "fs", "io-util", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["sync", "time", "fs", "io-util", "rt-multi-thread", "macros", "process", "net"] }
 dirs = "5"
+which = "6"
+sysinfo = "0.33"
 rusqlite = { version = "0.32", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+urlencoding = "2"
+arboard = "3"
+totp-rs = { version = "5", features = ["gen_secret", "otpauth"] }
+sha2 = "0.10"
+hex = "0.4"
+zip = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 # Shared wallet stack (same as iOS / Tauri light mode)
 vericonomy-wallet-facade = { path = "../../../../../vericonomy-sdk/vericonomy-wallet-facade" }

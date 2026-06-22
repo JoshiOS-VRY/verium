@@ -6,6 +6,7 @@
 //! also delegate to them so it stays shippable (Phase 1b).
 
 pub mod addressbook;
+pub mod bootstrap;
 pub mod daemon;
 pub mod dashboard;
 pub mod diagnostics;

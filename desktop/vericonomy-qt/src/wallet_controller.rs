@@ -27,6 +27,7 @@ pub mod qobject {
         #[qproperty(QString, receiveAddress)]
         #[qproperty(QString, lastMessage)]
         #[qproperty(QString, lastTxid)]
+        #[qproperty(QString, walletPassphrase)]
         type WalletController = super::WalletControllerRust;
 
         #[qsignal]
@@ -51,7 +52,14 @@ pub mod qobject {
         fn refreshAddress(self: Pin<&mut WalletController>);
 
         #[qinvokable]
-        fn send(self: Pin<&mut WalletController>, address: &QString, amount: f64);
+        fn send(
+            self: Pin<&mut WalletController>,
+            address: &QString,
+            amount: f64,
+            feeRate: f64,
+            totpCode: &QString,
+            extraConfirmed: bool,
+        );
 
         #[qinvokable]
         fn signMessage(
@@ -85,6 +93,17 @@ pub mod qobject {
 
         #[qinvokable]
         fn restoreWallet(self: Pin<&mut WalletController>, sourcePath: &QString);
+
+        #[qsignal]
+        fn recoveryCompleted(self: Pin<&mut WalletController>, ok: bool);
+
+        #[qinvokable]
+        fn applyRecoveryPhrase(
+            self: Pin<&mut WalletController>,
+            phrase: &QString,
+            walletPassphrase: &QString,
+            bip39Passphrase: &QString,
+        );
     }
 
     impl cxx_qt::Threading for WalletController {}
@@ -102,6 +121,7 @@ pub struct WalletControllerRust {
     receiveAddress: QString,
     lastMessage: QString,
     lastTxid: QString,
+    walletPassphrase: QString,
 }
 
 impl Default for WalletControllerRust {
@@ -118,6 +138,7 @@ impl Default for WalletControllerRust {
             receiveAddress: QString::default(),
             lastMessage: QString::default(),
             lastTxid: QString::default(),
+            walletPassphrase: QString::default(),
         }
     }
 }
@@ -161,14 +182,16 @@ impl qobject::WalletController {
     }
 
     pub fn refreshAddress(self: Pin<&mut Self>) {
-        let mut this = self;
+        let this = self;
         let coin = coin_id(&this.coin());
+        let pass = this.walletPassphrase().to_string();
         let ctx = crate::app_context::context();
         let qt_thread = this.qt_thread();
 
         crate::runtime::runtime().spawn(async move {
             let result =
-                vericonomy_desktop_host::commands::wallet::get_new_address(&ctx, coin).await;
+                vericonomy_desktop_host::commands::wallet::get_new_address(&ctx, coin, &pass)
+                    .await;
             let _ = qt_thread.queue(move |mut ctrl| match result {
                 Ok(addr) => {
                     ctrl.as_mut().set_receiveAddress(QString::from(&addr));
@@ -183,16 +206,38 @@ impl qobject::WalletController {
         });
     }
 
-    pub fn send(self: Pin<&mut Self>, address: &QString, amount: f64) {
+    pub fn send(
+        self: Pin<&mut Self>,
+        address: &QString,
+        amount: f64,
+        fee_rate: f64,
+        totp_code: &QString,
+        extra_confirmed: bool,
+    ) {
         let mut this = self;
         let coin = coin_id(&this.coin());
         let addr = address.to_string();
+        let pass = this.walletPassphrase().to_string();
+        let totp = totp_code.to_string();
+        let fee = if fee_rate > 0.0 { Some(fee_rate) } else { None };
         let ctx = crate::app_context::context();
         let qt_thread = this.qt_thread();
 
         crate::runtime::runtime().spawn(async move {
+            let totp_opt = if totp.trim().is_empty() {
+                None
+            } else {
+                Some(totp.as_str())
+            };
             let result = vericonomy_desktop_host::commands::wallet::send_to_address(
-                &ctx, coin, &addr, amount,
+                &ctx,
+                coin,
+                &addr,
+                amount,
+                fee,
+                &pass,
+                totp_opt,
+                extra_confirmed,
             )
             .await;
             let _ = qt_thread.queue(move |mut ctrl| match result {
@@ -295,6 +340,8 @@ impl qobject::WalletController {
             let _ = qt_thread.queue(move |mut ctrl| match result {
                 Ok(()) => {
                     ctrl.as_mut()
+                        .set_walletPassphrase(QString::from(&pass));
+                    ctrl.as_mut()
                         .set_lastMessage(QString::from("Wallet unlocked"));
                     ctrl.as_mut().unlockCompleted(true);
                     ctrl.as_mut().refresh();
@@ -360,6 +407,54 @@ impl qobject::WalletController {
                     ctrl.as_mut()
                         .set_lastMessage(QString::from(&e.to_string()));
                     ctrl.as_mut().restoreCompleted(false);
+                }
+            });
+        });
+    }
+
+    pub fn applyRecoveryPhrase(
+        self: Pin<&mut Self>,
+        phrase: &QString,
+        wallet_passphrase: &QString,
+        bip39_passphrase: &QString,
+    ) {
+        let this = self;
+        let coin = coin_id(&this.coin());
+        let phrase_s = phrase.to_string();
+        let wallet_pass = wallet_passphrase.to_string();
+        let bip39_pass = bip39_passphrase.to_string();
+        let ctx = crate::app_context::context();
+        let qt_thread = this.qt_thread();
+
+        crate::runtime::runtime().spawn(async move {
+            let bip39 = if bip39_pass.is_empty() {
+                None
+            } else {
+                Some(bip39_pass.as_str())
+            };
+            let unlock = if wallet_pass.is_empty() {
+                None
+            } else {
+                Some(wallet_pass.as_str())
+            };
+            let result = vericonomy_desktop_host::commands::security::recovery_apply_hd_seed(
+                &ctx,
+                coin,
+                &phrase_s,
+                bip39,
+                unlock,
+            )
+            .await;
+            let _ = qt_thread.queue(move |mut ctrl| match result {
+                Ok(msg) => {
+                    ctrl.as_mut().set_lastMessage(QString::from(&msg));
+                    ctrl.as_mut().recoveryCompleted(true);
+                    ctrl.as_mut().refresh();
+                }
+                Err(e) => {
+                    ctrl.as_mut()
+                        .set_lastMessage(QString::from(&e.to_string()));
+                    ctrl.as_mut().recoveryCompleted(false);
                 }
             });
         });

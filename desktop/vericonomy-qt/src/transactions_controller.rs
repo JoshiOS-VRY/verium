@@ -77,31 +77,13 @@ impl qobject::TransactionsController {
         let qt_thread = this.qt_thread();
 
         crate::runtime::runtime().spawn(async move {
-            let wallet_result =
-                vericonomy_desktop_host::commands::wallet::get_wallet_info(&ctx, coin).await;
+            let tx_result =
+                vericonomy_desktop_host::commands::transactions::fetch_transactions(&ctx, coin)
+                    .await;
 
-            let (count, skip, wallet_tx_count, history_capped) = match &wallet_result {
-                Ok(info) => {
-                    let (count, skip) =
-                        vericonomy_desktop_host::commands::transactions::list_transactions_fetch_params(
-                            info.txcount,
-                        );
-                    let capped = info.txcount
-                        > vericonomy_desktop_host::commands::transactions::TRANSACTIONS_LIST_CAP
-                            as i64;
-                    (count, skip, info.txcount, capped)
-                }
-                Err(_) => (0, 0, 0, false),
-            };
-
-            let tx_result = if count == 0 {
-                Ok(vericonomy_desktop_host::commands::transactions::TransactionList::default())
-            } else {
-                vericonomy_desktop_host::commands::transactions::list_transactions(
-                    &ctx, coin, count, skip,
-                )
-                .await
-            };
+            let wallet_tx_count = tx_result.as_ref().map(|l| l.rows.len() as i64).unwrap_or(0);
+            let history_capped = wallet_tx_count
+                > vericonomy_desktop_host::commands::transactions::TRANSACTIONS_LIST_CAP as i64;
 
             let _ = qt_thread.queue(move |mut ctrl| {
                 ctrl.as_mut().set_walletTxCount(wallet_tx_count as i32);

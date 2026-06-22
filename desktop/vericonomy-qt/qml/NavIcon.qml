@@ -1,7 +1,9 @@
 import QtQuick
+import QtQuick.Effects
 import com.vericonomy.verium
 
-// Lucide nav icon (16×16) with theme tint — no Qt5Compat dependency.
+// Lucide nav icon (16×16) with theme tint.
+// SVG assets use white strokes (#FFFFFF); MultiEffect colorization maps luminance → tint.
 Item {
     id: icon
     property string name: "gauge"
@@ -20,21 +22,11 @@ Item {
         visible: false
     }
 
-    ShaderEffect {
+    MultiEffect {
         anchors.fill: parent
-        property variant source: src
-        property color tintColor: icon.tint
-
-        fragmentShader: "
-            uniform lowp sampler2D source;
-            uniform lowp vec4 tintColor;
-            uniform lowp float qt_Opacity;
-            varying highp vec2 qt_TexCoord0;
-            void main() {
-                lowp vec4 c = texture2D(source, qt_TexCoord0);
-                lowp float a = max(c.a, max(c.r, max(c.g, c.b)));
-                gl_FragColor = vec4(tintColor.rgb, a * tintColor.a * qt_Opacity);
-            }
-        "
+        source: src
+        saturation: 0
+        colorization: 1.0
+        colorizationColor: icon.tint
     }
 }

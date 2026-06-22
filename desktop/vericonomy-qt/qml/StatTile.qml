@@ -21,9 +21,10 @@ ColumnLayout {
         text: value
         color: valueColor
         font.family: Theme.fontFamily
-        font.pixelSize: 15
+        font.pixelSize: 14
         font.weight: Font.DemiBold
         elide: Text.ElideRight
         Layout.fillWidth: true
+        maximumLineCount: 1
     }
 }

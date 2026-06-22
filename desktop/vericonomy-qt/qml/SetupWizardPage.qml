@@ -10,7 +10,7 @@ Item {
     property var wallet
     property string coin: "verium"
     property int step: 0
-    property int walletAction: 0 // 0=hub, 1=create, 2=import, 3=unlock
+    property int walletAction: 0 // 0=hub, 1=create, 2=import dat, 3=unlock, 4=phrase
     signal finished()
 
     readonly property var steps: [
@@ -95,6 +95,12 @@ Item {
                     }
                     AppButton {
                         Layout.fillWidth: true
+                        text: qsTr("Restore 24-word phrase")
+                        variant: "secondary"
+                        onClicked: page.walletAction = 4
+                    }
+                    AppButton {
+                        Layout.fillWidth: true
                         text: qsTr("Unlock existing wallet")
                         variant: "secondary"
                         enabled: page.setup && (page.setup.hasFullNodeWallet || page.setup.walletReady)
@@ -176,6 +182,61 @@ Item {
                         AppButton {
                             text: qsTr("Choose wallet.dat…")
                             onClicked: walletFileDialog.open()
+                        }
+                    }
+                }
+
+                // Restore HD recovery phrase (sethdseed)
+                ColumnLayout {
+                    visible: page.step === 1 && page.walletAction === 4
+                    Layout.fillWidth: true
+                    spacing: 10
+                    Text {
+                        text: qsTr("Applies a BIP39 phrase to your full-node wallet via sethdseed. Requires a running daemon and wallet passphrase if locked.")
+                        color: Theme.fgSubtle
+                        font.pixelSize: 11
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    TextArea {
+                        id: recoveryPhrase
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 80
+                        placeholderText: qsTr("24-word recovery phrase")
+                        wrapMode: TextArea.Wrap
+                        color: Theme.fg
+                    }
+                    TextField {
+                        id: recoveryWalletPass
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("Wallet passphrase (if locked)")
+                        echoMode: TextInput.Password
+                        color: Theme.fg
+                    }
+                    TextField {
+                        id: recoveryBip39Pass
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("BIP39 passphrase (optional)")
+                        echoMode: TextInput.Password
+                        color: Theme.fg
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        AppButton {
+                            text: qsTr("Back")
+                            variant: "ghost"
+                            onClicked: page.walletAction = 0
+                        }
+                        Item { Layout.fillWidth: true }
+                        AppButton {
+                            text: qsTr("Apply phrase")
+                            enabled: page.wallet && recoveryPhrase.text.trim().length > 0
+                            onClicked: if (page.wallet)
+                                page.wallet.applyRecoveryPhrase(
+                                    recoveryPhrase.text,
+                                    recoveryWalletPass.text,
+                                    recoveryBip39Pass.text
+                                )
                         }
                     }
                 }
@@ -267,5 +328,6 @@ Item {
         function onCreateCompleted(ok) { if (ok) page.step = 2 }
         function onRestoreCompleted(ok) { if (ok) page.step = 2 }
         function onUnlockCompleted(ok) { if (ok) page.step = 2 }
+        function onRecoveryCompleted(ok) { if (ok) page.step = 2 }
     }
 }

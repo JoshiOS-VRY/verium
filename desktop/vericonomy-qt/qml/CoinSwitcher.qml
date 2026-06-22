@@ -39,7 +39,8 @@ Item {
     }
 
     implicitWidth: 208
-    implicitHeight: trigger.implicitHeight
+    implicitHeight: 52
+    height: implicitHeight
 
     function selectCoin(coinId) {
         switcher.coinSelected(coinId)

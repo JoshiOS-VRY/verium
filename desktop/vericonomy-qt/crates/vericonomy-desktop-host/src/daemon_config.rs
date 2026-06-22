@@ -15,6 +15,8 @@ pub struct DaemonConfig {
     pub chain: String,
     #[serde(default)]
     pub rpc_user: Option<String>,
+    #[serde(skip_serializing, default)]
+    pub rpc_password: Option<String>,
 }
 
 impl Default for DaemonConfig {
@@ -31,7 +33,21 @@ pub fn default_config(coin: CoinId) -> DaemonConfig {
         rpc_port: coin.default_rpc_port(),
         chain: "main".into(),
         rpc_user: None,
+        rpc_password: None,
     }
+}
+
+pub fn verium_uses_legacy_flat(cfg: &DaemonConfig) -> bool {
+    cfg.chain == "main"
+}
+
+/// Pull RPC credentials from `vericonomy.conf` into the in-memory config.
+pub fn sync_rpc_from_conf(coin: CoinId, cfg: &mut DaemonConfig) -> HostResult<()> {
+    if let Some(ep) = crate::config::resolve_endpoint(coin) {
+        cfg.rpc_user = Some(ep.user);
+        cfg.rpc_password = Some(ep.password);
+    }
+    Ok(())
 }
 
 pub fn default_datadir(coin: CoinId) -> PathBuf {
@@ -65,6 +81,7 @@ pub fn load_daemon_config(coin: CoinId) -> HostResult<DaemonConfig> {
                 rpc_port: saved.rpc_port,
                 chain: saved.chain,
                 rpc_user: saved.rpc_user,
+                rpc_password: None,
             });
         }
     }

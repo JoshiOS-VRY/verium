@@ -18,6 +18,9 @@ pub mod qobject {
         #[qml_element]
         #[qproperty(QString, coin)]
         #[qproperty(f64, networkHashps)]
+        #[qproperty(f64, hashrate)]
+        #[qproperty(f64, blockReward)]
+        #[qproperty(f64, blocksPerHour)]
         #[qproperty(f64, difficulty)]
         #[qproperty(i32, blocks)]
         #[qproperty(QString, chain)]
@@ -50,6 +53,9 @@ pub mod qobject {
 pub struct MiningControllerRust {
     coin: QString,
     networkHashps: f64,
+    hashrate: f64,
+    blockReward: f64,
+    blocksPerHour: f64,
     difficulty: f64,
     blocks: i32,
     chain: QString,
@@ -65,6 +71,9 @@ impl Default for MiningControllerRust {
         Self {
             coin: QString::from("verium"),
             networkHashps: 0.0,
+            hashrate: 0.0,
+            blockReward: 0.0,
+            blocksPerHour: 0.0,
             difficulty: 0.0,
             blocks: 0,
             chain: QString::default(),
@@ -99,6 +108,9 @@ impl qobject::MiningController {
             let _ = qt_thread.queue(move |mut ctrl| match result {
                 Ok(info) => {
                     ctrl.as_mut().set_networkHashps(info.networkhashps);
+                    ctrl.as_mut().set_hashrate(info.hashrate);
+                    ctrl.as_mut().set_blockReward(info.blockreward);
+                    ctrl.as_mut().set_blocksPerHour(info.blocksperhour);
                     ctrl.as_mut().set_difficulty(info.difficulty);
                     ctrl.as_mut().set_blocks(info.blocks as i32);
                     ctrl.as_mut().set_chain(QString::from(&info.chain));

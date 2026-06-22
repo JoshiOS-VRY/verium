@@ -6,6 +6,7 @@ Item {
     id: page
     property var node
     property var network
+    property var bootstrap
     property var parseJson
     readonly property var peers: network ? parseJson(network.peersJson, []) : []
 
@@ -35,6 +36,58 @@ Item {
                         value: page.node ? (page.node.connected ? page.node.stateLabel : "Offline") : "—"
                         valueColor: page.node && page.node.connected ? Theme.success : Theme.fgMuted
                     }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    AppButton {
+                        text: qsTr("Start node")
+                        enabled: page.node && !page.node.daemonRunning
+                        onClicked: if (page.node) page.node.startDaemon()
+                    }
+                    AppButton {
+                        text: qsTr("Stop node")
+                        variant: "secondary"
+                        enabled: page.node
+                        onClicked: if (page.node) page.node.stopDaemon()
+                    }
+                    AppButton {
+                        text: qsTr("Restart")
+                        variant: "secondary"
+                        enabled: page.node
+                        onClicked: if (page.node) page.node.restartDaemon()
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        visible: page.node && page.node.daemonMessage.length > 0
+                        text: page.node ? page.node.daemonMessage : ""
+                        color: Theme.fgSubtle
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                    }
+                }
+            }
+        }
+
+        Card {
+            Layout.fillWidth: true
+            padding: 20
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                SectionHeader { title: qsTr("Chain bootstrap"); Layout.fillWidth: true }
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    color: Theme.fgMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 12
+                    text: qsTr("Download the official chain snapshot to sync quickly instead of full block download from the network.")
+                }
+                AppButton {
+                    text: qsTr("Import bootstrap…")
+                    enabled: page.bootstrap
+                    onClicked: bootstrapDialog.open()
                 }
             }
         }
@@ -103,5 +156,13 @@ Item {
                 }
             }
         }
+    }
+
+    BootstrapDialog {
+        id: bootstrapDialog
+        coin: page.bootstrap ? page.bootstrap.coin : "verium"
+        bootstrap: page.bootstrap
+        parseJson: page.parseJson
+        node: page.node
     }
 }

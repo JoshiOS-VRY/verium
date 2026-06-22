@@ -47,12 +47,16 @@ Item {
     WalletController     { id: wallet; coin: shell.coin }
     TransactionsController { id: transactions; coin: shell.coin }
     MiningController     { id: mining; coin: shell.coin }
+    PoolMinerController  { id: poolMiner; coin: shell.coin }
     StakingController    { id: staking; coin: shell.coin }
     NetworkController    { id: network; coin: shell.coin }
     ExplorerController   { id: explorer; coin: shell.coin }
     SettingsController   { id: settings }
+    AddressBookController { id: addressBook; coin: shell.coin }
+    SecurityController   { id: security; coin: shell.coin }
     LogsController       { id: logs; coin: shell.coin }
     RpcController        { id: rpc; coin: shell.coin }
+    BootstrapController  { id: bootstrap; coin: shell.coin }
 
     Component.onCompleted: {
         setup.refresh()
@@ -76,19 +80,24 @@ Item {
         wallet.refresh()
         transactions.refresh()
         mining.refresh()
+        if (shell.coin === "verium") poolMiner.detect()
         staking.refresh()
         network.refresh()
         dashboard.refresh()
         walletMode.refresh()
         explorer.refresh()
+        addressBook.refresh()
         logs.refresh()
     }
 
     onCoinChanged: {
         setup.coin = shell.coin
+        addressBook.coin = shell.coin
+        security.coin = shell.coin
         lightWallet.coin = shell.coin
         explorer.coin = shell.coin
         walletMode.coin = shell.coin
+        bootstrap.coin = shell.coin
         if (shell.route === "staking" && shell.coin === "verium")
             shell.route = "mining"
         else if (shell.route === "mining" && shell.coin === "vericoin")
@@ -162,9 +171,24 @@ Item {
                     coin: shell.coin
                     parseJson: shell.parseJson
                 }
-                MiningPage { coin: shell.coin; mining: mining }
+                MiningPage {
+                    coin: shell.coin
+                    mining: mining
+                    poolMiner: poolMiner
+                    node: node
+                    wallet: wallet
+                    settings: settings
+                    walletMode: walletMode
+                    dashboard: dashboard
+                    parseJson: shell.parseJson
+                }
                 StakingPage { coin: shell.coin; staking: staking }
-                NetworkPage { node: node; network: network; parseJson: shell.parseJson }
+                NetworkPage {
+                    node: node
+                    network: network
+                    bootstrap: bootstrap
+                    parseJson: shell.parseJson
+                }
                 PlaceholderPage {
                     title: qsTr("Binary Chain")
                     subtitle: qsTr("DACE binarytest network tools — coming soon in the Qt shell.")
@@ -179,10 +203,19 @@ Item {
                     coin: shell.coin
                     transactions: transactions
                     wallet: wallet
+                    security: security
                     parseJson: shell.parseJson
                 }
-                AddressBookPage {}
-                SecurityPage {}
+                AddressBookPage {
+                    addressBook: addressBook
+                    coin: shell.coin
+                    parseJson: shell.parseJson
+                }
+                SecurityPage {
+                    security: security
+                    coin: shell.coin
+                    parseJson: shell.parseJson
+                }
                 SignVerifyPage { coin: shell.coin; wallet: wallet }
                 RpcConsolePage { rpc: rpc; parseJson: shell.parseJson }
                 LogsPage { logs: logs; parseJson: shell.parseJson }
@@ -194,7 +227,7 @@ Item {
                     coin: shell.coin
                     parseJson: shell.parseJson
                 }
-                SendReceivePage { coin: shell.coin; wallet: wallet }
+                SendReceivePage { coin: shell.coin; wallet: wallet; security: security; parseJson: shell.parseJson }
                 ExplorerPage { coin: shell.coin; explorer: explorer; parseJson: shell.parseJson }
             }
         }

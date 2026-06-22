@@ -1,6 +1,7 @@
 //! Transaction list + cumulative balance series.
 
 use serde_json::Value;
+use vericonomy_chain::types::WalletTx;
 
 use crate::coin::CoinId;
 use crate::context::AppContext;
@@ -22,6 +23,50 @@ impl Default for TransactionList {
             rows: vec![],
             balance_series: vec![],
         }
+    }
+}
+
+pub async fn fetch_transactions(ctx: &AppContext, coin: CoinId) -> HostResult<TransactionList> {
+    if crate::light_session::is_light_mode(coin)? {
+        return list_light_transactions(coin, TRANSACTIONS_LIST_CAP as usize).await;
+    }
+
+    let wallet_result = crate::commands::wallet::get_wallet_info(ctx, coin).await?;
+    let (count, skip) = list_transactions_fetch_params(wallet_result.txcount);
+    if count == 0 {
+        return Ok(TransactionList::default());
+    }
+    list_transactions(ctx, coin, count, skip).await
+}
+
+pub async fn list_light_transactions(coin: CoinId, limit: usize) -> HostResult<TransactionList> {
+    let txs = crate::light_session::light_wallet_list_transactions(coin, limit).await?;
+    let mut rows: Vec<TransactionRow> = txs.iter().map(wallet_tx_to_row).collect();
+    rows.sort_by_key(|r| r.time);
+    let balance_series = build_balance_series(&rows);
+    rows.sort_by(|a, b| b.time.cmp(&a.time).then_with(|| b.txid.cmp(&a.txid)));
+    Ok(TransactionList {
+        rows,
+        balance_series,
+    })
+}
+
+pub fn wallet_tx_to_row(t: &WalletTx) -> TransactionRow {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let time = t.time.map(|u| u as i64).unwrap_or(0);
+    TransactionRow {
+        txid: t.txid.clone(),
+        category: t.category.clone(),
+        amount: t.amount,
+        fee: t.fee_sats.map(vericonomy_hd::sats_to_coins),
+        confirmations: t.confirmations as i64,
+        address: t.address.clone(),
+        time,
+        time_label: format_time_ago(time, now),
+        time_display: format_transaction_time(time),
     }
 }
 

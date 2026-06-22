@@ -9,8 +9,30 @@ Item {
     property string coin: "verium"
     readonly property bool isVerium: coin !== "vericoin"
     readonly property string ticker: isVerium ? "VRM" : "VRC"
+    readonly property int hPad: 16
+    readonly property int colCount: 7
+    readonly property var colWidths: [0.13, 0.13, 0.08, 0.14, 0.10, 0.16, 0.26]
+    readonly property var colAlign: [
+        Text.AlignLeft,
+        Text.AlignRight,
+        Text.AlignRight,
+        Text.AlignRight,
+        Text.AlignRight,
+        Text.AlignRight,
+        Text.AlignLeft
+    ]
+    readonly property var headerLabels: [
+        qsTr("Height"),
+        qsTr("Time"),
+        qsTr("Txs"),
+        qsTr("Out"),
+        qsTr("Size"),
+        qsTr("Difficulty"),
+        qsTr("Extracted by")
+    ]
 
-    implicitWidth: parent ? parent.width : 640
+    readonly property real contentWidth: Math.max(0, width - hPad * 2)
+
     implicitHeight: tableCol.implicitHeight
 
     property int ageTick: 0
@@ -19,6 +41,18 @@ Item {
         running: true
         repeat: true
         onTriggered: panel.ageTick++
+    }
+
+    function cellWidth(colIndex) {
+        if (contentWidth <= 0)
+            return 0
+        if (colIndex === colCount - 1) {
+            var used = 0
+            for (var i = 0; i < colCount - 1; i++)
+                used += Math.floor(contentWidth * colWidths[i])
+            return Math.max(0, contentWidth - used)
+        }
+        return Math.floor(contentWidth * colWidths[colIndex])
     }
 
     function formatBlockAge(unixSeconds) {
@@ -55,29 +89,47 @@ Item {
         return addr.slice(0, 8) + "…" + addr.slice(-6)
     }
 
-    ColumnLayout {
+    function rowValues(block) {
+        return [
+            String(block.height),
+            formatBlockAge(block.time),
+            block.n_tx !== undefined ? String(block.n_tx) : "—",
+            fmtOutput(block),
+            block.size != null ? block.size + " B" : "—",
+            fmtDiff(block.difficulty),
+            shortAddr(block.miner_address)
+        ]
+    }
+
+    Column {
         id: tableCol
-        width: parent.width
+        width: panel.width
         spacing: 0
 
         Rectangle {
-            Layout.fillWidth: true
+            width: parent.width
             height: 36
             color: Theme.bgPanel
+
             Row {
-                anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
+                x: panel.hPad
+                width: panel.contentWidth
+                height: parent.height
                 spacing: 0
-                width: parent.width - 32
-                BlockHeader { label: qsTr("Height"); fw: 0.13; align: Text.AlignLeft }
-                BlockHeader { label: qsTr("Time"); fw: 0.13 }
-                BlockHeader { label: qsTr("Txs"); fw: 0.08 }
-                BlockHeader { label: qsTr("Out"); fw: 0.14 }
-                BlockHeader { label: qsTr("Size"); fw: 0.10 }
-                BlockHeader { label: qsTr("Difficulty"); fw: 0.16 }
-                BlockHeader { label: qsTr("Extracted by"); fw: 0.26; align: Text.AlignLeft }
+
+                Repeater {
+                    model: panel.headerLabels.length
+                    delegate: TableCell {
+                        required property int index
+                        cellW: panel.cellWidth(index)
+                        rowH: 36
+                        text: panel.headerLabels[index].toUpperCase()
+                        header: true
+                        align: panel.colAlign[index]
+                    }
+                }
             }
+
             Rectangle {
                 anchors.bottom: parent.bottom
                 width: parent.width
@@ -95,53 +147,31 @@ Item {
                 height: 44
                 color: index % 2 === 0 ? "transparent"
                     : Qt.rgba(Theme.bgSubtle.r, Theme.bgSubtle.g, Theme.bgSubtle.b, 0.25)
+
                 Row {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
+                    x: panel.hPad
+                    width: panel.contentWidth
+                    height: parent.height
                     spacing: 0
-                    width: parent.width - 32
-                    BlockCell {
-                        value: String(modelData.height)
-                        fw: 0.13
-                        accent: true
-                        bold: true
-                        align: Text.AlignLeft
-                    }
-                    BlockCell {
-                        value: panel.formatBlockAge(modelData.time)
-                        fw: 0.13
-                        muted: true
-                    }
-                    BlockCell {
-                        value: modelData.n_tx !== undefined ? String(modelData.n_tx) : "—"
-                        fw: 0.08
-                        muted: true
-                    }
-                    BlockCell {
-                        value: panel.fmtOutput(modelData)
-                        fw: 0.14
-                        muted: true
-                    }
-                    BlockCell {
-                        value: modelData.size != null ? modelData.size + " B" : "—"
-                        fw: 0.10
-                        muted: true
-                    }
-                    BlockCell {
-                        value: panel.fmtDiff(modelData.difficulty)
-                        fw: 0.16
-                        muted: true
-                        mono: true
-                    }
-                    BlockCell {
-                        value: panel.shortAddr(modelData.miner_address)
-                        fw: 0.26
-                        muted: true
-                        mono: true
-                        align: Text.AlignLeft
+
+                    Repeater {
+                        model: panel.rowValues(modelData)
+                        delegate: TableCell {
+                            required property int index
+                            required property var modelData
+                            cellW: panel.cellWidth(index)
+                            rowH: 44
+                            text: modelData
+                            header: false
+                            align: panel.colAlign[index]
+                            accent: index === 0
+                            bold: index === 0
+                            muted: index !== 0
+                            mono: index === 5 || index === 6
+                        }
                     }
                 }
+
                 Rectangle {
                     anchors.bottom: parent.bottom
                     width: parent.width
@@ -154,45 +184,45 @@ Item {
 
         Text {
             visible: panel.blocks.length === 0
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
             text: qsTr("No blocks returned.")
             color: Theme.fgSubtle
             font.pixelSize: 13
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-            Layout.topMargin: 24
-            Layout.bottomMargin: 24
+            topPadding: 24
+            bottomPadding: 24
         }
     }
 
-    component BlockHeader: Text {
-        property string label: ""
-        property real fw: 0.1
+    component TableCell: Item {
+        property real cellW: 0
+        property int rowH: 44
+        property string text: ""
+        property bool header: false
         property int align: Text.AlignRight
-        width: parent.width * fw
-        text: label.toUpperCase()
-        color: Theme.fgSubtle
-        font.pixelSize: 10
-        font.weight: Font.DemiBold
-        font.letterSpacing: 0.5
-        horizontalAlignment: align
-        elide: Text.ElideRight
-    }
-
-    component BlockCell: Text {
-        property string value: ""
-        property real fw: 0.1
         property bool bold: false
         property bool muted: false
         property bool mono: false
         property bool accent: false
-        property int align: Text.AlignRight
-        width: parent.width * fw
-        text: value
-        color: accent ? Theme.accent : (muted ? Theme.fgMuted : Theme.fg)
-        font.family: mono ? Theme.monoFamily : Theme.fontFamily
-        font.pixelSize: mono ? 11 : 12
-        font.weight: bold ? Font.DemiBold : Font.Normal
-        horizontalAlignment: align
-        elide: Text.ElideRight
+
+        width: cellW
+        height: rowH
+        clip: true
+
+        Text {
+            anchors.fill: parent
+            anchors.rightMargin: parent.align === Text.AlignRight ? 4 : 0
+            anchors.leftMargin: parent.align === Text.AlignLeft ? 0 : 4
+            text: parent.text
+            color: parent.accent ? Theme.accent
+                : (parent.muted ? Theme.fgMuted : (parent.header ? Theme.fgSubtle : Theme.fg))
+            font.family: parent.mono ? Theme.monoFamily : Theme.fontFamily
+            font.pixelSize: parent.header ? 10 : (parent.mono ? 11 : 12)
+            font.weight: parent.bold || parent.header ? Font.DemiBold : Font.Normal
+            font.letterSpacing: parent.header ? 0.5 : 0
+            horizontalAlignment: parent.align
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
     }
 }

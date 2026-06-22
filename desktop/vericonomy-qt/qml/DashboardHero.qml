@@ -192,11 +192,11 @@ Rectangle {
             font.letterSpacing: 0.8
         }
 
-        GridLayout {
+        RowLayout {
             Layout.fillWidth: true
-            columns: 5
-            columnSpacing: 14
+            spacing: 16
             StatTile {
+                Layout.fillWidth: true
                 label: hero.isVerium ? qsTr("Network hashrate") : qsTr("PoS difficulty")
                 value: hero.isVerium
                     ? (hero.snap.network_hash_khm > 0
@@ -204,26 +204,32 @@ Rectangle {
                     : hero.fmtDiff(hero.snap.explorer ? hero.snap.explorer.difficulty : null)
             }
             StatTile {
+                Layout.fillWidth: true
                 visible: hero.isVerium
                 label: qsTr("Difficulty")
                 value: hero.fmtDiff(hero.snap.explorer ? hero.snap.explorer.difficulty : null)
             }
             StatTile {
+                Layout.fillWidth: true
                 visible: !hero.isVerium
                 label: qsTr("Network staked")
                 value: hero.snap.net_stake_weight > 0 && hero.snap.explorer && hero.snap.explorer.supply
                     ? hero.fmt((hero.snap.net_stake_weight / hero.snap.explorer.supply) * 100, 2) + "%" : "—"
             }
             StatTile {
+                Layout.fillWidth: true
                 label: hero.isVerium ? qsTr("Avg. block time") : qsTr("Block time")
                 value: hero.snap.block_time_min > 0
                     ? hero.fmt(hero.snap.block_time_min, 1) + " min" : "—"
             }
             StatTile {
+                Layout.fillWidth: true
                 label: qsTr("Mempool")
-                value: hero.snap.mempool > 0 ? String(hero.snap.mempool) : "—"
+                value: hero.snap.mempool != null && hero.snap.mempool !== undefined
+                    ? String(hero.snap.mempool) : "—"
             }
             StatTile {
+                Layout.fillWidth: true
                 label: qsTr("Peers · ") + (hero.hasText(hero.snap.peer_status) ? hero.snap.peer_status : "Offline")
                 value: hero.snap.connected === true ? String(hero.snap.connections || 0) : "—"
             }

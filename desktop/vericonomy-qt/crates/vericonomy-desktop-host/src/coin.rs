@@ -59,4 +59,48 @@ impl CoinId {
             _ => None,
         }
     }
+
+    pub fn binary_base(self) -> &'static str {
+        match self {
+            CoinId::Verium => "veriumd",
+            CoinId::Vericoin => "vericoind",
+        }
+    }
+
+    pub fn binary_name(self) -> String {
+        if cfg!(target_os = "windows") {
+            format!("{}.exe", self.binary_base())
+        } else {
+            self.binary_base().to_string()
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            CoinId::Verium => "Verium",
+            CoinId::Vericoin => "Vericoin",
+        }
+    }
+
+    pub fn chain_cli_arg(self) -> Option<&'static str> {
+        match self {
+            CoinId::Verium => Some("-verium"),
+            CoinId::Vericoin => Some("-vericoin"),
+        }
+    }
+
+    pub fn symbol(self) -> &'static str {
+        self.ticker()
+    }
+
+    pub fn bootstrap_cdn_base(self) -> &'static str {
+        match self {
+            CoinId::Verium => "https://files.vericonomy.com/vrm/bootstrap",
+            CoinId::Vericoin => "https://files.vericonomy.com/vrc/bootstrap",
+        }
+    }
+
+    pub fn all() -> [CoinId; 2] {
+        [CoinId::Verium, CoinId::Vericoin]
+    }
 }

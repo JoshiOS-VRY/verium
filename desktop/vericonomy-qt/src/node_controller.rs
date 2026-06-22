@@ -40,15 +40,27 @@ pub mod qobject {
         #[qproperty(bool, warmingUp)]
         #[qproperty(bool, loading)]
         #[qproperty(QString, stateLabel)]
+        #[qproperty(QString, daemonMessage)]
+        #[qproperty(bool, daemonRunning)]
         type NodeController = super::NodeControllerRust;
 
-        /// Emitted after every refresh attempt. `ok = false` signals an error.
         #[qsignal]
         fn statusRefreshed(self: Pin<&mut NodeController>, ok: bool);
 
-        /// Called from QML to (re)load node status asynchronously.
+        #[qsignal]
+        fn daemonActionFinished(self: Pin<&mut NodeController>, ok: bool);
+
         #[qinvokable]
         fn refresh(self: Pin<&mut NodeController>);
+
+        #[qinvokable]
+        fn startDaemon(self: Pin<&mut NodeController>);
+
+        #[qinvokable]
+        fn stopDaemon(self: Pin<&mut NodeController>);
+
+        #[qinvokable]
+        fn restartDaemon(self: Pin<&mut NodeController>);
     }
 
     // Opt in to background-thread -> GUI-thread marshalling via `qt_thread()`.
@@ -67,6 +79,8 @@ pub struct NodeControllerRust {
     warmingUp: bool,
     loading: bool,
     stateLabel: QString,
+    daemonMessage: QString,
+    daemonRunning: bool,
 }
 
 impl Default for NodeControllerRust {
@@ -82,6 +96,8 @@ impl Default for NodeControllerRust {
             warmingUp: false,
             loading: false,
             stateLabel: QString::from("…"),
+            daemonMessage: QString::default(),
+            daemonRunning: false,
         }
     }
 }
@@ -103,6 +119,8 @@ impl qobject::NodeController {
         crate::runtime::runtime().spawn(async move {
             let result =
                 vericonomy_desktop_host::commands::node::get_node_status(&ctx, coin).await;
+            let daemon =
+                vericonomy_desktop_host::commands::daemon::daemon_status(&ctx, coin).await;
 
             let _ = qt_thread.queue(move |mut ctrl| {
                 match result {
@@ -125,6 +143,91 @@ impl qobject::NodeController {
                         ctrl.as_mut().set_loading(false);
                         ctrl.as_mut().statusRefreshed(false);
                     }
+                }
+                if let Ok(ds) = daemon {
+                    ctrl.as_mut().set_daemonRunning(ds.running);
+                    if !ds.message.is_empty() {
+                        ctrl.as_mut().set_daemonMessage(QString::from(&ds.message));
+                    }
+                }
+            });
+        });
+    }
+
+    pub fn startDaemon(self: Pin<&mut Self>) {
+        let this = self;
+        let coin = vericonomy_desktop_host::CoinId::parse(&this.coin().to_string())
+            .unwrap_or(vericonomy_desktop_host::CoinId::Verium);
+        let ctx = crate::app_context::context();
+        let qt_thread = this.qt_thread();
+
+        crate::runtime::runtime().spawn(async move {
+            let result =
+                vericonomy_desktop_host::commands::daemon::start_daemon(ctx.as_ref(), coin).await;
+            let _ = qt_thread.queue(move |mut ctrl| match result {
+                Ok(st) => {
+                    ctrl.as_mut().set_daemonRunning(st.running);
+                    ctrl.as_mut()
+                        .set_daemonMessage(QString::from(&st.message));
+                    ctrl.as_mut().daemonActionFinished(true);
+                }
+                Err(e) => {
+                    ctrl.as_mut()
+                        .set_daemonMessage(QString::from(&e.to_string()));
+                    ctrl.as_mut().daemonActionFinished(false);
+                }
+            });
+        });
+    }
+
+    pub fn stopDaemon(self: Pin<&mut Self>) {
+        let this = self;
+        let coin = vericonomy_desktop_host::CoinId::parse(&this.coin().to_string())
+            .unwrap_or(vericonomy_desktop_host::CoinId::Verium);
+        let ctx = crate::app_context::context();
+        let qt_thread = this.qt_thread();
+
+        crate::runtime::runtime().spawn(async move {
+            let result =
+                vericonomy_desktop_host::commands::daemon::stop_daemon(ctx.as_ref(), coin).await;
+            let _ = qt_thread.queue(move |mut ctrl| match result {
+                Ok(()) => {
+                    ctrl.as_mut().set_daemonRunning(false);
+                    ctrl.as_mut()
+                        .set_daemonMessage(QString::from("Daemon stopped"));
+                    ctrl.as_mut().daemonActionFinished(true);
+                }
+                Err(e) => {
+                    ctrl.as_mut()
+                        .set_daemonMessage(QString::from(&e.to_string()));
+                    ctrl.as_mut().daemonActionFinished(false);
+                }
+            });
+        });
+    }
+
+    pub fn restartDaemon(self: Pin<&mut Self>) {
+        let this = self;
+        let coin = vericonomy_desktop_host::CoinId::parse(&this.coin().to_string())
+            .unwrap_or(vericonomy_desktop_host::CoinId::Verium);
+        let ctx = crate::app_context::context();
+        let qt_thread = this.qt_thread();
+
+        crate::runtime::runtime().spawn(async move {
+            let result =
+                vericonomy_desktop_host::commands::daemon::restart_daemon(ctx.as_ref(), coin)
+                    .await;
+            let _ = qt_thread.queue(move |mut ctrl| match result {
+                Ok(st) => {
+                    ctrl.as_mut().set_daemonRunning(st.running);
+                    ctrl.as_mut()
+                        .set_daemonMessage(QString::from(&st.message));
+                    ctrl.as_mut().daemonActionFinished(true);
+                }
+                Err(e) => {
+                    ctrl.as_mut()
+                        .set_daemonMessage(QString::from(&e.to_string()));
+                    ctrl.as_mut().daemonActionFinished(false);
                 }
             });
         });

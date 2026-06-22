@@ -11,18 +11,31 @@
 //! source of truth shared with the native iOS app); this crate orchestrates it
 //! for the desktop.
 
+pub mod auto_lock;
+pub mod bootstrap;
+pub mod bootstrap_session;
 pub mod bridge;
+pub mod chain_layout;
 pub mod coin;
 pub mod commands;
 pub mod config;
 pub mod context;
+pub mod cpuminer_topo;
+pub mod daemon_binary;
 pub mod daemon_config;
+pub mod daemon_manager;
 pub mod error;
 pub mod light_session;
+pub mod hd_wallet_export;
+pub mod send_policy;
+pub mod mining_supervisor;
 pub mod model;
 pub mod os;
 pub mod prefs;
+pub mod receive_requests;
 pub mod rpc;
+pub mod spending_controls;
+pub mod two_factor;
 
 pub use bridge::{DesktopHostBridge, HostBridge, NullHostBridge, SharedHostBridge};
 pub use coin::CoinId;
