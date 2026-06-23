@@ -14,7 +14,7 @@
 // This is the naming convention for every Phase 2 controller.
 #![allow(non_snake_case)]
 
-use cxx_qt::Threading;
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
 
@@ -35,6 +35,8 @@ pub mod qobject {
         #[qproperty(i32, blocks)]
         #[qproperty(i32, headers)]
         #[qproperty(f64, verificationProgress)]
+        #[qproperty(bool, initialBlockDownload)]
+        #[qproperty(i32, medianTime)]
         #[qproperty(i32, connections)]
         #[qproperty(bool, connected)]
         #[qproperty(bool, warmingUp)]
@@ -74,6 +76,8 @@ pub struct NodeControllerRust {
     blocks: i32,
     headers: i32,
     verificationProgress: f64,
+    initialBlockDownload: bool,
+    medianTime: i32,
     connections: i32,
     connected: bool,
     warmingUp: bool,
@@ -81,6 +85,8 @@ pub struct NodeControllerRust {
     stateLabel: QString,
     daemonMessage: QString,
     daemonRunning: bool,
+    refresh_coin: String,
+    refresh_ready: bool,
 }
 
 impl Default for NodeControllerRust {
@@ -91,6 +97,8 @@ impl Default for NodeControllerRust {
             blocks: 0,
             headers: 0,
             verificationProgress: 0.0,
+            initialBlockDownload: false,
+            medianTime: 0,
             connections: 0,
             connected: false,
             warmingUp: false,
@@ -98,6 +106,8 @@ impl Default for NodeControllerRust {
             stateLabel: QString::from("…"),
             daemonMessage: QString::default(),
             daemonRunning: false,
+            refresh_coin: String::new(),
+            refresh_ready: false,
         }
     }
 }
@@ -107,9 +117,19 @@ impl qobject::NodeController {
     /// async task queues its result back onto the GUI thread.
     pub fn refresh(self: Pin<&mut Self>) {
         let mut this = self;
-        this.as_mut().set_loading(true);
+        let coin_key = this.coin().to_string();
+        let mut rust = this.as_mut().rust_mut();
+        let rust = Pin::get_mut(rust);
+        let show_loading = crate::controller_refresh::begin_poll_refresh(
+            &coin_key,
+            &mut rust.refresh_coin,
+            &mut rust.refresh_ready,
+        );
+        if show_loading {
+            this.as_mut().set_loading(true);
+        }
 
-        let coin = vericonomy_desktop_host::CoinId::parse(&this.coin().to_string())
+        let coin = vericonomy_desktop_host::CoinId::parse(&coin_key)
             .unwrap_or(vericonomy_desktop_host::CoinId::Verium);
         let ctx = crate::app_context::context();
 
@@ -130,11 +150,15 @@ impl qobject::NodeController {
                         ctrl.as_mut().set_headers(status.headers as i32);
                         ctrl.as_mut()
                             .set_verificationProgress(status.verification_progress);
+                        ctrl.as_mut()
+                            .set_initialBlockDownload(status.initial_block_download);
+                        ctrl.as_mut().set_medianTime(status.median_time as i32);
                         ctrl.as_mut().set_connections(status.connections as i32);
                         ctrl.as_mut().set_connected(status.connected);
                         ctrl.as_mut().set_warmingUp(status.warming_up);
                         ctrl.as_mut().set_stateLabel(QString::from(&status.state));
                         ctrl.as_mut().set_loading(false);
+                        crate::controller_refresh::mark_poll_ready(&mut Pin::get_mut(ctrl.as_mut().rust_mut()).refresh_ready);
                         ctrl.as_mut().statusRefreshed(true);
                     }
                     Err(_) => {

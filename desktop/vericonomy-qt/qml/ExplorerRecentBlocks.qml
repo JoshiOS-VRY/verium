@@ -89,6 +89,17 @@ Item {
         return addr.slice(0, 8) + "…" + addr.slice(-6)
     }
 
+    function explorerBase() {
+        return "https://explorer.vericonomy.com/" + (coin === "vericoin" ? "vrc" : "vrm")
+    }
+
+    function blockUrl(block) {
+        if (!block) return ""
+        var id = block.hash || block.height
+        if (id === undefined || id === null) return ""
+        return explorerBase() + "/block/" + encodeURIComponent(String(id))
+    }
+
     function rowValues(block) {
         return [
             String(block.height),
@@ -147,6 +158,16 @@ Item {
                 height: 44
                 color: index % 2 === 0 ? "transparent"
                     : Qt.rgba(Theme.bgSubtle.r, Theme.bgSubtle.g, Theme.bgSubtle.b, 0.25)
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        var url = panel.blockUrl(modelData)
+                        if (url.length > 0) HostLinks.open(url)
+                    }
+                }
 
                 Row {
                     x: panel.hPad

@@ -93,6 +93,19 @@ Item {
                         color: Theme.bgSubtle
                         border.color: Theme.border
                         border.width: 1
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                var chain = page.coin === "vericoin" ? "vrc" : "vrm"
+                                var id = modelData.hash || modelData.height
+                                if (id !== undefined)
+                                    HostLinks.open("https://explorer.vericonomy.com/" + chain + "/block/" + encodeURIComponent(String(id)))
+                            }
+                        }
+
                         RowLayout {
                             anchors.fill: parent
                             anchors.margins: 12

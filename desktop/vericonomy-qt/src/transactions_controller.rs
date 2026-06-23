@@ -2,7 +2,7 @@
 
 #![allow(non_snake_case)]
 
-use cxx_qt::Threading;
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
 
@@ -47,6 +47,8 @@ pub struct TransactionsControllerRust {
     historyCapped: bool,
     loading: bool,
     hasError: bool,
+    refresh_coin: String,
+    refresh_ready: bool,
 }
 
 impl Default for TransactionsControllerRust {
@@ -61,6 +63,8 @@ impl Default for TransactionsControllerRust {
             historyCapped: false,
             loading: false,
             hasError: false,
+            refresh_coin: String::new(),
+            refresh_ready: false,
         }
     }
 }
@@ -68,10 +72,18 @@ impl Default for TransactionsControllerRust {
 impl qobject::TransactionsController {
     pub fn refresh(self: Pin<&mut Self>) {
         let mut this = self;
-        this.as_mut().set_loading(true);
-        this.as_mut().set_hasError(false);
-
-        let coin = vericonomy_desktop_host::CoinId::parse(&this.coin().to_string())
+        let coin_key = this.coin().to_string();
+        let mut rust = this.as_mut().rust_mut();
+        let rust = Pin::get_mut(rust);
+        let show_loading = crate::controller_refresh::begin_poll_refresh(
+            &coin_key,
+            &mut rust.refresh_coin,
+            &mut rust.refresh_ready,
+        );
+        if show_loading {
+            this.as_mut().set_loading(true);
+        }
+        let coin = vericonomy_desktop_host::CoinId::parse(&coin_key)
             .unwrap_or(vericonomy_desktop_host::CoinId::Verium);
         let ctx = crate::app_context::context();
         let qt_thread = this.qt_thread();
@@ -101,6 +113,7 @@ impl qobject::TransactionsController {
                             .set_balanceSeriesJson(QString::from(&series_json));
                         ctrl.as_mut().set_loading(false);
                         ctrl.as_mut().set_hasError(false);
+                        crate::controller_refresh::mark_poll_ready(&mut Pin::get_mut(ctrl.as_mut().rust_mut()).refresh_ready);
                         ctrl.as_mut().dataRefreshed(true);
                     }
                     Err(_) => {

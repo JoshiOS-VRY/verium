@@ -4,7 +4,7 @@ import com.vericonomy.verium
 
 // Tauri MiningStatusBanner — sync / immature warnings above mining controls.
 ColumnLayout {
-    id: banner
+    id: root
     property bool syncStalled: false
     property bool chainSynced: true
     property bool ibd: false
@@ -21,14 +21,14 @@ ColumnLayout {
         return Number(n).toLocaleString(Qt.locale(), 'f', 0)
     }
 
-    function banner(text, tone) {
+    function makeItem(text, tone) {
         return { text: text, tone: tone }
     }
 
     readonly property var items: {
         var out = []
         if (syncStalled) {
-            out.push(banner(qsTr("Sync is stalled — check node status on the Network page."), "danger"))
+            out.push(makeItem(qsTr("Sync is stalled — check node status on the Network page."), "danger"))
         } else if (!chainSynced) {
             var msg = ibd
                 ? qsTr("Mining is disabled while the node is syncing")
@@ -39,10 +39,10 @@ ColumnLayout {
             if (blocksBehind > 0)
                 msg += " · ~" + fmt(blocksBehind) + qsTr(" blocks behind")
             msg += ")."
-            out.push(banner(msg, "warning"))
+            out.push(makeItem(msg, "warning"))
         }
         if (immatureBalance > 0) {
-            out.push(banner(
+            out.push(makeItem(
                 qsTr("Pending from recent blocks: ") + immatureBalance.toLocaleString(Qt.locale(), 'f', 4)
                     + qsTr(" VRM (immature)"),
                 "accent"))
@@ -51,7 +51,7 @@ ColumnLayout {
     }
 
     Repeater {
-        model: banner.items
+        model: root.items
         delegate: Rectangle {
             required property var modelData
             Layout.fillWidth: true

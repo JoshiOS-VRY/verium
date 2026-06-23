@@ -6,6 +6,7 @@ rust-version = "1.77"
 description = "Tauri-free desktop host layer: daemon/RPC orchestration + HostBridge contract for the Qt shell. Wraps the shared vericonomy-sdk."
 authors = ["Vericonomy developers"]
 license = "MIT"
+build = "build.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -16,6 +16,7 @@ pub mod mining;
 pub mod network;
 pub mod node;
 pub mod pool;
+pub mod pool_stats;
 pub mod setup;
 pub mod security;
 pub mod staking;

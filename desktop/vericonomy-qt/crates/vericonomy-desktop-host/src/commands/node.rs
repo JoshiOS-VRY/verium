@@ -67,6 +67,10 @@ pub async fn get_node_status(ctx: &AppContext, coin: CoinId) -> HostResult<NodeS
         .get("initialblockdownload")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    let median_time = chain_info
+        .get("mediantime")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let connections = net_info
         .get("connections")
         .and_then(|v| v.as_i64())
@@ -93,6 +97,7 @@ pub async fn get_node_status(ctx: &AppContext, coin: CoinId) -> HostResult<NodeS
         headers,
         verification_progress: progress,
         initial_block_download: ibd,
+        median_time,
         connections,
         state,
     })

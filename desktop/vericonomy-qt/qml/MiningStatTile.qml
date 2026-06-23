@@ -13,18 +13,13 @@ Card {
     property bool highlight: false
 
     padding: 16
+    color: highlight
+        ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.04)
+        : Theme.bgPanel
     border.color: highlight
         ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.35)
         : Theme.border
-    border.width: highlight ? 1 : 1
-
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        visible: highlight
-        color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.04)
-        z: -1
-    }
+    border.width: 1
 
     ColumnLayout {
         spacing: 8

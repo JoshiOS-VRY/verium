@@ -14,7 +14,31 @@ Item {
     property var settings
     property var walletMode
     property var dashboard
+    property var explorer
+    property var poolStats
+    property var soundCtrl
     property var parseJson: function(s, fb) { try { return JSON.parse(s) } catch(e) { return fb || {} } }
+
+    property string revenuePeriod: "day"
+
+    readonly property var explorerStats: page.explorer
+        ? page.parseJson(page.explorer.statsJson, {})
+        : {}
+    readonly property bool minerBooting: {
+        if (!page.minerActive || page.localHashrate > 0) return false
+        var started = page.mining ? page.mining.minerStartedAt : 0
+        if (!started || started <= 0) return page.minerActive
+        return (Date.now() / 1000 - started) < 120
+    }
+    readonly property bool minerLive: page.minerActive || page.minerBooting
+    readonly property real marketPriceUsd: explorerStats.price_usd !== undefined
+        ? explorerStats.price_usd : NaN
+    readonly property bool usingCustomVrmPrice: prefs.mining_vrm_price_usd !== undefined
+        && prefs.mining_vrm_price_usd !== null && Number(prefs.mining_vrm_price_usd) > 0
+    readonly property real revenuePriceUsd: usingCustomVrmPrice
+        ? Number(prefs.mining_vrm_price_usd) : marketPriceUsd
+    readonly property var dailyEstimate: page.estimateDailyMining()
+    readonly property string networkStatsSource: explorerStats.network_hash != null ? "explorer" : "local"
 
     readonly property var prefs: page.settings
         ? page.parseJson(page.settings.prefsJson, {})
@@ -59,8 +83,16 @@ Item {
 
     property var hashSamples: []
 
-    Component.onCompleted: page.refreshMining()
-    onVisibleChanged: if (visible) page.refreshMining()
+    Component.onCompleted: {
+        page.refreshMining()
+        if (page.explorer) page.explorer.refresh()
+    }
+    onVisibleChanged: {
+        if (visible) {
+            page.refreshMining()
+            if (page.explorer) page.explorer.refresh()
+        }
+    }
 
     function refreshMining() {
         if (page.mining) page.mining.refresh()
@@ -77,13 +109,32 @@ Item {
         page.settings.savePrefs(JSON.stringify(p))
     }
 
+    function estimateDailyMining() {
+        var hr = page.localHashrate
+        var networkHs = page.networkHashHs
+        var blocksPerHour = page.mining ? page.mining.blocksPerHour : 0
+        var blockReward = page.mining ? page.mining.blockReward : 0
+        if (hr <= 0 || networkHs <= 0 || blocksPerHour <= 0 || blockReward <= 0)
+            return null
+        var networkHm = networkHs * 60.0
+        var share = hr / networkHm
+        var blocksPerDay = share * blocksPerHour * 24.0
+        var vrmPerDay = blocksPerDay * blockReward
+        var hoursPerBlock = blocksPerDay > 0 ? 24.0 / blocksPerDay : null
+        var priceUsd = page.revenuePriceUsd
+        var priceBtc = page.explorerStats.price_btc
+        return {
+            blocksPerDay: blocksPerDay,
+            vrmPerDay: vrmPerDay,
+            usdPerDay: !isNaN(priceUsd) ? vrmPerDay * priceUsd : null,
+            btcPerDay: priceBtc !== undefined && priceBtc !== null ? vrmPerDay * priceBtc : null,
+            hoursPerBlock: hoursPerBlock
+        }
+    }
+
     function setMiningMode(mode) {
         page.activeMode = mode
         page.savePref("mining_mode", mode)
-        if (mode === "solo" && page.poolMiner && page.poolMiner.running)
-            page.poolMiner.stopPool()
-        if (mode === "pool" && page.minerActive && page.mining)
-            page.mining.stopMiner()
     }
 
     function appendSample(rate) {
@@ -132,7 +183,7 @@ Item {
                     visible: !page.isLight
                     Layout.leftMargin: 24
                     mode: page.activeMode
-                    onModeSelected: (m) => page.setMiningMode(m)
+                    onModePicked: (m) => page.setMiningMode(m)
                 }
 
                 ColumnLayout {
@@ -144,6 +195,9 @@ Item {
                         Layout.fillWidth: true
                         Layout.leftMargin: 24
                         Layout.rightMargin: 24
+                        poolStats: page.poolStats
+                        parseJson: page.parseJson
+                        pollEnabled: page.coin === "verium"
                     }
 
                     PoolMiningControls {
@@ -160,6 +214,8 @@ Item {
                         hashrateHm: poolMiner ? poolMiner.hashrateHm : 0
                         connectionState: poolMiner ? poolMiner.connectionState : ""
                         lastMessage: poolMiner ? poolMiner.lastMessage : ""
+                        acceptedShares: poolMiner ? poolMiner.acceptedShares : 0
+                        rejectedShares: poolMiner ? poolMiner.rejectedShares : 0
                         autoAdjust: page.autoAdjustThreads
                         manualThreads: page.manualThreads
                         suggestedThreads: poolMiner ? poolMiner.suggestedThreads : 2
@@ -169,16 +225,17 @@ Item {
                         onWorkerChanged: (name) => page.savePref("pool_worker_name", name)
                         onAutoAdjustToggled: (v) => page.savePref("auto_adjust_mine_threads", v)
                         onThreadsEdited: (n) => page.savePref("auto_mine_threads", n)
-                        onStartRequested: {
-                            if (!poolMiner) return
+                        onStartRequested: (username) => {
+                            if (!poolMiner || !username || username.length === 0) return
                             if (page.minerActive && page.mining) page.mining.stopMiner()
-                            var addr = prefs.pool_payout_address || ""
-                            var worker = prefs.pool_worker_name || "wallet"
+                            var threads = page.resolvedThreads
+                            if (poolMiner.sidecarFound && !page.chainSynced)
+                                threads = Math.max(1, Math.floor(threads / 2))
                             poolMiner.startPool(
                                 "stratum+tcp://mine.vericonomy.com:3333",
-                                addr.trim(),
-                                worker.trim(),
-                                page.resolvedThreads
+                                username,
+                                "x",
+                                threads
                             )
                         }
                         onStopRequested: if (poolMiner) poolMiner.stopPool()
@@ -232,6 +289,7 @@ Item {
                         Layout.leftMargin: 24
                         Layout.rightMargin: 24
                         active: page.minerActive
+                        minerBooting: page.minerBooting
                         localHashrate: page.localHashrate
                         displayThreads: page.displayThreads
                         chainSynced: page.chainSynced
@@ -248,7 +306,7 @@ Item {
                     }
 
                     MiningHashrateChart {
-                        visible: page.minerActive
+                        visible: page.minerLive
                         Layout.fillWidth: true
                         Layout.leftMargin: 24
                         Layout.rightMargin: 24
@@ -362,13 +420,31 @@ Item {
                         onAutoAdjustToggled: (v) => page.savePref("auto_adjust_mine_threads", v)
                         onThreadsEdited: (n) => page.savePref("auto_mine_threads", n)
                         onAutoMineOnOpenToggled: (v) => page.savePref("auto_mine_on_open", v)
-                        onPlaySoundToggled: (v) => page.savePref("play_sound_on_block_mined", v)
-                        onRewardModeSelected: (m) => page.savePref("mining_reward_address_mode", m)
+                        onPlaySoundToggled: (v) => {
+                            page.savePref("play_sound_on_block_mined", v)
+                            if (v && page.soundCtrl) page.soundCtrl.playBlockChime()
+                        }
+                        onRewardModePicked: (m) => page.savePref("mining_reward_address_mode", m)
                         onRewardAddressEdited: (a) => page.savePref("mining_reward_address", a)
                     }
 
+                    MiningEconomicsCard {
+                        visible: page.dailyEstimate !== null && page.localHashrate > 0
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 24
+                        Layout.rightMargin: 24
+                        dailyEstimate: page.dailyEstimate
+                        revenuePeriod: page.revenuePeriod
+                        marketPriceUsd: page.marketPriceUsd
+                        usingCustomVrmPrice: page.usingCustomVrmPrice
+                        statsSource: page.networkStatsSource
+                        prefs: page.prefs
+                        savePref: page.savePref
+                        onRevenuePeriodPicked: (p) => page.revenuePeriod = p
+                    }
+
                     MiningHashrateChart {
-                        visible: !page.minerActive
+                        visible: !page.minerLive
                         Layout.fillWidth: true
                         Layout.leftMargin: 24
                         Layout.rightMargin: 24

@@ -2,7 +2,7 @@
 
 #![allow(non_snake_case)]
 
-use cxx_qt::Threading;
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
 
@@ -47,6 +47,8 @@ pub struct WalletModeControllerRust {
     lightWalletExists: bool,
     loading: bool,
     lastMessage: QString,
+    refresh_coin: String,
+    refresh_ready: bool,
 }
 
 impl Default for WalletModeControllerRust {
@@ -58,6 +60,8 @@ impl Default for WalletModeControllerRust {
             lightWalletExists: false,
             loading: false,
             lastMessage: QString::default(),
+            refresh_coin: String::new(),
+            refresh_ready: false,
         }
     }
 }
@@ -70,7 +74,17 @@ fn coin_id(coin: &QString) -> vericonomy_desktop_host::CoinId {
 impl qobject::WalletModeController {
     pub fn refresh(self: Pin<&mut Self>) {
         let mut this = self;
-        this.as_mut().set_loading(true);
+        let coin_key = this.coin().to_string();
+        let mut rust = this.as_mut().rust_mut();
+        let rust = Pin::get_mut(rust);
+        let show_loading = crate::controller_refresh::begin_poll_refresh(
+            &coin_key,
+            &mut rust.refresh_coin,
+            &mut rust.refresh_ready,
+        );
+        if show_loading {
+            this.as_mut().set_loading(true);
+        }
         let coin = coin_id(&this.coin());
         let ctx = crate::app_context::context();
         let qt_thread = this.qt_thread();
@@ -86,6 +100,7 @@ impl qobject::WalletModeController {
                     ctrl.as_mut()
                         .set_lightWalletExists(status.light_wallet_exists);
                     ctrl.as_mut().set_loading(false);
+                    crate::controller_refresh::mark_poll_ready(&mut Pin::get_mut(ctrl.as_mut().rust_mut()).refresh_ready);
                     ctrl.as_mut().modeRefreshed(true);
                 }
                 Err(e) => {

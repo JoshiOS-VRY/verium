@@ -9,6 +9,7 @@ Item {
     property string coin: "verium"
     property var transactions
     property var wallet
+    property var walletMode
     property var security
     property var parseJson
     property real feeRate: 0.001
@@ -22,7 +23,22 @@ Item {
 
     property string transferMode: "send"
 
-    Component.onCompleted: if (page.wallet) page.wallet.refreshAddress()
+    Component.onCompleted: {
+        if (page.wallet) page.wallet.refreshAddress()
+        if (page.transactions) page.transactions.refresh()
+    }
+    onVisibleChanged: {
+        if (visible && page.transactions) page.transactions.refresh()
+    }
+
+    // Tauri parity: poll history only while this page is open (not global refreshAll).
+    Timer {
+        interval: page.walletMode && page.walletMode.isLight ? 5000 : 45000
+        running: page.visible && page.wallet && !page.wallet.locked
+        repeat: true
+        onTriggered: if (page.transactions) page.transactions.refresh()
+    }
+
     onCoinChanged: {
         page.transferMode = "send"
         if (page.wallet) page.wallet.refreshAddress()

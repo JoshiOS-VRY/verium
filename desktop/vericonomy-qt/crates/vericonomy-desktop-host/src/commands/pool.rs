@@ -11,6 +11,7 @@ use crate::cpuminer_topo::{cpuminer_recommended_threads, cpuminer_scratchpad_mib
 use crate::daemon_binary::{binary_supports_native_pool_mining, resolve_daemon_binary};
 use crate::error::{HostError, HostResult};
 use crate::mining_supervisor;
+use crate::model::EarnState;
 use crate::rpc::RpcClient;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,9 +170,20 @@ fn rpc_method_missing(err: &HostError) -> bool {
     }
 }
 
-pub async fn stop_pool_miner(_ctx: &AppContext) -> HostResult<()> {
+pub async fn stop_pool_miner(ctx: &AppContext) -> HostResult<()> {
     mining_supervisor::stop().await;
+    stop_in_process_miners(ctx, CoinId::Verium).await;
     Ok(())
+}
+
+/// Stop veriumd solo + in-process pool miners so only one backend submits shares.
+async fn stop_in_process_miners(ctx: &AppContext, coin: CoinId) {
+    if let Some(ep) = ctx.endpoint(coin) {
+        let client = RpcClient::new(ctx.http(), &ep);
+        let _ = client.call("minerstop", json!([])).await;
+        let _ = client.call("poolminerstop", json!([])).await;
+    }
+    ctx.set_earn(coin, EarnState::default());
 }
 
 pub async fn pool_miner_status(ctx: &AppContext, coin: CoinId) -> HostResult<PoolMinerStatus> {
@@ -318,10 +330,7 @@ pub async fn pool_miner_start(
     let _ = auto_ceiling;
 
     if let Some(binary) = sidecar_binary {
-        if let Some(ep) = ctx.endpoint(coin) {
-            let client = RpcClient::new(ctx.http(), &ep);
-            let _ = client.call("minerstop", json!([])).await;
-        }
+        stop_in_process_miners(ctx, coin).await;
         mining_supervisor::start(mining_supervisor::RunConfig {
             binary,
             stratum_url: config.stratum_url.trim().to_string(),
@@ -348,13 +357,14 @@ pub async fn pool_miner_start(
     let Some(ep) = ctx.endpoint(coin) else {
         return Err(HostError::other("Verium node RPC not available"));
     };
+    mining_supervisor::stop().await;
+    let client = RpcClient::new(ctx.http(), &ep);
     let params = json!([
         threads,
         config.stratum_url.trim(),
         config.username.trim(),
         password,
     ]);
-    let client = RpcClient::new(ctx.http(), &ep);
     let _: Value = client.call("poolminerstart", params).await?;
     Ok(())
 }

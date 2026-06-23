@@ -4,9 +4,9 @@ import com.vericonomy.verium
 
 // Tauri MiningModeToggle — solo/pool segmented control.
 Rectangle {
-    id: toggle
+    id: modeToggleRoot
     property string mode: "pool"
-    signal modeSelected(string mode)
+    signal modePicked(string nextMode)
 
     implicitHeight: 40
     implicitWidth: row.implicitWidth + 8
@@ -29,8 +29,8 @@ Rectangle {
                 required property var modelData
                 text: modelData.label
                 size: "sm"
-                variant: toggle.mode === modelData.id ? "primary" : "ghost"
-                onClicked: toggle.modeSelected(modelData.id)
+                variant: modeToggleRoot.mode === modelData.id ? "primary" : "ghost"
+                onClicked: modeToggleRoot.modePicked(modelData.id)
             }
         }
     }

@@ -2,7 +2,7 @@
 
 #![allow(non_snake_case)]
 
-use cxx_qt::Threading;
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use std::pin::Pin;
 
@@ -28,6 +28,7 @@ pub mod qobject {
         #[qproperty(bool, loading)]
         #[qproperty(bool, minerActive)]
         #[qproperty(i32, threads)]
+        #[qproperty(i64, minerStartedAt)]
         #[qproperty(QString, lastMessage)]
         type MiningController = super::MiningControllerRust;
 
@@ -63,7 +64,10 @@ pub struct MiningControllerRust {
     loading: bool,
     minerActive: bool,
     threads: i32,
+    minerStartedAt: i64,
     lastMessage: QString,
+    refresh_coin: String,
+    refresh_ready: bool,
 }
 
 impl Default for MiningControllerRust {
@@ -81,7 +85,10 @@ impl Default for MiningControllerRust {
             loading: false,
             minerActive: false,
             threads: 2,
+            minerStartedAt: 0,
             lastMessage: QString::default(),
+            refresh_coin: String::new(),
+            refresh_ready: false,
         }
     }
 }
@@ -94,12 +101,24 @@ fn coin_id(coin: &QString) -> vericonomy_desktop_host::CoinId {
 impl qobject::MiningController {
     pub fn refresh(self: Pin<&mut Self>) {
         let mut this = self;
-        this.as_mut().set_loading(true);
+        let coin_key = this.coin().to_string();
+        let mut rust = this.as_mut().rust_mut();
+        let rust = Pin::get_mut(rust);
+        let show_loading = crate::controller_refresh::begin_poll_refresh(
+            &coin_key,
+            &mut rust.refresh_coin,
+            &mut rust.refresh_ready,
+        );
+        if show_loading {
+            this.as_mut().set_loading(true);
+        }
         let coin = coin_id(&this.coin());
         let ctx = crate::app_context::context();
         let earn = vericonomy_desktop_host::commands::mining::get_miner_state(&ctx, coin);
         this.as_mut().set_minerActive(earn.active);
         this.as_mut().set_threads(earn.threads as i32);
+        this.as_mut()
+            .set_minerStartedAt(earn.started_at.unwrap_or(0) as i64);
         let qt_thread = this.qt_thread();
 
         crate::runtime::runtime().spawn(async move {
@@ -116,6 +135,7 @@ impl qobject::MiningController {
                     ctrl.as_mut().set_chain(QString::from(&info.chain));
                     ctrl.as_mut().set_warnings(QString::from(&info.warnings));
                     ctrl.as_mut().set_loading(false);
+                    crate::controller_refresh::mark_poll_ready(&mut Pin::get_mut(ctrl.as_mut().rust_mut()).refresh_ready);
                     ctrl.as_mut().miningRefreshed(true);
                 }
                 Err(_) => {
@@ -141,6 +161,8 @@ impl qobject::MiningController {
                     ctrl.as_mut().set_minerActive(state.active);
                     ctrl.as_mut().set_threads(state.threads as i32);
                     ctrl.as_mut()
+                        .set_minerStartedAt(state.started_at.unwrap_or(0) as i64);
+                    ctrl.as_mut()
                         .set_lastMessage(QString::from("Miner started"));
                     ctrl.as_mut().minerStateChanged(true);
                 }
@@ -165,6 +187,7 @@ impl qobject::MiningController {
                 Ok(state) => {
                     ctrl.as_mut().set_minerActive(state.active);
                     ctrl.as_mut().set_threads(state.threads as i32);
+                    ctrl.as_mut().set_minerStartedAt(0);
                     ctrl.as_mut()
                         .set_lastMessage(QString::from("Miner stopped"));
                     ctrl.as_mut().minerStateChanged(true);

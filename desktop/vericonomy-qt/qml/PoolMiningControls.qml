@@ -16,6 +16,8 @@ Card {
     property real hashrateHm: 0
     property string connectionState: ""
     property string lastMessage: ""
+    property int acceptedShares: 0
+    property int rejectedShares: 0
     property bool autoAdjust: true
     property int manualThreads: 2
     property int suggestedThreads: 2
@@ -27,16 +29,22 @@ Card {
     signal workerChanged(string name)
     signal autoAdjustToggled(bool checked)
     signal threadsEdited(int threads)
-    signal startRequested()
+    signal startRequested(string username)
     signal stopRequested()
 
     readonly property string poolUsername: {
-        var addr = payoutAddress.trim()
-        var worker = workerName.trim().length > 0 ? workerName.trim() : "wallet"
+        var addr = payoutField.text.trim()
+        var worker = workerField.text.trim().length > 0 ? workerField.text.trim() : "wallet"
         return addr.length > 0 ? addr + "." + worker : ""
     }
-    readonly property bool canStart: sidecarFound && nodeConnected && payoutAddress.trim().length > 0
+    readonly property bool canStart: sidecarFound && nodeConnected && payoutField.text.trim().length > 0
         && !running && !controlsDisabled
+    readonly property real rejectRate: {
+        var total = acceptedShares + rejectedShares
+        return total > 0 ? rejectedShares / total : 0
+    }
+    readonly property bool showRejectWarning: running && (acceptedShares + rejectedShares) >= 10
+        && rejectRate > 0.05
 
     padding: 20
     border.color: running ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.25) : Theme.border
@@ -82,6 +90,7 @@ Card {
                 font.pixelSize: 12
             }
             TextField {
+                id: payoutField
                 Layout.fillWidth: true
                 text: panel.payoutAddress
                 enabled: !running
@@ -116,6 +125,7 @@ Card {
                     font.pixelSize: 12
                 }
                 TextField {
+                    id: workerField
                     Layout.fillWidth: true
                     text: panel.workerName
                     enabled: !running
@@ -206,6 +216,13 @@ Card {
                     font.family: Theme.fontFamily
                     font.pixelSize: 11
                 }
+                Text {
+                    visible: running && sidecarFound
+                    text: acceptedShares + qsTr(" accepted · ") + rejectedShares + qsTr(" rejected")
+                    color: Theme.fgSubtle
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                }
             }
 
             AppButton {
@@ -218,7 +235,16 @@ Card {
                 visible: !running
                 text: qsTr("Start pool mining")
                 enabled: canStart
-                onClicked: panel.startRequested()
+                onClicked: {
+                    var addr = payoutField.text.trim()
+                    var worker = workerField.text.trim()
+                    if (worker.length === 0)
+                        worker = "wallet"
+                    panel.payoutChanged(addr)
+                    panel.workerChanged(worker)
+                    var username = addr.length > 0 ? addr + "." + worker : ""
+                    panel.startRequested(username)
+                }
             }
         }
 
@@ -228,6 +254,17 @@ Card {
             color: Theme.fgSubtle
             font.family: Theme.fontFamily
             font.pixelSize: 11
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+        }
+
+        Text {
+            visible: showRejectWarning
+            text: qsTr("High reject rate (%1%). Stop pool mining, then restart with auto-adjust threads enabled or a lower thread count if this persists.")
+                .arg((rejectRate * 100).toFixed(1))
+            color: Theme.warning
+            font.family: Theme.fontFamily
+            font.pixelSize: 12
             wrapMode: Text.Wrap
             Layout.fillWidth: true
         }

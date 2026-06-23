@@ -11,6 +11,7 @@ pub struct NodeStatus {
     pub headers: i64,
     pub verification_progress: f64,
     pub initial_block_download: bool,
+    pub median_time: i64,
     pub connections: i64,
     pub state: String,
 }
@@ -96,6 +97,8 @@ pub struct LogLine {
 pub struct EarnState {
     pub active: bool,
     pub threads: u32,
+    #[serde(default)]
+    pub started_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

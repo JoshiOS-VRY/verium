@@ -48,6 +48,7 @@ Item {
     TransactionsController { id: transactions; coin: shell.coin }
     MiningController     { id: mining; coin: shell.coin }
     PoolMinerController  { id: poolMiner; coin: shell.coin }
+    PoolStatsController  { id: poolStats }
     StakingController    { id: staking; coin: shell.coin }
     NetworkController    { id: network; coin: shell.coin }
     ExplorerController   { id: explorer; coin: shell.coin }
@@ -57,6 +58,73 @@ Item {
     LogsController       { id: logs; coin: shell.coin }
     RpcController        { id: rpc; coin: shell.coin }
     BootstrapController  { id: bootstrap; coin: shell.coin }
+    SoundController      { id: soundCtrl }
+
+    property var seenMinedTxids: ({})
+    property bool minedWatcherReady: false
+    property int lastTipBlock: 0
+
+    readonly property var prefs: settings ? shell.parseJson(settings.prefsJson, {}) : {}
+    readonly property bool blockSoundEnabled: prefs.play_sound_on_block_mined === true
+    readonly property bool chainSynced: node.connected && node.verificationProgress >= 0.9999
+        && Math.max(0, Math.max(node.headers, node.blocks) - node.blocks) === 0
+
+    function isMinedCategory(category) {
+        return category === "generate" || category === "immature"
+    }
+
+    function markSeenMinedTxid(txid) {
+        if (!txid || txid.length === 0) return
+        var copy = Object.assign({}, shell.seenMinedTxids)
+        copy[txid] = true
+        shell.seenMinedTxids = copy
+    }
+
+    function seedMinedWatcher(rows) {
+        if (shell.minedWatcherReady) return
+        var nowSec = Date.now() / 1000
+        var graceSec = 180
+        for (var i = 0; i < rows.length; i++) {
+            var tx = rows[i]
+            if (!shell.isMinedCategory(tx.category)) continue
+            var t = tx.time || 0
+            if (t > 0 && nowSec - t > graceSec)
+                shell.markSeenMinedTxid(tx.txid)
+        }
+        shell.minedWatcherReady = true
+    }
+
+    function checkNewMinedBlock() {
+        if (walletMode.isLight || !shell.blockSoundEnabled || !shell.chainSynced) return
+        var rows = shell.parseJson(transactions.rowsJson, [])
+        shell.seedMinedWatcher(rows)
+        for (var i = 0; i < rows.length; i++) {
+            var tx = rows[i]
+            if (!shell.isMinedCategory(tx.category)) continue
+            if (shell.seenMinedTxids[tx.txid]) continue
+            shell.markSeenMinedTxid(tx.txid)
+            soundCtrl.playBlockChime()
+            break
+        }
+    }
+
+    Connections {
+        target: transactions
+        function onDataRefreshed(ok) {
+            if (ok) shell.checkNewMinedBlock()
+        }
+    }
+
+    Connections {
+        target: node
+        function onStatusRefreshed(ok) {
+            if (!ok) return
+            var height = node.blocks
+            if (shell.lastTipBlock > 0 && height > shell.lastTipBlock)
+                transactions.refresh()
+            shell.lastTipBlock = height
+        }
+    }
 
     Component.onCompleted: {
         setup.refresh()
@@ -78,7 +146,6 @@ Item {
     function refreshAll() {
         node.refresh()
         wallet.refresh()
-        transactions.refresh()
         mining.refresh()
         if (shell.coin === "verium") poolMiner.detect()
         staking.refresh()
@@ -86,8 +153,6 @@ Item {
         dashboard.refresh()
         walletMode.refresh()
         explorer.refresh()
-        addressBook.refresh()
-        logs.refresh()
     }
 
     onCoinChanged: {
@@ -98,6 +163,9 @@ Item {
         explorer.coin = shell.coin
         walletMode.coin = shell.coin
         bootstrap.coin = shell.coin
+        shell.seenMinedTxids = ({})
+        shell.minedWatcherReady = false
+        shell.lastTipBlock = 0
         if (shell.route === "staking" && shell.coin === "verium")
             shell.route = "mining"
         else if (shell.route === "mining" && shell.coin === "vericoin")
@@ -168,6 +236,10 @@ Item {
                 DashboardPage {
                     dashboard: dashboard
                     explorer: explorer
+                    node: node
+                    settings: settings
+                    bootstrap: bootstrap
+                    walletMode: walletMode
                     coin: shell.coin
                     parseJson: shell.parseJson
                 }
@@ -175,11 +247,14 @@ Item {
                     coin: shell.coin
                     mining: mining
                     poolMiner: poolMiner
+                    poolStats: poolStats
                     node: node
                     wallet: wallet
                     settings: settings
                     walletMode: walletMode
                     dashboard: dashboard
+                    explorer: explorer
+                    soundCtrl: soundCtrl
                     parseJson: shell.parseJson
                 }
                 StakingPage { coin: shell.coin; staking: staking }
@@ -203,6 +278,7 @@ Item {
                     coin: shell.coin
                     transactions: transactions
                     wallet: wallet
+                    walletMode: walletMode
                     security: security
                     parseJson: shell.parseJson
                 }

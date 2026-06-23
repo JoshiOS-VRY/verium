@@ -29,6 +29,8 @@ pub mod qobject {
         #[qproperty(QString, backend)]
         #[qproperty(QString, connectionState)]
         #[qproperty(QString, lastMessage)]
+        #[qproperty(i32, acceptedShares)]
+        #[qproperty(i32, rejectedShares)]
         type PoolMinerController = super::PoolMinerControllerRust;
 
         #[qsignal]
@@ -73,6 +75,8 @@ pub struct PoolMinerControllerRust {
     backend: QString,
     connectionState: QString,
     lastMessage: QString,
+    acceptedShares: i32,
+    rejectedShares: i32,
 }
 
 impl Default for PoolMinerControllerRust {
@@ -91,6 +95,8 @@ impl Default for PoolMinerControllerRust {
             backend: QString::default(),
             connectionState: QString::from("stopped"),
             lastMessage: QString::default(),
+            acceptedShares: 0,
+            rejectedShares: 0,
         }
     }
 }
@@ -121,6 +127,10 @@ impl qobject::PoolMinerController {
                     ctrl.as_mut().set_poolConnected(st.pool_connected);
                     ctrl.as_mut()
                         .set_connectionState(QString::from(&st.connection_state));
+                    ctrl.as_mut()
+                        .set_acceptedShares(st.accepted_shares as i32);
+                    ctrl.as_mut()
+                        .set_rejectedShares(st.rejected_shares as i32);
                     ctrl.as_mut().set_loading(false);
                     ctrl.as_mut().poolRefreshed(true);
                 }
@@ -220,6 +230,8 @@ impl qobject::PoolMinerController {
                 Ok(()) => {
                     ctrl.as_mut().set_running(false);
                     ctrl.as_mut().set_hashrateHm(0.0);
+                    ctrl.as_mut().set_acceptedShares(0);
+                    ctrl.as_mut().set_rejectedShares(0);
                     ctrl.as_mut()
                         .set_lastMessage(QString::from("Pool miner stopped"));
                     ctrl.as_mut().poolStateChanged(true);

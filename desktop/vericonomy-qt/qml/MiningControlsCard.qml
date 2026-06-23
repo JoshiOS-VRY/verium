@@ -22,8 +22,12 @@ Card {
     signal threadsEdited(int threads)
     signal autoMineOnOpenToggled(bool checked)
     signal playSoundToggled(bool checked)
-    signal rewardModeSelected(string mode)
+    signal rewardModePicked(string nextMode)
     signal rewardAddressEdited(string address)
+
+    function selectRewardMode(nextMode) {
+        card.rewardModePicked(nextMode)
+    }
 
     padding: 20
 
@@ -173,7 +177,7 @@ Card {
                             size: "sm"
                             variant: card.rewardMode === modelData.id ? "primary" : "secondary"
                             enabled: !card.controlsDisabled
-                            onClicked: card.rewardModeSelected(modelData.id)
+                            onClicked: card.selectRewardMode(modelData.id)
                         }
                     }
                 }

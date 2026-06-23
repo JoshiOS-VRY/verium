@@ -31,6 +31,7 @@ pub mod send_policy;
 pub mod mining_supervisor;
 pub mod model;
 pub mod os;
+pub mod pool_api;
 pub mod prefs;
 pub mod receive_requests;
 pub mod rpc;

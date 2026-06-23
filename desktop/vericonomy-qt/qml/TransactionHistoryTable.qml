@@ -26,7 +26,8 @@ Item {
     readonly property int rangeTo: Math.min(totalItems, (effectivePage + 1) * pageSize)
     readonly property var pageRows: allRows.slice(effectivePage * pageSize, rangeTo)
 
-    readonly property bool isLoading: transactions && transactions.loading
+    readonly property bool isInitialLoading: transactions && transactions.loading && totalItems === 0
+    readonly property bool isLoading: isInitialLoading
     readonly property bool isError: transactions && transactions.hasError
     readonly property bool showEmpty: !isLoading && !isError && totalItems === 0
     readonly property bool historyCapped: transactions && transactions.historyCapped

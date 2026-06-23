@@ -205,7 +205,7 @@ Item {
                     }
 
                     Text {
-                        visible: page.addressBook && page.addressBook.loading
+                        visible: page.addressBook && page.addressBook.loading && page.entries.length === 0 && page.draft === null
                         text: qsTr("Loading…")
                         color: Theme.fgMuted
                         font.pixelSize: 13

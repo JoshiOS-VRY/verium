@@ -9,6 +9,16 @@ Item {
     property var parseJson
     readonly property var entries: logs ? parseJson(logs.linesJson, []) : []
 
+    Component.onCompleted: if (page.logs) page.logs.refresh()
+    onVisibleChanged: if (visible && page.logs) page.logs.refresh()
+
+    Timer {
+        interval: 5000
+        running: page.visible
+        repeat: true
+        onTriggered: if (page.logs) page.logs.refresh()
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 24

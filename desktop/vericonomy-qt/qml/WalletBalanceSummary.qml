@@ -12,7 +12,7 @@ Rectangle {
     readonly property string displayName: coin === "vericoin" ? qsTr("Vericoin") : qsTr("Verium")
     readonly property int maturity: coin === "vericoin" ? 500 : 100
 
-    visible: wallet && !wallet.loading
+    visible: wallet !== undefined && wallet !== null
     radius: Theme.radiusMd
     color: Theme.bgSubtle
     border.color: Theme.border

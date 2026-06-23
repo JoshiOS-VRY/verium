@@ -52,9 +52,14 @@ pub async fn miner_start(
         params.push(serde_json::json!(addr));
     }
     let _: serde_json::Value = client.call("minerstart", serde_json::json!(params)).await?;
+    let started_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_secs());
     let state = EarnState {
         active: true,
         threads,
+        started_at,
     };
     ctx.set_earn(coin, state.clone());
     Ok(state)

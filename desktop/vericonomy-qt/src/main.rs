@@ -5,6 +5,7 @@
 //! and no WebView — which is the security goal driving this port.
 
 mod bootstrap_controller;
+mod controller_refresh;
 mod host_events;
 mod addressbook_controller;
 mod app_context;
@@ -12,6 +13,7 @@ mod explorer_controller;
 mod host_links;
 mod logs_controller;
 mod pool_miner_controller;
+mod pool_stats_controller;
 mod mining_controller;
 mod network_controller;
 mod node_controller;
@@ -19,6 +21,7 @@ mod qr_helper;
 mod rpc_controller;
 mod runtime;
 mod settings_controller;
+mod sound_controller;
 mod wallet_mode_controller;
 mod dashboard_controller;
 mod light_wallet_controller;

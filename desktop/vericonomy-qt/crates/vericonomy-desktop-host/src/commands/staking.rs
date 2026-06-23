@@ -57,6 +57,7 @@ pub async fn staking_start(ctx: &AppContext, coin: CoinId) -> HostResult<EarnSta
     let state = EarnState {
         active: true,
         threads: 0,
+        started_at: None,
     };
     ctx.set_earn(coin, state.clone());
     Ok(state)

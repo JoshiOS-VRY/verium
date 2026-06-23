@@ -7,6 +7,10 @@ Item {
     id: page
     property var dashboard
     property var explorer
+    property var node
+    property var settings
+    property var bootstrap
+    property var walletMode
     property string coin: "verium"
     property var parseJson: function(s, fb) { try { return JSON.parse(s) } catch(e) { return fb || {} } }
 
@@ -16,6 +20,9 @@ Item {
     readonly property var blocks: page.explorer
         ? page.parseJson(page.explorer.blocksJson, [])
         : []
+
+    readonly property string explorerBlocksUrl:
+        "https://explorer.vericonomy.com/" + (coin === "vericoin" ? "vrc" : "vrm") + "/"
 
     Component.onCompleted: page.refreshAll()
     onCoinChanged: page.refreshAll()
@@ -29,6 +36,19 @@ Item {
             width: page.width
             spacing: 20
             Item { Layout.preferredHeight: 8; Layout.fillWidth: true }
+
+            BootstrapBanner {
+                Layout.fillWidth: true
+                Layout.leftMargin: 24
+                Layout.rightMargin: 24
+                coin: page.coin
+                node: page.node
+                explorer: page.explorer
+                settings: page.settings
+                bootstrap: page.bootstrap
+                walletMode: page.walletMode
+                parseJson: page.parseJson
+            }
 
             DashboardHero {
                 Layout.fillWidth: true
@@ -68,6 +88,7 @@ Item {
                             text: qsTr("All blocks")
                             variant: "ghost"
                             size: "sm"
+                            onClicked: HostLinks.open(page.explorerBlocksUrl)
                         }
                     }
                     ExplorerRecentBlocks {

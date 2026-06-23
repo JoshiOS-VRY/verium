@@ -6,6 +6,7 @@ import com.vericonomy.verium
 Card {
     id: hero
     property bool active: false
+    property bool minerBooting: false
     property real localHashrate: 0
     property int displayThreads: 2
     property bool chainSynced: true
@@ -19,7 +20,7 @@ Card {
     signal startRequested()
     signal stopRequested()
 
-    readonly property bool live: active
+    readonly property bool live: active || minerBooting
     readonly property bool canStart: chainSynced && !syncStalled && !staticAddressMissing
 
     padding: 20
@@ -66,7 +67,7 @@ Card {
                     }
                     Badge {
                         tone: live ? "success" : "neutral"
-                        text: live ? qsTr("Running") : qsTr("Stopped")
+                        text: minerBooting ? qsTr("Starting…") : (live ? qsTr("Running") : qsTr("Stopped"))
                     }
                 }
 

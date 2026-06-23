@@ -18,7 +18,7 @@ Item {
         ? description
         : qsTr("Enter your wallet passphrase to send or receive %1 and view your transaction history.").arg(ticker)
 
-    readonly property bool showContent: wallet && !wallet.loading && !wallet.missing && !wallet.locked
+    readonly property bool showContent: wallet && !wallet.missing && !wallet.locked
 
     ColumnLayout {
         anchors.fill: parent
